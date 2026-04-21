@@ -37,9 +37,9 @@ if (SpeechRecognition) {
     recognition.onstart = () => {
         isListening = true;
         dom.orb.classList.add('listening');
-        clearTimeout(submitTimer);
-        submitTimer = null;
         if (!isRestarting) {
+            clearTimeout(submitTimer);
+            submitTimer = null;
             fullTranscript = '';
             dom.chat.style.display = 'none';
             dom.orbContainer.style.transform = 'translateY(0)';
@@ -49,7 +49,9 @@ if (SpeechRecognition) {
     };
 
     recognition.onresult = (event) => {
-        // With continuous=false, results[0] is the single clean utterance
+        // New speech detected - cancel any pending submission
+        clearTimeout(submitTimer);
+        submitTimer = null;
         const transcript = event.results[0][0].transcript;
         dom.status.innerText = (fullTranscript + transcript).trim();
     };
