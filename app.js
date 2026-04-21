@@ -174,6 +174,20 @@ dom.input.addEventListener('keypress', (e) => {
     }
 });
 
+// Attempt Auto-Start on Load
+window.addEventListener('load', () => {
+    // Small delay to ensure everything is ready
+    setTimeout(() => {
+        if (recognition && !isListening) {
+            try {
+                recognition.start();
+            } catch (err) {
+                console.log("Auto-start blocked by browser. Awaiting manual tap.");
+            }
+        }
+    }, 1000);
+});
+
 // PWA Install Logic
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
