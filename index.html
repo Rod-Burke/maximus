@@ -18,9 +18,22 @@
                 <div class="logo-sym">✞</div>
                 <h1>Saint Max</h1>
             </div>
+            <div class="header-actions">
+                <button id="history-btn" class="icon-btn" title="Message History">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </button>
+                <button id="email-btn" class="icon-btn" title="Email Last 10">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+            </div>
         </header>
 
-        <main id="response-container">
+        <!-- Main Voice View -->
+        <main id="voice-view">
             <div class="orb-container">
                 <div class="orb" id="voice-trigger">
                     <div class="orb-core"></div>
@@ -33,6 +46,21 @@
                 <!-- AI Responses appear here -->
             </div>
         </main>
+
+        <!-- History Panel (hidden by default) -->
+        <div id="history-panel" class="history-panel hidden">
+            <div class="history-header">
+                <h2>Message History</h2>
+                <button id="close-history" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Messages populated by JS -->
+            </div>
+        </div>
 
         <footer>
             <div class="input-tray">

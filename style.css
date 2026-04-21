@@ -32,14 +32,14 @@ body {
 }
 
 header {
-    padding: 2rem 1.5rem 1rem;
+    padding: 1.5rem 1.5rem 0.5rem;
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .logo {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
 }
@@ -58,15 +58,44 @@ h1 {
     opacity: 0.8;
 }
 
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.icon-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.icon-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 main {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 1.5rem;
-    gap: 2rem;
+    padding: 1rem 1.5rem;
+    gap: 1.5rem;
     position: relative;
+    overflow-y: auto;
 }
 
 /* --- THE ORB --- */
@@ -74,13 +103,13 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1rem;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .orb {
-    width: 140px;
-    height: 140px;
+    width: 120px;
+    height: 120px;
     position: relative;
     cursor: pointer;
     z-index: 10;
@@ -91,8 +120,8 @@ main {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     background: radial-gradient(circle, var(--accent-gold), #d97706);
     border-radius: 50%;
     box-shadow: 
@@ -130,9 +159,12 @@ main {
 }
 
 #status-text {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     opacity: 0.5;
     font-weight: 300;
+    text-align: center;
+    max-width: 300px;
+    word-wrap: break-word;
 }
 
 /* --- CHAT OUTPUT --- */
@@ -142,12 +174,20 @@ main {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 1.5rem;
+    border-radius: 16px;
+    padding: 1rem;
     font-weight: 300;
     line-height: 1.6;
-    display: none; /* Shown via JS */
+    font-size: 0.9rem;
+    display: none;
     animation: fade-up 0.5s ease-out;
+}
+
+.chat-output .debug-line {
+    font-size: 0.7rem;
+    opacity: 0.4;
+    margin-top: 0.5rem;
+    font-style: italic;
 }
 
 @keyframes fade-up {
@@ -155,10 +195,124 @@ main {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* --- HISTORY PANEL --- */
+.history-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-color);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    animation: slide-up 0.3s ease-out;
+}
+
+@keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.history-header h2 {
+    font-weight: 300;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1rem;
+}
+
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.history-item {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+    animation: fade-up 0.3s ease-out;
+}
+
+.history-item .thought-content {
+    font-weight: 300;
+    line-height: 1.5;
+    font-size: 0.9rem;
+    padding-right: 2rem;
+}
+
+.history-item .thought-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    opacity: 0.4;
+}
+
+.history-item .thought-type {
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--accent-gold);
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+
+.history-item .delete-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--accent-red);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.history-item .delete-btn:active {
+    background: rgba(239, 68, 68, 0.4);
+}
+
+.history-item .delete-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.history-item.deleting {
+    opacity: 0.3;
+    transform: scale(0.95);
+    transition: all 0.3s;
+}
+
+.history-empty {
+    text-align: center;
+    opacity: 0.3;
+    padding: 3rem;
+    font-weight: 300;
+}
+
 /* --- FOOTER / INPUT --- */
 footer {
-    padding: 1.5rem;
-    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+    padding: 1rem 1.5rem;
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 
 .input-tray {
@@ -166,7 +320,7 @@ footer {
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(10px);
     border-radius: 30px;
-    padding: 0.5rem 0.5rem 0.5rem 1.5rem;
+    padding: 0.4rem 0.4rem 0.4rem 1.2rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -178,13 +332,13 @@ input {
     border: none;
     color: white;
     font-family: inherit;
-    font-size: 1rem;
+    font-size: 0.95rem;
     outline: none;
 }
 
 button#send-btn {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     background: var(--accent-gold);
     border: none;
@@ -201,8 +355,8 @@ button#send-btn:active {
 }
 
 button#send-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 /* --- UTILS --- */
