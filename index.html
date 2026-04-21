@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Saint Max</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-sym">✞</div>
+                <h1>Saint Max</h1>
+            </div>
+        </header>
+
+        <main id="response-container">
+            <div class="orb-container">
+                <div class="orb" id="voice-trigger">
+                    <div class="orb-core"></div>
+                    <div class="orb-ring"></div>
+                </div>
+                <p id="status-text">Tap to speak to Maximus</p>
+            </div>
+            
+            <div id="chat-output" class="chat-output">
+                <!-- AI Responses appear here -->
+            </div>
+        </main>
+
+        <footer>
+            <div class="input-tray">
+                <input type="text" id="text-input" placeholder="Type a thought..." autocomplete="off">
+                <button id="send-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- PWA Installation Prompt (Custom) -->
+    <div id="install-banner" class="banner hidden">
+        <p>Add Maximus to your home screen</p>
+        <button id="install-btn">Install</button>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
