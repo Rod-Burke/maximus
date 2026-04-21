@@ -16,10 +16,12 @@ const dom = {
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
+let silenceTimer = null;
+const SILENCE_THRESHOLD = 2500; // 2.5 seconds of silence before auto-submitting
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true; // Stay alive even when user pauses
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
@@ -38,6 +40,12 @@ if (SpeechRecognition) {
             .join('');
         
         dom.status.innerText = transcript;
+
+        // Reset the silence timer every time the user speaks
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+            if (isListening) recognition.stop();
+        }, SILENCE_THRESHOLD);
     };
 
     recognition.onend = () => {
