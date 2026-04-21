@@ -26,16 +26,18 @@ let isListening = false;
 let fullTranscript = '';
 let submitTimer = null;
 let isRestarting = false;
+let sessionHadResults = false;  // Track if THIS session produced speech
 const SUBMIT_DELAY = 2500;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = false;  // KEY FIX: single utterance mode for Android
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
         isListening = true;
+        sessionHadResults = false;
         dom.orb.classList.add('listening');
         if (!isRestarting) {
             clearTimeout(submitTimer);
@@ -49,7 +51,7 @@ if (SpeechRecognition) {
     };
 
     recognition.onresult = (event) => {
-        // New speech detected - cancel any pending submission
+        sessionHadResults = true;
         clearTimeout(submitTimer);
         submitTimer = null;
         const transcript = event.results[0][0].transcript;
@@ -58,13 +60,13 @@ if (SpeechRecognition) {
 
     recognition.onend = () => {
         isListening = false;
-        const currentDisplay = dom.status.innerText;
 
-        if (currentDisplay && currentDisplay !== 'Listening...' && currentDisplay !== 'Tap to speak to Maximus') {
+        if (sessionHadResults) {
+            // This session had real speech - update transcript and set timer
+            const currentDisplay = dom.status.innerText;
             fullTranscript = currentDisplay + ' ';
-            dom.orb.classList.add('listening'); // Keep orb glowing
+            dom.orb.classList.add('listening');
 
-            // Submit after silence
             submitTimer = setTimeout(() => {
                 const text = fullTranscript.trim();
                 fullTranscript = '';
@@ -73,22 +75,22 @@ if (SpeechRecognition) {
                 if (text) askMaximus(text);
             }, SUBMIT_DELAY);
 
-            // Auto-restart to catch more speech
+            // Restart to catch more speech
             setTimeout(() => {
                 if (submitTimer) {
                     isRestarting = true;
                     try { recognition.start(); } catch (e) {
-                        clearTimeout(submitTimer);
-                        submitTimer = null;
-                        const text = fullTranscript.trim();
-                        fullTranscript = '';
-                        dom.orb.classList.remove('listening');
-                        if (text) askMaximus(text);
+                        // Can't restart - let the timer fire
                     }
                 }
             }, 300);
+
+        } else if (fullTranscript.trim() && submitTimer) {
+            // Silent session but we have pending text - DON'T restart again
+            // Just let the existing submit timer fire naturally
+
         } else if (!fullTranscript.trim()) {
-            fullTranscript = '';
+            // Nothing at all
             dom.status.innerText = 'Tap to speak to Maximus';
             dom.orb.classList.remove('listening');
         }
@@ -99,15 +101,7 @@ if (SpeechRecognition) {
             dom.status.innerText = 'Error: ' + event.error;
         }
         isListening = false;
-        // If we were restarting and got no-speech, just submit what we have
-        if (event.error === 'no-speech' && fullTranscript.trim()) {
-            clearTimeout(submitTimer);
-            submitTimer = null;
-            const text = fullTranscript.trim();
-            fullTranscript = '';
-            dom.orb.classList.remove('listening');
-            askMaximus(text);
-        }
+        // no-speech during a silent restart - let the timer fire
     };
 }
 
