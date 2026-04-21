@@ -19,350 +19,242 @@ const dom = {
     historyList: document.getElementById('history-list')
 };
 
-// --- VOICE LOGIC ---
+// --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
-let silenceTimer = null;
-let finalTranscript = '';  // Accumulates ONLY finalized speech segments
-const SILENCE_THRESHOLD = 2500;
+let fullTranscript = '';
+let submitTimer = null;
+let isRestarting = false;
+const SUBMIT_DELAY = 2500;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous = false;  // KEY FIX: single utterance mode for Android
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
         isListening = true;
-        finalTranscript = '';  // Reset for this new listening session
         dom.orb.classList.add('listening');
-        dom.status.innerText = 'Listening...';
-        dom.chat.style.display = 'none';
-        dom.orbContainer.style.transform = 'translateY(0)';
+        clearTimeout(submitTimer);
+        submitTimer = null;
+        if (!isRestarting) {
+            fullTranscript = '';
+            dom.chat.style.display = 'none';
+            dom.orbContainer.style.transform = 'translateY(0)';
+        }
+        isRestarting = false;
+        if (!fullTranscript) dom.status.innerText = 'Listening...';
     };
 
     recognition.onresult = (event) => {
-        // Properly separate FINAL (committed) results from INTERIM (in-progress) ones
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const segment = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalTranscript += segment + ' ';
-            } else {
-                interimTranscript = segment;
-            }
-        }
-
-        // Display: show finalized text + whatever the user is currently saying
-        const displayText = (finalTranscript + interimTranscript).trim();
-        if (displayText) {
-            dom.status.innerText = displayText;
-        }
-
-        // Reset the silence timer every time new speech is detected
-        clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(() => {
-            if (isListening) recognition.stop();
-        }, SILENCE_THRESHOLD);
+        // With continuous=false, results[0] is the single clean utterance
+        const transcript = event.results[0][0].transcript;
+        dom.status.innerText = (fullTranscript + transcript).trim();
     };
 
     recognition.onend = () => {
         isListening = false;
-        dom.orb.classList.remove('listening');
-        clearTimeout(silenceTimer);
+        const currentDisplay = dom.status.innerText;
 
-        // Use the accumulated FINAL transcript for submission
-        const text = finalTranscript.trim();
-        if (text) {
-            askMaximus(text);
-        } else {
+        if (currentDisplay && currentDisplay !== 'Listening...' && currentDisplay !== 'Tap to speak to Maximus') {
+            fullTranscript = currentDisplay + ' ';
+            dom.orb.classList.add('listening'); // Keep orb glowing
+
+            // Submit after silence
+            submitTimer = setTimeout(() => {
+                const text = fullTranscript.trim();
+                fullTranscript = '';
+                submitTimer = null;
+                dom.orb.classList.remove('listening');
+                if (text) askMaximus(text);
+            }, SUBMIT_DELAY);
+
+            // Auto-restart to catch more speech
+            setTimeout(() => {
+                if (submitTimer) {
+                    isRestarting = true;
+                    try { recognition.start(); } catch (e) {
+                        clearTimeout(submitTimer);
+                        submitTimer = null;
+                        const text = fullTranscript.trim();
+                        fullTranscript = '';
+                        dom.orb.classList.remove('listening');
+                        if (text) askMaximus(text);
+                    }
+                }
+            }, 300);
+        } else if (!fullTranscript.trim()) {
+            fullTranscript = '';
             dom.status.innerText = 'Tap to speak to Maximus';
+            dom.orb.classList.remove('listening');
         }
     };
 
     recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        if (event.error !== 'aborted') {
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
             dom.status.innerText = 'Error: ' + event.error;
         }
         isListening = false;
-        dom.orb.classList.remove('listening');
+        // If we were restarting and got no-speech, just submit what we have
+        if (event.error === 'no-speech' && fullTranscript.trim()) {
+            clearTimeout(submitTimer);
+            submitTimer = null;
+            const text = fullTranscript.trim();
+            fullTranscript = '';
+            dom.orb.classList.remove('listening');
+            askMaximus(text);
+        }
     };
 }
 
 function startListening() {
     if (!SpeechRecognition) {
-        alert("Your browser does not support voice recognition. Please try Chrome on Android.");
+        alert("Voice not supported. Please use Chrome.");
         return;
     }
     if (isListening) return;
-    try {
-        recognition.start();
-    } catch (err) {
-        console.log("Could not start recognition:", err.message);
-    }
+    try { recognition.start(); } catch (e) { console.log("Start failed:", e.message); }
 }
 
-// --- API LOGIC ---
+// --- API ---
 async function askMaximus(text) {
     dom.status.innerText = 'Consulting Maximus...';
-
     try {
-        const response = await fetch(CONFIG.ENDPOINT, {
+        const res = await fetch(CONFIG.ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-brain-key': CONFIG.KEY
-            },
-            body: JSON.stringify({ text: text })
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ text })
         });
-
-        const data = await response.json();
-        const answer = data.text || "I'm sorry, I couldn't reach your brain.";
-        const debug = data.debug || {};
-
-        displayResponse(answer, debug);
+        const data = await res.json();
+        const answer = data.text || "Couldn't reach your brain.";
+        displayResponse(answer, data.debug || {});
         speakResponse(answer);
-
-    } catch (error) {
-        console.error(error);
-        displayResponse("There was an error connecting to Maximus.", {});
+    } catch (e) {
+        console.error(e);
+        displayResponse("Error connecting to Maximus.", {});
     }
 }
 
 function displayResponse(text, debug) {
     dom.status.innerText = 'Tap to speak to Maximus';
-
     let html = `<div>${text}</div>`;
-    if (debug && debug.received) {
-        html += `<div class="debug-line">Sent: "${debug.received}" → Routed as: ${debug.mode || '?'}</div>`;
+    if (debug.received) {
+        html += `<div class="debug-line">Sent: "${debug.received}" → ${debug.mode}</div>`;
     }
-
     dom.chat.innerHTML = html;
     dom.chat.style.display = 'block';
     dom.orbContainer.style.transform = 'translateY(-15px)';
 }
 
-// --- TTS LOGIC ---
+// --- TTS ---
 function speakResponse(text) {
-    if (!('speechSynthesis' in window)) {
-        setTimeout(() => startListening(), 2000);
-        return;
-    }
-
+    if (!('speechSynthesis' in window)) { setTimeout(startListening, 2000); return; }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    let voices = window.speechSynthesis.getVoices();
-
-    const findBestVoice = () => {
-        voices = window.speechSynthesis.getVoices();
-        return voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Neural'))) ||
-               voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
-               voices.find(v => v.lang.startsWith('en')) ||
-               voices[0];
-    };
-
-    const bestVoice = findBestVoice();
-    if (bestVoice) {
-        console.log('Selected Voice:', bestVoice.name);
-        utterance.voice = bestVoice;
-    }
-
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-
-    // AUTO-RESTART LISTENING after Maximus finishes speaking
-    utterance.onend = () => {
-        setTimeout(() => startListening(), 800);
-    };
-
-    window.speechSynthesis.speak(utterance);
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const best = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Neural'))) ||
+                 voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+                 voices.find(v => v.lang.startsWith('en')) || voices[0];
+    if (best) u.voice = best;
+    u.rate = 0.95;
+    u.onend = () => setTimeout(startListening, 800);
+    window.speechSynthesis.speak(u);
 }
+window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 
-window.speechSynthesis.onvoiceschanged = () => {
-    window.speechSynthesis.getVoices();
-};
-
-// --- EVENT LISTENERS ---
+// --- EVENTS ---
 dom.orb.addEventListener('click', () => {
-    if (isListening) {
-        recognition.stop();
-    } else {
-        startListening();
-    }
+    if (isListening || submitTimer) {
+        clearTimeout(submitTimer); submitTimer = null;
+        try { recognition.stop(); } catch(e) {}
+        isListening = false;
+        dom.orb.classList.remove('listening');
+        const text = fullTranscript.trim();
+        fullTranscript = '';
+        if (text && text !== 'Listening...' && text !== 'Tap to speak to Maximus') askMaximus(text);
+        else dom.status.innerText = 'Tap to speak to Maximus';
+    } else { startListening(); }
 });
 
 dom.send.addEventListener('click', () => {
-    const text = dom.input.value.trim();
-    if (text) {
-        dom.input.value = '';
-        askMaximus(text);
-    }
+    const t = dom.input.value.trim();
+    if (t) { dom.input.value = ''; askMaximus(t); }
 });
+dom.input.addEventListener('keypress', (e) => { if (e.key === 'Enter') dom.send.click(); });
 
-dom.input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        dom.send.click();
-    }
-});
-
-// --- HISTORY PANEL ---
-dom.historyBtn.addEventListener('click', () => {
-    dom.historyPanel.classList.remove('hidden');
-    loadHistory();
-});
-
-dom.closeHistory.addEventListener('click', () => {
-    dom.historyPanel.classList.add('hidden');
-});
+// --- HISTORY ---
+dom.historyBtn.addEventListener('click', () => { dom.historyPanel.classList.remove('hidden'); loadHistory(); });
+dom.closeHistory.addEventListener('click', () => dom.historyPanel.classList.add('hidden'));
 
 async function loadHistory() {
     dom.historyList.innerHTML = '<div class="history-empty">Loading...</div>';
-
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-brain-key': CONFIG.KEY
-            },
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
             body: JSON.stringify({ action: 'list', limit: 30 })
         });
         const data = await res.json();
-
-        if (!data.thoughts || data.thoughts.length === 0) {
-            dom.historyList.innerHTML = '<div class="history-empty">No thoughts captured yet.</div>';
-            return;
-        }
-
+        if (!data.thoughts?.length) { dom.historyList.innerHTML = '<div class="history-empty">No thoughts yet.</div>'; return; }
         dom.historyList.innerHTML = '';
-        data.thoughts.forEach(thought => {
-            const date = new Date(thought.created_at);
-            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            const meta = thought.payload?.metadata || {};
-            const type = meta.type || 'thought';
-
+        data.thoughts.forEach(t => {
+            const d = new Date(t.created_at);
+            const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const type = t.payload?.metadata?.type || 'thought';
             const el = document.createElement('div');
             el.className = 'history-item';
-            el.dataset.id = thought.id;
-            el.innerHTML = `
-                <div class="thought-content">${thought.content}</div>
-                <div class="thought-meta">
-                    <span>${dateStr}</span>
-                    <span class="thought-type">${type}</span>
-                </div>
-                <button class="delete-btn" title="Delete this thought">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                </button>
-            `;
-
-            el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(thought.id, el));
+            el.innerHTML = `<div class="thought-content">${t.content}</div>
+                <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}</span></div>
+                <button class="delete-btn" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+            el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
             dom.historyList.appendChild(el);
         });
-
-    } catch (err) {
-        dom.historyList.innerHTML = '<div class="history-empty">Error loading history.</div>';
-        console.error(err);
-    }
+    } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading.</div>'; }
 }
 
-async function deleteThought(id, element) {
+async function deleteThought(id, el) {
     if (!confirm('Delete this thought?')) return;
-
-    element.classList.add('deleting');
-
+    el.classList.add('deleting');
     try {
         await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-brain-key': CONFIG.KEY
-            },
-            body: JSON.stringify({ action: 'delete', id: id })
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'delete', id })
         });
-        element.remove();
-    } catch (err) {
-        element.classList.remove('deleting');
-        alert('Failed to delete. Please try again.');
-    }
+        el.remove();
+    } catch (e) { el.classList.remove('deleting'); alert('Delete failed.'); }
 }
 
-// --- EMAIL EXPORT ---
+// --- EMAIL ---
 dom.emailBtn.addEventListener('click', async () => {
     dom.emailBtn.style.opacity = '0.3';
-
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-brain-key': CONFIG.KEY
-            },
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
             body: JSON.stringify({ action: 'list', limit: 10 })
         });
         const data = await res.json();
-
-        if (!data.thoughts || data.thoughts.length === 0) {
-            alert('No thoughts to email.');
-            dom.emailBtn.style.opacity = '1';
-            return;
-        }
-
+        if (!data.thoughts?.length) { alert('No thoughts to email.'); dom.emailBtn.style.opacity = '1'; return; }
         let body = 'Last 10 Maximus Brain Entries:\n\n';
         data.thoughts.forEach((t, i) => {
-            const date = new Date(t.created_at);
-            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const meta = t.payload?.metadata || {};
-            body += `${i + 1}. [${dateStr}] (${meta.type || 'thought'})\n`;
-            body += `   ${t.content}\n\n`;
+            const d = new Date(t.created_at);
+            const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            body += `${i+1}. [${ds}] (${t.payload?.metadata?.type || 'thought'})\n   ${t.content}\n\n`;
         });
-
-        const subject = encodeURIComponent('Maximus Brain Export - ' + new Date().toLocaleDateString());
-        const encodedBody = encodeURIComponent(body);
-        window.location.href = `mailto:${CONFIG.EMAIL}?subject=${subject}&body=${encodedBody}`;
-
-    } catch (err) {
-        alert('Error fetching thoughts for email.');
-        console.error(err);
-    }
+        window.location.href = `mailto:${CONFIG.EMAIL}?subject=${encodeURIComponent('Maximus Export - ' + new Date().toLocaleDateString())}&body=${encodeURIComponent(body)}`;
+    } catch (e) { alert('Error fetching thoughts.'); }
     dom.emailBtn.style.opacity = '1';
 });
 
-// --- AUTO-START ON LOAD ---
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        if (recognition && !isListening) {
-            try {
-                recognition.start();
-            } catch (err) {
-                console.log("Auto-start blocked by browser. Awaiting manual tap.");
-            }
-        }
-    }, 1000);
-});
+// --- AUTO-START ---
+window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });
 
-// PWA Install Logic
+// --- PWA ---
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('install-banner').classList.remove('hidden');
-});
-
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('install-banner').classList.remove('hidden'); });
 document.getElementById('install-btn').addEventListener('click', () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                document.getElementById('install-banner').classList.add('hidden');
-            }
-            deferredPrompt = null;
-        });
-    }
+    if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(r => { if (r.outcome === 'accepted') document.getElementById('install-banner').classList.add('hidden'); deferredPrompt = null; }); }
 });
