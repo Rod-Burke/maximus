@@ -24,7 +24,8 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition = null;
 let isListening = false;
 let silenceTimer = null;
-const SILENCE_THRESHOLD = 2500; // 2.5 seconds of silence before auto-submitting
+let finalTranscript = '';  // Accumulates ONLY finalized speech segments
+const SILENCE_THRESHOLD = 2500;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -34,6 +35,7 @@ if (SpeechRecognition) {
 
     recognition.onstart = () => {
         isListening = true;
+        finalTranscript = '';  // Reset for this new listening session
         dom.orb.classList.add('listening');
         dom.status.innerText = 'Listening...';
         dom.chat.style.display = 'none';
@@ -41,14 +43,25 @@ if (SpeechRecognition) {
     };
 
     recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join('');
+        // Properly separate FINAL (committed) results from INTERIM (in-progress) ones
+        let interimTranscript = '';
 
-        dom.status.innerText = transcript;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const segment = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += segment + ' ';
+            } else {
+                interimTranscript = segment;
+            }
+        }
 
-        // Reset the silence timer every time the user speaks
+        // Display: show finalized text + whatever the user is currently saying
+        const displayText = (finalTranscript + interimTranscript).trim();
+        if (displayText) {
+            dom.status.innerText = displayText;
+        }
+
+        // Reset the silence timer every time new speech is detected
         clearTimeout(silenceTimer);
         silenceTimer = setTimeout(() => {
             if (isListening) recognition.stop();
@@ -59,8 +72,10 @@ if (SpeechRecognition) {
         isListening = false;
         dom.orb.classList.remove('listening');
         clearTimeout(silenceTimer);
-        const text = dom.status.innerText;
-        if (text && text !== 'Listening...' && text !== 'Tap to speak to Maximus') {
+
+        // Use the accumulated FINAL transcript for submission
+        const text = finalTranscript.trim();
+        if (text) {
             askMaximus(text);
         } else {
             dom.status.innerText = 'Tap to speak to Maximus';
@@ -69,7 +84,6 @@ if (SpeechRecognition) {
 
     recognition.onerror = (event) => {
         console.error('Speech recognition error', event.error);
-        // Don't show "aborted" errors (happens during normal stop/restart cycles)
         if (event.error !== 'aborted') {
             dom.status.innerText = 'Error: ' + event.error;
         }
@@ -134,7 +148,6 @@ function displayResponse(text, debug) {
 // --- TTS LOGIC ---
 function speakResponse(text) {
     if (!('speechSynthesis' in window)) {
-        // If no TTS, auto-restart listening after a short delay
         setTimeout(() => startListening(), 2000);
         return;
     }
