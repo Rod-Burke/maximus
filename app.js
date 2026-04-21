@@ -111,6 +111,7 @@ function startListening() {
         return;
     }
     if (isListening) return;
+    if (isSpeaking) return;  // Don't start while Maximus is talking
     try { recognition.start(); } catch (e) { console.log("Start failed:", e.message); }
 }
 
@@ -145,8 +146,15 @@ function displayResponse(text, debug) {
 }
 
 // --- TTS ---
+let isSpeaking = false;
 function speakResponse(text) {
     if (!('speechSynthesis' in window)) { setTimeout(startListening, 2000); return; }
+    // Stop listening so the mic doesn't pick up our own voice
+    isSpeaking = true;
+    try { recognition.stop(); } catch(e) {}
+    clearTimeout(submitTimer); submitTimer = null;
+    fullTranscript = '';
+
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
@@ -155,7 +163,10 @@ function speakResponse(text) {
                  voices.find(v => v.lang.startsWith('en')) || voices[0];
     if (best) u.voice = best;
     u.rate = 0.95;
-    u.onend = () => setTimeout(startListening, 800);
+    u.onend = () => {
+        isSpeaking = false;
+        setTimeout(startListening, 1500); // Longer delay to avoid echo
+    };
     window.speechSynthesis.speak(u);
 }
 window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -198,7 +209,7 @@ async function loadHistory() {
         data.thoughts.forEach(t => {
             const d = new Date(t.created_at);
             const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const type = t.payload?.metadata?.type || 'thought';
+            const type = t.metadata?.type || 'thought';
             const el = document.createElement('div');
             el.className = 'history-item';
             el.innerHTML = `<div class="thought-content">${t.content}</div>
@@ -238,7 +249,7 @@ dom.emailBtn.addEventListener('click', async () => {
         data.thoughts.forEach((t, i) => {
             const d = new Date(t.created_at);
             const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            body += `${i+1}. [${ds}] (${t.payload?.metadata?.type || 'thought'})\n   ${t.content}\n\n`;
+            body += `${i+1}. [${ds}] (${t.metadata?.type || 'thought'})\n   ${t.content}\n\n`;
         });
         window.location.href = `mailto:${CONFIG.EMAIL}?subject=${encodeURIComponent('Maximus Export - ' + new Date().toLocaleDateString())}&body=${encodeURIComponent(body)}`;
     } catch (e) { alert('Error fetching thoughts.'); }
