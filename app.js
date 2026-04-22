@@ -47,7 +47,8 @@ if (SpeechRecognition) {
             clearTimeout(submitTimer);
             submitTimer = null;
             fullTranscript = '';
-            dom.chat.style.display = 'none';
+            // We NO LONGER hide the chat immediately on onstart. 
+            // We wait until the user actually starts speaking in onresult.
             dom.orbContainer.style.transform = 'translateY(0)';
         }
         isRestarting = false;
@@ -62,6 +63,10 @@ if (SpeechRecognition) {
         clearTimeout(submitTimer);
         submitTimer = null;
         stopCountdown();
+
+        // Hide the previous chat box only when we actually get new speech results
+        dom.chat.style.display = 'none';
+
         const transcript = event.results[0][0].transcript;
         dom.status.innerText = (fullTranscript + transcript).trim();
     };
@@ -189,8 +194,15 @@ function displayResponse(text, debug) {
 
 // --- TTS ---
 let isSpeaking = false;
+let currentResponseText = ''; // Track for dynamic delay
+
 function speakResponse(text) {
-    if (!('speechSynthesis' in window)) { setTimeout(startListening, 2000); return; }
+    currentResponseText = text;
+    if (!('speechSynthesis' in window)) { 
+        const delay = Math.max(3000, text.split(' ').length * 250);
+        setTimeout(startListening, delay); 
+        return; 
+    }
     // Stop listening so the mic doesn't pick up our own voice
     isSpeaking = true;
     try { recognition.stop(); } catch(e) {}
@@ -207,7 +219,10 @@ function speakResponse(text) {
     u.rate = 0.95;
     u.onend = () => {
         isSpeaking = false;
-        setTimeout(startListening, 1500); // Longer delay to avoid echo
+        // Dynamic delay: 250ms per word + 2s base, capped at 15s
+        const wordCount = currentResponseText.split(' ').length;
+        const readingDelay = Math.min(15000, Math.max(2500, wordCount * 250));
+        setTimeout(startListening, readingDelay);
     };
     window.speechSynthesis.speak(u);
 }

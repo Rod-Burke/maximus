@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maximus-v5';
+const CACHE_NAME = 'maximus-v6';
 const ASSETS = ['index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
