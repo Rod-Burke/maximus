@@ -16,7 +16,9 @@ const dom = {
     emailBtn: document.getElementById('email-btn'),
     historyPanel: document.getElementById('history-panel'),
     closeHistory: document.getElementById('close-history'),
-    historyList: document.getElementById('history-list')
+    historyList: document.getElementById('history-list'),
+    undoBtn: document.getElementById('undo-btn'),
+    countdownBar: document.getElementById('countdown-bar')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -25,9 +27,11 @@ let recognition = null;
 let isListening = false;
 let fullTranscript = '';
 let submitTimer = null;
+let countdownInterval = null;
 let isRestarting = false;
-let sessionHadResults = false;  // Track if THIS session produced speech
-const SUBMIT_DELAY = 2500;
+let sessionHadResults = false;
+let lastThoughtId = null;
+const SUBMIT_DELAY = 4000; // Increased to 4 seconds for better thought gathering
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -47,13 +51,17 @@ if (SpeechRecognition) {
             dom.orbContainer.style.transform = 'translateY(0)';
         }
         isRestarting = false;
-        if (!fullTranscript) dom.status.innerText = 'Listening...';
+        if (!fullTranscript) {
+            dom.status.innerText = 'Listening...';
+            dom.undoBtn.classList.add('hidden');
+        }
     };
 
     recognition.onresult = (event) => {
         sessionHadResults = true;
         clearTimeout(submitTimer);
         submitTimer = null;
+        stopCountdown();
         const transcript = event.results[0][0].transcript;
         dom.status.innerText = (fullTranscript + transcript).trim();
     };
@@ -62,15 +70,17 @@ if (SpeechRecognition) {
         isListening = false;
 
         if (sessionHadResults) {
-            // This session had real speech - update transcript and set timer
+            // This session had real speech - update transcript and start countdown
             const currentDisplay = dom.status.innerText;
             fullTranscript = currentDisplay + ' ';
             dom.orb.classList.add('listening');
 
+            startCountdown();
             submitTimer = setTimeout(() => {
                 const text = fullTranscript.trim();
                 fullTranscript = '';
                 submitTimer = null;
+                stopCountdown();
                 dom.orb.classList.remove('listening');
                 if (text) askMaximus(text);
             }, SUBMIT_DELAY);
@@ -79,9 +89,7 @@ if (SpeechRecognition) {
             setTimeout(() => {
                 if (submitTimer) {
                     isRestarting = true;
-                    try { recognition.start(); } catch (e) {
-                        // Can't restart - let the timer fire
-                    }
+                    try { recognition.start(); } catch (e) { }
                 }
             }, 300);
 
@@ -93,8 +101,29 @@ if (SpeechRecognition) {
             // Nothing at all
             dom.status.innerText = 'Tap to speak to Maximus';
             dom.orb.classList.remove('listening');
+            stopCountdown();
         }
     };
+
+    function startCountdown() {
+        stopCountdown();
+        let start = Date.now();
+        dom.countdownBar.style.opacity = '1';
+        dom.countdownBar.style.width = '60px';
+        
+        countdownInterval = setInterval(() => {
+            let elapsed = Date.now() - start;
+            let remaining = Math.max(0, SUBMIT_DELAY - elapsed);
+            let width = (remaining / SUBMIT_DELAY) * 60;
+            dom.countdownBar.style.width = width + 'px';
+            if (remaining <= 0) stopCountdown();
+        }, 50);
+    }
+
+    function stopCountdown() {
+        clearInterval(countdownInterval);
+        dom.countdownBar.style.opacity = '0';
+    }
 
     recognition.onerror = (event) => {
         if (event.error !== 'aborted' && event.error !== 'no-speech') {
@@ -126,6 +155,19 @@ async function askMaximus(text) {
         });
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
+        
+        // Handle "Captured as" responses to show Undo button
+        if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
+            lastThoughtId = data.thoughtId;
+            dom.undoBtn.classList.remove('hidden');
+        } else if (data.debug?.mode === 'capture') {
+            // Check debug info if the answer text changed but it was a capture
+            // We need the edge function to return the ID. 
+            // I will update the edge function next.
+            lastThoughtId = data.debug?.thoughtId; 
+            if (lastThoughtId) dom.undoBtn.classList.remove('hidden');
+        }
+
         displayResponse(answer, data.debug || {});
         speakResponse(answer);
     } catch (e) {
@@ -233,6 +275,30 @@ async function deleteThought(id, el) {
         el.remove();
     } catch (e) { el.classList.remove('deleting'); alert('Delete failed.'); }
 }
+
+async function undoLastThought() {
+    if (!lastThoughtId) return;
+    const id = lastThoughtId;
+    lastThoughtId = null;
+    dom.undoBtn.classList.add('hidden');
+    dom.status.innerText = 'Undoing last capture...';
+    
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'delete', id })
+        });
+        dom.status.innerText = 'Deleted last thought.';
+        dom.chat.innerHTML = '<div style="opacity:0.5; font-style:italic;">Last thought deleted.</div>';
+        setTimeout(() => { dom.status.innerText = 'Tap to speak to Maximus'; }, 2000);
+    } catch (e) {
+        alert('Undo failed.');
+        dom.status.innerText = 'Undo failed.';
+    }
+}
+
+dom.undoBtn.addEventListener('click', undoLastThought);
 
 // --- EMAIL ---
 dom.emailBtn.addEventListener('click', async () => {

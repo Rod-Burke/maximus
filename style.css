@@ -167,6 +167,41 @@ main {
     word-wrap: break-word;
 }
 
+.countdown-bar {
+    width: 60px;
+    height: 4px;
+    background: var(--accent-gold);
+    border-radius: 2px;
+    opacity: 0;
+    transition: width 0.1s linear, opacity 0.3s;
+}
+
+.undo-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
+    padding: 0.5rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+}
+
+.undo-btn:active {
+    background: rgba(239, 68, 68, 0.3);
+    transform: scale(0.95);
+}
+
+.undo-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* --- CHAT OUTPUT --- */
 .chat-output {
     width: 100%;
