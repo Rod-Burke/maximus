@@ -41,12 +41,21 @@
                 </div>
                 <p id="status-text">Tap to speak to Maximus</p>
                 <div id="countdown-bar" class="countdown-bar"></div>
-                <button id="undo-btn" class="undo-btn hidden">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                    </svg>
-                    <span>Undo Last</span>
-                </button>
+                <div id="action-buttons" class="action-buttons hidden">
+                    <button id="undo-btn" class="action-btn undo-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                        </svg>
+                        <span>Undo Last</span>
+                    </button>
+                    <button id="edit-last-btn" class="action-btn edit-last-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Edit Last</span>
+                    </button>
+                </div>
             </div>
             
             <div id="chat-output" class="chat-output">

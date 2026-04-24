@@ -17,8 +17,11 @@ const dom = {
     historyPanel: document.getElementById('history-panel'),
     closeHistory: document.getElementById('close-history'),
     historyList: document.getElementById('history-list'),
+    actionButtons: document.getElementById('action-buttons'),
     undoBtn: document.getElementById('undo-btn'),
-    countdownBar: document.getElementById('countdown-bar')
+    editLastBtn: document.getElementById('edit-last-btn'),
+    countdownBar: document.getElementById('countdown-bar'),
+    inputTray: document.querySelector('.input-tray')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -31,7 +34,12 @@ let countdownInterval = null;
 let isRestarting = false;
 let sessionHadResults = false;
 let lastThoughtId = null;
+let lastThoughtContent = null;  // Store content for "Edit Last"
 const SUBMIT_DELAY = 4000; // Increased to 4 seconds for better thought gathering
+
+// --- EDIT MODE STATE ---
+let editingThoughtId = null;
+let cancelEditBtn = null; // Created dynamically
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -54,7 +62,7 @@ if (SpeechRecognition) {
         isRestarting = false;
         if (!fullTranscript) {
             dom.status.innerText = 'Listening...';
-            dom.undoBtn.classList.add('hidden');
+            dom.actionButtons.classList.add('hidden');
         }
     };
 
@@ -161,16 +169,15 @@ async function askMaximus(text) {
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
         
-        // Handle "Captured as" responses to show Undo button
+        // Handle "Captured as" responses to show action buttons
         if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
             lastThoughtId = data.thoughtId;
-            dom.undoBtn.classList.remove('hidden');
+            lastThoughtContent = text;
+            dom.actionButtons.classList.remove('hidden');
         } else if (data.debug?.mode === 'capture') {
-            // Check debug info if the answer text changed but it was a capture
-            // We need the edge function to return the ID. 
-            // I will update the edge function next.
             lastThoughtId = data.debug?.thoughtId; 
-            if (lastThoughtId) dom.undoBtn.classList.remove('hidden');
+            lastThoughtContent = text;
+            if (lastThoughtId) dom.actionButtons.classList.remove('hidden');
         }
 
         displayResponse(answer, data.debug || {});
@@ -228,6 +235,69 @@ function speakResponse(text) {
 }
 window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 
+// --- EDIT MODE ---
+function enterEditMode(thoughtId, content) {
+    editingThoughtId = thoughtId;
+    dom.input.value = content;
+    dom.input.placeholder = 'Editing thought... (× to cancel)';
+    dom.inputTray.classList.add('edit-mode');
+    dom.send.classList.add('edit-mode');
+    dom.actionButtons.classList.add('hidden');
+    
+    // Create cancel button if it doesn't exist
+    if (!cancelEditBtn) {
+        cancelEditBtn = document.createElement('button');
+        cancelEditBtn.id = 'cancel-edit-btn';
+        cancelEditBtn.innerHTML = '×';
+        cancelEditBtn.title = 'Cancel edit';
+        cancelEditBtn.addEventListener('click', exitEditMode);
+    }
+    // Insert cancel button before the send button
+    if (!dom.inputTray.contains(cancelEditBtn)) {
+        dom.inputTray.insertBefore(cancelEditBtn, dom.send);
+    }
+    
+    dom.input.focus();
+}
+
+function exitEditMode() {
+    editingThoughtId = null;
+    dom.input.value = '';
+    dom.input.placeholder = 'Type a thought...';
+    dom.inputTray.classList.remove('edit-mode');
+    dom.send.classList.remove('edit-mode');
+    
+    if (cancelEditBtn && dom.inputTray.contains(cancelEditBtn)) {
+        dom.inputTray.removeChild(cancelEditBtn);
+    }
+}
+
+async function submitEdit() {
+    const id = editingThoughtId;
+    const content = dom.input.value.trim();
+    if (!id || !content) return;
+    
+    exitEditMode();
+    dom.status.innerText = 'Updating thought...';
+    
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'update', id, content })
+        });
+        const data = await res.json();
+        if (data.success) {
+            displayResponse('✓ Thought updated and re-embedded.', {});
+        } else {
+            displayResponse('Update failed: ' + (data.error || 'Unknown error'), {});
+        }
+    } catch (e) {
+        console.error(e);
+        displayResponse('Error updating thought.', {});
+    }
+}
+
 // --- EVENTS ---
 dom.orb.addEventListener('click', () => {
     if (isListening || submitTimer) {
@@ -243,6 +313,12 @@ dom.orb.addEventListener('click', () => {
 });
 
 dom.send.addEventListener('click', () => {
+    // If in edit mode, submit the edit
+    if (editingThoughtId) {
+        submitEdit();
+        return;
+    }
+    // Otherwise, normal new thought submission
     const t = dom.input.value.trim();
     if (t) { dom.input.value = ''; askMaximus(t); }
 });
@@ -266,12 +342,28 @@ async function loadHistory() {
         data.thoughts.forEach(t => {
             const d = new Date(t.created_at);
             const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const type = t.metadata?.type || 'thought';
+            const type = t.metadata?.type || t.payload?.type || 'thought';
             const el = document.createElement('div');
             el.className = 'history-item';
             el.innerHTML = `<div class="thought-content">${t.content}</div>
                 <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}</span></div>
-                <button class="delete-btn" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`;
+                <div class="item-actions">
+                    <button class="edit-btn" title="Edit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="delete-btn" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>`;
+            el.querySelector('.edit-btn').addEventListener('click', () => {
+                dom.historyPanel.classList.add('hidden');
+                enterEditMode(t.id, t.content);
+            });
             el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
             dom.historyList.appendChild(el);
         });
@@ -295,7 +387,8 @@ async function undoLastThought() {
     if (!lastThoughtId) return;
     const id = lastThoughtId;
     lastThoughtId = null;
-    dom.undoBtn.classList.add('hidden');
+    lastThoughtContent = null;
+    dom.actionButtons.classList.add('hidden');
     dom.status.innerText = 'Undoing last capture...';
     
     try {
@@ -313,7 +406,13 @@ async function undoLastThought() {
     }
 }
 
+function editLastThought() {
+    if (!lastThoughtId || !lastThoughtContent) return;
+    enterEditMode(lastThoughtId, lastThoughtContent);
+}
+
 dom.undoBtn.addEventListener('click', undoLastThought);
+dom.editLastBtn.addEventListener('click', editLastThought);
 
 // --- EMAIL ---
 dom.emailBtn.addEventListener('click', async () => {
@@ -330,7 +429,7 @@ dom.emailBtn.addEventListener('click', async () => {
         data.thoughts.forEach((t, i) => {
             const d = new Date(t.created_at);
             const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            body += `${i+1}. [${ds}] (${t.metadata?.type || 'thought'})\n   ${t.content}\n\n`;
+            body += `${i+1}. [${ds}] (${t.metadata?.type || t.payload?.type || 'thought'})\n   ${t.content}\n\n`;
         });
         window.location.href = `mailto:${CONFIG.EMAIL}?subject=${encodeURIComponent('Maximus Export - ' + new Date().toLocaleDateString())}&body=${encodeURIComponent(body)}`;
     } catch (e) { alert('Error fetching thoughts.'); }

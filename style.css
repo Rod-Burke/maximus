@@ -176,30 +176,53 @@ main {
     transition: width 0.1s linear, opacity 0.3s;
 }
 
-.undo-btn {
+/* --- ACTION BUTTONS (Undo + Edit Last) --- */
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    animation: fade-up 0.3s ease-out;
+}
+
+.action-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: var(--accent-red);
     padding: 0.5rem 0.8rem;
     border-radius: 20px;
     font-size: 0.75rem;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.2s;
-    margin-top: 0.5rem;
+}
+
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.undo-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
 }
 
 .undo-btn:active {
     background: rgba(239, 68, 68, 0.3);
-    transform: scale(0.95);
 }
 
-.undo-btn svg {
-    width: 14px;
-    height: 14px;
+.edit-last-btn {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: var(--accent-blue);
+}
+
+.edit-last-btn:active {
+    background: rgba(59, 130, 246, 0.3);
 }
 
 /* --- CHAT OUTPUT --- */
@@ -284,7 +307,7 @@ main {
     font-weight: 300;
     line-height: 1.5;
     font-size: 0.9rem;
-    padding-right: 2rem;
+    padding-right: 4.5rem;
 }
 
 .history-item .thought-meta {
@@ -305,16 +328,20 @@ main {
     text-transform: uppercase;
 }
 
-.history-item .delete-btn {
+/* History item action buttons container */
+.history-item .item-actions {
     position: absolute;
     top: 0.75rem;
     right: 0.75rem;
-    width: 28px;
-    height: 28px;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.history-item .edit-btn,
+.history-item .delete-btn {
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: var(--accent-red);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -322,10 +349,27 @@ main {
     transition: background 0.2s;
 }
 
+.history-item .edit-btn {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: var(--accent-blue);
+}
+
+.history-item .edit-btn:active {
+    background: rgba(59, 130, 246, 0.4);
+}
+
+.history-item .delete-btn {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--accent-red);
+}
+
 .history-item .delete-btn:active {
     background: rgba(239, 68, 68, 0.4);
 }
 
+.history-item .edit-btn svg,
 .history-item .delete-btn svg {
     width: 14px;
     height: 14px;
@@ -342,6 +386,42 @@ main {
     opacity: 0.3;
     padding: 3rem;
     font-weight: 300;
+}
+
+/* --- EDIT MODE INDICATOR --- */
+.input-tray.edit-mode {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+}
+
+.input-tray.edit-mode input::placeholder {
+    color: var(--accent-blue);
+    opacity: 0.7;
+}
+
+#cancel-edit-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+#cancel-edit-btn:active {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+button#send-btn.edit-mode {
+    background: var(--accent-blue);
 }
 
 /* --- FOOTER / INPUT --- */
