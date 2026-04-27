@@ -239,6 +239,9 @@ window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(
 function enterEditMode(thoughtId, content) {
     editingThoughtId = thoughtId;
     dom.input.value = content;
+    // Programmatically trigger auto-expand for long edits
+    dom.input.style.height = '24px';
+    dom.input.style.height = (dom.input.scrollHeight) + 'px';
     dom.input.placeholder = 'Editing thought... (× to cancel)';
     dom.inputTray.classList.add('edit-mode');
     dom.send.classList.add('edit-mode');
@@ -263,6 +266,7 @@ function enterEditMode(thoughtId, content) {
 function exitEditMode() {
     editingThoughtId = null;
     dom.input.value = '';
+    dom.input.style.height = '24px';
     dom.input.placeholder = 'Type a thought...';
     dom.inputTray.classList.remove('edit-mode');
     dom.send.classList.remove('edit-mode');
@@ -302,6 +306,7 @@ async function submitEdit() {
 dom.orb.addEventListener('click', () => {
     if (isListening || submitTimer) {
         clearTimeout(submitTimer); submitTimer = null;
+        stopCountdown(); // Hide the wait bar immediately
         try { recognition.stop(); } catch(e) {}
         isListening = false;
         dom.orb.classList.remove('listening');
@@ -320,9 +325,22 @@ dom.send.addEventListener('click', () => {
     }
     // Otherwise, normal new thought submission
     const t = dom.input.value.trim();
-    if (t) { dom.input.value = ''; askMaximus(t); }
+    if (t) { 
+        dom.input.value = ''; 
+        dom.input.style.height = '24px';
+        askMaximus(t); 
+    }
 });
-dom.input.addEventListener('keypress', (e) => { if (e.key === 'Enter') dom.send.click(); });
+dom.input.addEventListener('keypress', (e) => { 
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Prevent adding a new line
+        dom.send.click(); 
+    }
+});
+dom.input.addEventListener('input', function() {
+    this.style.height = '24px';
+    this.style.height = (this.scrollHeight) + 'px';
+});
 
 // --- HISTORY ---
 dom.historyBtn.addEventListener('click', () => { dom.historyPanel.classList.remove('hidden'); loadHistory(); });
