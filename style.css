@@ -443,13 +443,13 @@ footer {
 
 textarea#text-input {
     flex: 1;
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    border: none !important;
     color: white;
     font-family: inherit;
     font-size: 0.95rem;
     line-height: 1.4;
-    outline: none;
+    outline: none !important;
     resize: none;
     overflow-y: auto;
     height: 24px;
@@ -457,6 +457,8 @@ textarea#text-input {
     padding: 0;
     margin: 0;
     box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 button#send-btn {
