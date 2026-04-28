@@ -13,7 +13,10 @@ const dom = {
     send: document.getElementById('send-btn'),
     orbContainer: document.querySelector('.orb-container'),
     historyBtn: document.getElementById('history-btn'),
-    emailBtn: document.getElementById('email-btn'),
+    tasksBtn: document.getElementById('tasks-btn'),
+    tasksPanel: document.getElementById('tasks-panel'),
+    closeTasks: document.getElementById('close-tasks'),
+    tasksList: document.getElementById('tasks-list'),
     historyPanel: document.getElementById('history-panel'),
     closeHistory: document.getElementById('close-history'),
     historyList: document.getElementById('history-list'),
@@ -432,27 +435,206 @@ function editLastThought() {
 dom.undoBtn.addEventListener('click', undoLastThought);
 dom.editLastBtn.addEventListener('click', editLastThought);
 
-// --- EMAIL ---
-dom.emailBtn.addEventListener('click', async () => {
-    dom.emailBtn.style.opacity = '0.3';
+// --- TASKS DASHBOARD ---
+dom.tasksBtn.addEventListener('click', () => { dom.tasksPanel.classList.remove('hidden'); loadTasksDashboard(); });
+dom.closeTasks.addEventListener('click', () => dom.tasksPanel.classList.add('hidden'));
+
+let draggedTask = null;
+
+async function loadTasksDashboard() {
+    dom.tasksList.innerHTML = '<div class="history-empty">Loading Tasks...</div>';
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'list', limit: 10 })
+            body: JSON.stringify({ action: 'list', limit: 300 })
         });
         const data = await res.json();
-        if (!data.thoughts?.length) { alert('No thoughts to email.'); dom.emailBtn.style.opacity = '1'; return; }
-        let body = 'Last 10 Maximus Brain Entries:\n\n';
-        data.thoughts.forEach((t, i) => {
-            const d = new Date(t.created_at);
-            const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            body += `${i+1}. [${ds}] (${t.metadata?.type || t.payload?.type || 'thought'})\n   ${t.content}\n\n`;
+        if (!data.thoughts) return;
+        
+        // Filter pending tasks and events
+        const activeItems = data.thoughts.filter(t => {
+            const meta = t.metadata || t.payload?.metadata || {};
+            const type = meta.type || '';
+            const status = meta.status || 'pending';
+            return (type === 'task' || type === 'event') && status === 'pending';
         });
-        window.location.href = `mailto:${CONFIG.EMAIL}?subject=${encodeURIComponent('Maximus Export - ' + new Date().toLocaleDateString())}&body=${encodeURIComponent(body)}`;
-    } catch (e) { alert('Error fetching thoughts.'); }
-    dom.emailBtn.style.opacity = '1';
-});
+
+        // Sort: Bumped > Events with Dates > Tasks with Dates > Unscheduled
+        activeItems.sort((a, b) => {
+            const m_a = a.metadata || a.payload?.metadata || {};
+            const m_b = b.metadata || b.payload?.metadata || {};
+            
+            // Explicit order field from drag and drop
+            if (m_a.order !== undefined && m_b.order !== undefined) return m_a.order - m_b.order;
+
+            // Bumped to top
+            if (m_a.bumped_at && !m_b.bumped_at) return -1;
+            if (!m_a.bumped_at && m_b.bumped_at) return 1;
+            if (m_a.bumped_at && m_b.bumped_at) return new Date(m_b.bumped_at) - new Date(m_a.bumped_at);
+            
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        const events = [];
+        const todayTasks = [];
+        const unscheduled = [];
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        activeItems.forEach(t => {
+            const meta = t.metadata || t.payload?.metadata || {};
+            if (meta.type === 'event') {
+                // If event date is past, we can hide it or keep it. For now, keep it unless manually marked done.
+                events.push(t);
+            } else if (meta.bumped_at || (meta.due_date && meta.due_date <= todayStr)) {
+                todayTasks.push(t);
+            } else {
+                unscheduled.push(t);
+            }
+        });
+
+        dom.tasksList.innerHTML = '';
+        if (events.length) renderTaskSection('Upcoming Events', events);
+        if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
+        if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
+        
+        if (!events.length && !todayTasks.length && !unscheduled.length) {
+            dom.tasksList.innerHTML = '<div class="history-empty">All caught up!</div>';
+        }
+
+    } catch (e) {
+        dom.tasksList.innerHTML = '<div class="history-empty">Error loading tasks.</div>';
+    }
+}
+
+function renderTaskSection(title, items) {
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerText = title;
+    dom.tasksList.appendChild(header);
+
+    const container = document.createElement('div');
+    container.className = 'task-section-container';
+    
+    // Dropzone logic for reordering
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(container, e.clientY);
+        if (draggedTask) {
+            if (afterElement == null) container.appendChild(draggedTask);
+            else container.insertBefore(draggedTask, afterElement);
+        }
+    });
+
+    items.forEach((t, index) => {
+        const meta = t.metadata || t.payload?.metadata || {};
+        const el = document.createElement('div');
+        el.className = 'task-item';
+        el.draggable = true;
+        el.dataset.id = t.id;
+        el.dataset.meta = JSON.stringify(meta);
+        
+        const dueMeta = meta.due_date ? `Due: ${meta.due_date}` : '';
+        const recMeta = meta.recurrence ? `↺ ${meta.recurrence}` : '';
+        const metaStr = [dueMeta, recMeta].filter(Boolean).join(' | ');
+
+        el.innerHTML = `
+            <div class="task-checkbox"></div>
+            <div class="task-content-wrapper">
+                <div class="task-content">${t.content}</div>
+                ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
+            </div>
+            <div class="task-actions">
+                <button class="bump-btn" title="Bump to Top">↑</button>
+            </div>
+        `;
+
+        // Drag and Drop Handlers
+        el.addEventListener('dragstart', () => {
+            draggedTask = el;
+            el.classList.add('drag-ghost');
+        });
+
+        el.addEventListener('dragend', () => {
+            el.classList.remove('drag-ghost');
+            draggedTask = null;
+            saveNewOrder(container);
+        });
+
+        // Checkbox complete
+        el.querySelector('.task-checkbox').addEventListener('click', async function(e) {
+            e.stopPropagation();
+            this.classList.add('checked');
+            el.style.opacity = '0.5';
+            try {
+                await fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                });
+                setTimeout(() => el.remove(), 500);
+            } catch(err) {
+                this.classList.remove('checked');
+                el.style.opacity = '1';
+                alert('Error completing task.');
+            }
+        });
+
+        // Bump to Top
+        el.querySelector('.bump-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            el.style.opacity = '0.5';
+            try {
+                await fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, bumped_at: new Date().toISOString(), order: 0 }})
+                });
+                loadTasksDashboard();
+            } catch(err) {
+                el.style.opacity = '1';
+                alert('Error bumping task.');
+            }
+        });
+
+        // Click to edit using the main edit tray
+        el.querySelector('.task-content-wrapper').addEventListener('click', () => {
+            dom.tasksPanel.classList.add('hidden');
+            enterEditMode(t.id, t.content);
+        });
+
+        container.appendChild(el);
+    });
+
+    dom.tasksList.appendChild(container);
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.task-item:not(.drag-ghost)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+async function saveNewOrder(container) {
+    const items = [...container.querySelectorAll('.task-item')];
+    // We update the order in the background so the UI feels instant
+    items.forEach((el, index) => {
+        const id = el.dataset.id;
+        const meta = JSON.parse(el.dataset.meta || '{}');
+        fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'update', id: id, metadata: { ...meta, order: index }})
+        }).catch(() => {});
+    });
+}
 
 // --- AUTO-START ---
 window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });

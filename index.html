@@ -6,7 +6,7 @@
     <title>Saint Max</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a2e">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -19,14 +19,14 @@
                 <h1>Saint Max</h1>
             </div>
             <div class="header-actions">
+                <button id="tasks-btn" class="icon-btn" title="Tasks Dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                </button>
                 <button id="history-btn" class="icon-btn" title="Message History">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </button>
-                <button id="email-btn" class="icon-btn" title="Email Last 10">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
                 </button>
             </div>
@@ -78,6 +78,21 @@
             </div>
         </div>
 
+        <!-- Tasks Panel (hidden by default) -->
+        <div id="tasks-panel" class="history-panel hidden">
+            <div class="history-header">
+                <h2>Tasks & Events</h2>
+                <button id="close-tasks" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="tasks-list" class="history-list tasks-list">
+                <!-- Tasks populated by JS -->
+            </div>
+        </div>
+
         <footer>
             <div class="input-tray">
                 <textarea id="text-input" rows="1" placeholder="Type a thought..." autocomplete="off"></textarea>
@@ -96,7 +111,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

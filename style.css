@@ -388,6 +388,104 @@ main {
     font-weight: 300;
 }
 
+/* --- TASKS PANEL --- */
+.section-header {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-gold);
+    margin: 1.5rem 0 0.5rem 0.5rem;
+    opacity: 0.8;
+}
+
+.task-item {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+    transition: all 0.2s;
+    cursor: grab;
+}
+
+.task-item:active {
+    cursor: grabbing;
+}
+
+.task-item.drag-ghost {
+    opacity: 0.4;
+    border-style: dashed;
+}
+
+.task-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-gold);
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-checkbox.checked {
+    background: var(--accent-gold);
+}
+
+.task-checkbox.checked::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--bg-color);
+    border-radius: 50%;
+}
+
+.task-content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.task-content {
+    font-size: 0.95rem;
+    font-weight: 300;
+    line-height: 1.3;
+}
+
+.task-meta {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    margin-top: 0.25rem;
+}
+
+.task-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.bump-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.bump-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 /* --- EDIT MODE INDICATOR --- */
 .input-tray.edit-mode {
     border-color: var(--accent-blue);
