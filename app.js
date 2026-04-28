@@ -24,7 +24,18 @@ const dom = {
     undoBtn: document.getElementById('undo-btn'),
     editLastBtn: document.getElementById('edit-last-btn'),
     countdownBar: document.getElementById('countdown-bar'),
-    inputTray: document.querySelector('.input-tray')
+    inputTray: document.querySelector('.input-tray'),
+    // Modal
+    modal: document.getElementById('task-detail-modal'),
+    modalContent: document.getElementById('modal-content-input'),
+    modalNotes: document.getElementById('modal-notes-input'),
+    modalType: document.getElementById('modal-type'),
+    modalPriority: document.getElementById('modal-priority'),
+    modalDueDate: document.getElementById('modal-due-date'),
+    modalRecurrence: document.getElementById('modal-recurrence'),
+    modalSave: document.getElementById('modal-save-btn'),
+    modalDelete: document.getElementById('modal-delete-btn'),
+    modalClose: document.getElementById('close-modal')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -462,8 +473,8 @@ async function loadTasksDashboard() {
 
         // Sort: Bumped > Events with Dates > Tasks with Dates > Unscheduled
         activeItems.sort((a, b) => {
-            const m_a = a.metadata || a.payload?.metadata || {};
-            const m_b = b.metadata || b.payload?.metadata || {};
+            const m_a = a.metadata || {};
+            const m_b = b.metadata || {};
             
             // Explicit order field from drag and drop
             if (m_a.order !== undefined && m_b.order !== undefined) return m_a.order - m_b.order;
@@ -482,7 +493,7 @@ async function loadTasksDashboard() {
         const todayStr = new Date().toISOString().split('T')[0];
 
         activeItems.forEach(t => {
-            const meta = t.metadata || t.payload?.metadata || {};
+            const meta = t.metadata || {};
             if (meta.type === 'event') {
                 // If event date is past, we can hide it or keep it. For now, keep it unless manually marked done.
                 events.push(t);
@@ -527,7 +538,7 @@ function renderTaskSection(title, items) {
     });
 
     items.forEach((t, index) => {
-        const meta = t.metadata || t.payload?.metadata || {};
+        const meta = t.metadata || {};
         const el = document.createElement('div');
         el.className = 'task-item';
         el.draggable = true;
@@ -597,10 +608,9 @@ function renderTaskSection(title, items) {
             }
         });
 
-        // Click to edit using the main edit tray
+        // Click to open Task Detail Modal
         el.querySelector('.task-content-wrapper').addEventListener('click', () => {
-            dom.tasksPanel.classList.add('hidden');
-            enterEditMode(t.id, t.content);
+            openTaskModal(t.id, t.content, meta);
         });
 
         container.appendChild(el);
@@ -635,6 +645,90 @@ async function saveNewOrder(container) {
         }).catch(() => {});
     });
 }
+
+// --- TASK DETAIL MODAL ---
+let modalThoughtId = null;
+
+function openTaskModal(id, content, meta) {
+    modalThoughtId = id;
+    dom.modalContent.value = content;
+    dom.modalNotes.value = meta.notes || '';
+    dom.modalType.value = meta.type || 'task';
+    dom.modalPriority.value = meta.priority || 'normal';
+    dom.modalDueDate.value = meta.due_date || '';
+    dom.modalRecurrence.value = meta.recurrence || '';
+    dom.modal.classList.remove('hidden');
+}
+
+function closeTaskModal() {
+    dom.modal.classList.add('hidden');
+    modalThoughtId = null;
+}
+
+dom.modalClose.addEventListener('click', closeTaskModal);
+dom.modal.addEventListener('click', (e) => {
+    if (e.target === dom.modal) closeTaskModal();
+});
+
+dom.modalSave.addEventListener('click', async () => {
+    if (!modalThoughtId) return;
+    const id = modalThoughtId;
+    const newContent = dom.modalContent.value.trim();
+    if (!newContent) { alert('Content cannot be empty.'); return; }
+
+    dom.modalSave.textContent = 'Saving...';
+    dom.modalSave.disabled = true;
+
+    try {
+        const updatePayload = {
+            action: 'update',
+            id,
+            content: newContent,
+            metadata: {
+                type: dom.modalType.value,
+                priority: dom.modalPriority.value,
+                due_date: dom.modalDueDate.value || null,
+                recurrence: dom.modalRecurrence.value || null,
+                notes: dom.modalNotes.value.trim() || null
+            }
+        };
+
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify(updatePayload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeTaskModal();
+            loadTasksDashboard();
+        } else {
+            alert('Save failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Error saving changes.');
+    } finally {
+        dom.modalSave.textContent = 'Save Changes';
+        dom.modalSave.disabled = false;
+    }
+});
+
+dom.modalDelete.addEventListener('click', async () => {
+    if (!modalThoughtId) return;
+    if (!confirm('Delete this thought permanently?')) return;
+    
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'delete', id: modalThoughtId })
+        });
+        closeTaskModal();
+        loadTasksDashboard();
+    } catch (e) {
+        alert('Delete failed.');
+    }
+});
 
 // --- AUTO-START ---
 window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });

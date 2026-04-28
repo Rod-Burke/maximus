@@ -6,7 +6,7 @@
     <title>Saint Max</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a2e">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -93,6 +93,66 @@
             </div>
         </div>
 
+        <!-- Task Detail Modal -->
+        <div id="task-detail-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Task Details</h2>
+                    <button id="close-modal" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <label class="modal-label">Content</label>
+                    <textarea id="modal-content-input" class="modal-input" rows="3"></textarea>
+                    
+                    <label class="modal-label">Notes / Instructions</label>
+                    <textarea id="modal-notes-input" class="modal-input" rows="2" placeholder="Add extra notes..."></textarea>
+
+                    <div class="modal-row">
+                        <div class="modal-field">
+                            <label class="modal-label">Type</label>
+                            <select id="modal-type" class="modal-select">
+                                <option value="task">Task</option>
+                                <option value="event">Event</option>
+                                <option value="observation">Note</option>
+                            </select>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-label">Priority</label>
+                            <select id="modal-priority" class="modal-select">
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="modal-row">
+                        <div class="modal-field">
+                            <label class="modal-label">Due Date</label>
+                            <input type="date" id="modal-due-date" class="modal-input">
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-label">Recurrence</label>
+                            <select id="modal-recurrence" class="modal-select">
+                                <option value="">None</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal-delete-btn" class="modal-btn modal-btn-danger">Delete</button>
+                    <button id="modal-save-btn" class="modal-btn modal-btn-primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
         <footer>
             <div class="input-tray">
                 <textarea id="text-input" rows="1" placeholder="Type a thought..." autocomplete="off"></textarea>
@@ -111,7 +171,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
