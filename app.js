@@ -548,15 +548,18 @@ async function loadTasksDashboard() {
         const recurring = [];
         const actionable = [];
 
+        const todayStr_pre = new Date().toISOString().split('T')[0];
         activeItems.forEach(t => {
             const meta = t.metadata || {};
             const rec = (meta.recurrence || '').toLowerCase();
-            // Daily and every-other-day tasks are implicitly due today — keep them actionable
             const isDailyType = rec === 'daily' || rec === 'every_other_day';
-            // If it has a recurrence pattern but no specific due date, treat as recurring template
-            // EXCEPT daily tasks which are always actionable
+            // Recurring template: has recurrence but not due today
+            // Daily tasks with no date are actionable (due today by default)
+            // Daily tasks with a FUTURE date are recurring templates until that date
             if (meta.recurrence && !meta.due_date && !isDailyType) {
                 recurring.push(t);
+            } else if (isDailyType && meta.due_date && meta.due_date > todayStr_pre) {
+                recurring.push(t); // Daily task not yet due → recurring
             } else {
                 actionable.push(t);
             }
@@ -573,8 +576,8 @@ async function loadTasksDashboard() {
             const isDailyType = rec === 'daily' || rec === 'every_other_day';
             if (meta.type === 'event') {
                 events.push(t);
-            } else if (isDailyType) {
-                // Daily tasks are always in Today's Priorities
+            } else if (isDailyType && (!meta.due_date || meta.due_date <= todayStr)) {
+                // Daily task due today (or no date yet) → Today's Priorities
                 todayTasks.push(t);
             } else if (meta.due_date && meta.due_date <= todayStr) {
                 // Due today or overdue → Today's Priorities
