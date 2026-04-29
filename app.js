@@ -550,8 +550,12 @@ async function loadTasksDashboard() {
 
         activeItems.forEach(t => {
             const meta = t.metadata || {};
-            // If it has a recurrence pattern but no specific due date for "today", treat as recurring template
-            if (meta.recurrence && !meta.due_date) {
+            const rec = (meta.recurrence || '').toLowerCase();
+            // Daily and every-other-day tasks are implicitly due today — keep them actionable
+            const isDailyType = rec === 'daily' || rec === 'every_other_day';
+            // If it has a recurrence pattern but no specific due date, treat as recurring template
+            // EXCEPT daily tasks which are always actionable
+            if (meta.recurrence && !meta.due_date && !isDailyType) {
                 recurring.push(t);
             } else {
                 actionable.push(t);
@@ -565,8 +569,13 @@ async function loadTasksDashboard() {
 
         actionable.forEach(t => {
             const meta = t.metadata || {};
+            const rec = (meta.recurrence || '').toLowerCase();
+            const isDailyType = rec === 'daily' || rec === 'every_other_day';
             if (meta.type === 'event') {
                 events.push(t);
+            } else if (isDailyType) {
+                // Daily tasks are always in Today's Priorities
+                todayTasks.push(t);
             } else if (meta.due_date && meta.due_date <= todayStr) {
                 // Due today or overdue → Today's Priorities
                 todayTasks.push(t);
@@ -577,7 +586,7 @@ async function loadTasksDashboard() {
                     todayTasks.push(t); // Bumped today → Today's Priorities
                 } else {
                     // Bumped yesterday or earlier → top of Unscheduled
-                    t._wasBumped = true; // marker for sorting
+                    t._wasBumped = true;
                     unscheduled.push(t);
                 }
             } else {
