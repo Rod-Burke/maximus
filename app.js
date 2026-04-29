@@ -695,22 +695,32 @@ function renderTaskSection(title, items) {
             this.classList.add('checked');
             el.style.opacity = '0.5';
             try {
-                // Mark as completed
-                await fetch(CONFIG.MANAGE_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
-                });
-
-                // If recurring, create the next occurrence
                 if (meta.recurrence) {
+                    // Recurring task: DON'T mark as completed — roll due_date forward
                     const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
-                    const newContent = t.content;
-                    // Capture a new thought with the next due date
-                    await fetch(CONFIG.ENDPOINT, {
+                    // Check if recurrence has ended
+                    const endDate = meta.recurrence_end;
+                    if (endDate && nextDate > endDate) {
+                        // Recurrence is over — mark as completed
+                        await fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                        });
+                    } else {
+                        // Update due_date to next occurrence
+                        await fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
+                        });
+                    }
+                } else {
+                    // Non-recurring: mark as completed
+                    await fetch(CONFIG.MANAGE_ENDPOINT, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ text: `${newContent} (recurring: ${meta.recurrence}, due ${nextDate})` })
+                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                     });
                 }
 
