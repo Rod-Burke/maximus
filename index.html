@@ -143,9 +143,42 @@
                             <select id="modal-recurrence" class="modal-select">
                                 <option value="">None</option>
                                 <option value="daily">Daily</option>
+                                <option value="every_other_day">Every Other Day</option>
                                 <option value="weekly">Weekly</option>
+                                <option value="every_other_week">Every Other Week</option>
                                 <option value="monthly">Monthly</option>
+                                <option value="custom">Custom...</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Custom Recurrence Panel (hidden by default) -->
+                    <div id="custom-recurrence-panel" class="custom-recurrence hidden">
+                        <label class="modal-label">Repeat on</label>
+                        <div class="day-toggles">
+                            <button type="button" class="day-btn" data-day="mon">M</button>
+                            <button type="button" class="day-btn" data-day="tue">T</button>
+                            <button type="button" class="day-btn" data-day="wed">W</button>
+                            <button type="button" class="day-btn" data-day="thu">T</button>
+                            <button type="button" class="day-btn" data-day="fri">F</button>
+                            <button type="button" class="day-btn" data-day="sat">S</button>
+                            <button type="button" class="day-btn" data-day="sun">S</button>
+                        </div>
+                        <div class="modal-row" style="margin-top: 0.5rem;">
+                            <div class="modal-field">
+                                <label class="modal-label">Every</label>
+                                <div class="interval-row">
+                                    <input type="number" id="custom-interval" class="modal-input" value="1" min="1" max="52" style="width: 60px; text-align: center;">
+                                    <select id="custom-interval-unit" class="modal-select" style="flex:1;">
+                                        <option value="weeks">Week(s)</option>
+                                        <option value="days">Day(s)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-field">
+                                <label class="modal-label">Ends</label>
+                                <input type="date" id="custom-end-date" class="modal-input" placeholder="Never">
+                            </div>
                         </div>
                     </div>
                 </div>

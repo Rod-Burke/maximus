@@ -35,7 +35,12 @@ const dom = {
     modalRecurrence: document.getElementById('modal-recurrence'),
     modalSave: document.getElementById('modal-save-btn'),
     modalDelete: document.getElementById('modal-delete-btn'),
-    modalClose: document.getElementById('close-modal')
+    modalClose: document.getElementById('close-modal'),
+    // Custom Recurrence
+    customPanel: document.getElementById('custom-recurrence-panel'),
+    customInterval: document.getElementById('custom-interval'),
+    customIntervalUnit: document.getElementById('custom-interval-unit'),
+    customEndDate: document.getElementById('custom-end-date')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -562,11 +567,29 @@ async function loadTasksDashboard() {
             const meta = t.metadata || {};
             if (meta.type === 'event') {
                 events.push(t);
-            } else if (meta.bumped_at || (meta.due_date && meta.due_date <= todayStr)) {
+            } else if (meta.due_date && meta.due_date <= todayStr) {
+                // Due today or overdue → Today's Priorities
                 todayTasks.push(t);
+            } else if (meta.bumped_at) {
+                // Check if bumped today
+                const bumpedDate = meta.bumped_at.split('T')[0];
+                if (bumpedDate === todayStr) {
+                    todayTasks.push(t); // Bumped today → Today's Priorities
+                } else {
+                    // Bumped yesterday or earlier → top of Unscheduled
+                    t._wasBumped = true; // marker for sorting
+                    unscheduled.push(t);
+                }
             } else {
                 unscheduled.push(t);
             }
+        });
+
+        // Sort unscheduled: previously-bumped items float to top
+        unscheduled.sort((a, b) => {
+            if (a._wasBumped && !b._wasBumped) return -1;
+            if (!a._wasBumped && b._wasBumped) return 1;
+            return 0; // preserve original order otherwise
         });
 
         dom.tasksList.innerHTML = '';
@@ -724,9 +747,42 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
     const rec = (recurrence || '').toLowerCase();
     
     if (rec === 'daily') {
-        // Next day from today (not from old due date)
         next = new Date(today);
         next.setDate(next.getDate() + 1);
+    } else if (rec === 'every_other_day') {
+        next = new Date(today);
+        next.setDate(next.getDate() + 2);
+    } else if (rec === 'every_other_week') {
+        next.setDate(next.getDate() + 14);
+        while (next <= today) next.setDate(next.getDate() + 14);
+    } else if (rec.startsWith('custom:')) {
+        // custom:2:weeks:mon,wed or custom:3:days
+        const parts = rec.replace('custom:', '').split(':');
+        const interval = parseInt(parts[0]) || 1;
+        const unit = parts[1] || 'weeks';
+        const days = parts[2] ? parts[2].split(',') : [];
+        
+        if (unit === 'days') {
+            next = new Date(today);
+            next.setDate(next.getDate() + interval);
+        } else {
+            // weeks - find next matching day
+            if (days.length) {
+                const dayMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+                const targetDays = days.map(d => dayMap[d]).filter(d => d !== undefined).sort();
+                next = new Date(today);
+                next.setDate(next.getDate() + 1); // Start from tomorrow
+                let found = false;
+                for (let i = 0; i < interval * 7 + 7; i++) {
+                    if (targetDays.includes(next.getDay())) { found = true; break; }
+                    next.setDate(next.getDate() + 1);
+                }
+                if (!found) next.setDate(today.getDate() + interval * 7);
+            } else {
+                next.setDate(next.getDate() + interval * 7);
+                while (next <= today) next.setDate(next.getDate() + interval * 7);
+            }
+        }
     } else if (rec.startsWith('weekly')) {
         // weekly or weekly:monday or weekly:monday,wednesday
         next.setDate(next.getDate() + 7);
@@ -791,18 +847,78 @@ function openTaskModal(id, content, meta) {
     dom.modalType.value = meta.type || 'task';
     dom.modalPriority.value = meta.priority || 'normal';
     dom.modalDueDate.value = meta.due_date || '';
-    dom.modalRecurrence.value = meta.recurrence || '';
+    dom.customEndDate.value = meta.recurrence_end || '';
+    
+    // Parse recurrence into the UI
+    const rec = meta.recurrence || '';
+    if (rec.startsWith('custom:')) {
+        dom.modalRecurrence.value = 'custom';
+        dom.customPanel.classList.remove('hidden');
+        parseCustomRecurrenceToUI(rec);
+    } else if (rec === 'every_other_day' || rec === 'every_other_week') {
+        dom.modalRecurrence.value = rec;
+        dom.customPanel.classList.add('hidden');
+    } else {
+        dom.modalRecurrence.value = rec;
+        dom.customPanel.classList.add('hidden');
+    }
+    // Clear day buttons state based on recurrence
+    if (!rec.startsWith('custom:')) resetDayButtons();
+    
     dom.modal.classList.remove('hidden');
+}
+
+function parseCustomRecurrenceToUI(rec) {
+    // Format: "custom:1:weeks:mon,wed,fri" or "custom:2:days"
+    const parts = rec.replace('custom:', '').split(':');
+    dom.customInterval.value = parts[0] || '1';
+    dom.customIntervalUnit.value = parts[1] || 'weeks';
+    resetDayButtons();
+    if (parts[2]) {
+        parts[2].split(',').forEach(d => {
+            const btn = document.querySelector(`.day-btn[data-day="${d}"]`);
+            if (btn) btn.classList.add('active');
+        });
+    }
+}
+
+function resetDayButtons() {
+    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+}
+
+function getCustomRecurrenceValue() {
+    const interval = dom.customInterval.value || '1';
+    const unit = dom.customIntervalUnit.value || 'weeks';
+    const days = [...document.querySelectorAll('.day-btn.active')].map(b => b.dataset.day);
+    let val = `custom:${interval}:${unit}`;
+    if (days.length) val += ':' + days.join(',');
+    return val;
 }
 
 function closeTaskModal() {
     dom.modal.classList.add('hidden');
+    dom.customPanel.classList.add('hidden');
+    resetDayButtons();
     modalThoughtId = null;
 }
 
 dom.modalClose.addEventListener('click', closeTaskModal);
 dom.modal.addEventListener('click', (e) => {
     if (e.target === dom.modal) closeTaskModal();
+});
+
+// Show/hide custom recurrence panel
+dom.modalRecurrence.addEventListener('change', () => {
+    if (dom.modalRecurrence.value === 'custom') {
+        dom.customPanel.classList.remove('hidden');
+    } else {
+        dom.customPanel.classList.add('hidden');
+    }
+});
+
+// Day button toggles
+document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
 });
 
 dom.modalSave.addEventListener('click', async () => {
@@ -815,6 +931,12 @@ dom.modalSave.addEventListener('click', async () => {
     dom.modalSave.disabled = true;
 
     try {
+        // Build the recurrence value
+        let recurrenceValue = dom.modalRecurrence.value || null;
+        if (recurrenceValue === 'custom') {
+            recurrenceValue = getCustomRecurrenceValue();
+        }
+
         const updatePayload = {
             action: 'update',
             id,
@@ -823,7 +945,8 @@ dom.modalSave.addEventListener('click', async () => {
                 type: dom.modalType.value,
                 priority: dom.modalPriority.value,
                 due_date: dom.modalDueDate.value || null,
-                recurrence: dom.modalRecurrence.value || null,
+                recurrence: recurrenceValue,
+                recurrence_end: dom.customEndDate.value || null,
                 notes: dom.modalNotes.value.trim() || null
             }
         };

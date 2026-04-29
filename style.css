@@ -752,6 +752,51 @@ button#send-btn svg {
     gap: 0.25rem;
 }
 
+/* --- CUSTOM RECURRENCE PANEL --- */
+.custom-recurrence {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.75rem;
+    animation: fade-up 0.2s ease-out;
+}
+
+.day-toggles {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.day-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.day-btn.active {
+    background: var(--accent-gold);
+    color: var(--bg-color);
+    border-color: var(--accent-gold);
+}
+
+.day-btn:active {
+    transform: scale(0.9);
+}
+
+.interval-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
 .modal-footer {
     display: flex;
     justify-content: space-between;
