@@ -506,6 +506,24 @@ main {
     background: rgba(255, 255, 255, 0.15);
 }
 
+/* --- JUMP LINK --- */
+.jump-link {
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+.jump-link a {
+    color: var(--accent-gold);
+    opacity: 0.6;
+    font-size: 0.75rem;
+    text-decoration: none;
+    letter-spacing: 0.05rem;
+}
+
+.jump-link a:active {
+    opacity: 1;
+}
+
 /* --- EDIT MODE INDICATOR --- */
 .input-tray.edit-mode {
     border-color: var(--accent-blue);

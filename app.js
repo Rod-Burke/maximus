@@ -187,7 +187,7 @@ function toggleMicMute() {
         fullTranscript = '';
         dom.orb.classList.remove('listening');
         dom.orb.classList.add('muted');
-        dom.status.innerText = '🔇 Mic muted — double-tap orb to unmute';
+        dom.status.innerText = '🔇 Double tap to speak to Maximus';
     } else {
         dom.orb.classList.remove('muted');
         dom.status.innerText = 'Tap to speak to Maximus';
@@ -539,15 +539,28 @@ async function loadTasksDashboard() {
             return new Date(b.created_at) - new Date(a.created_at);
         });
 
+        // Separate recurring templates from actionable items
+        const recurring = [];
+        const actionable = [];
+
+        activeItems.forEach(t => {
+            const meta = t.metadata || {};
+            // If it has a recurrence pattern but no specific due date for "today", treat as recurring template
+            if (meta.recurrence && !meta.due_date) {
+                recurring.push(t);
+            } else {
+                actionable.push(t);
+            }
+        });
+
         const events = [];
         const todayTasks = [];
         const unscheduled = [];
         const todayStr = new Date().toISOString().split('T')[0];
 
-        activeItems.forEach(t => {
+        actionable.forEach(t => {
             const meta = t.metadata || {};
             if (meta.type === 'event') {
-                // If event date is past, we can hide it or keep it. For now, keep it unless manually marked done.
                 events.push(t);
             } else if (meta.bumped_at || (meta.due_date && meta.due_date <= todayStr)) {
                 todayTasks.push(t);
@@ -557,11 +570,28 @@ async function loadTasksDashboard() {
         });
 
         dom.tasksList.innerHTML = '';
+
+        // Jump link to recurring section (only if there are recurring items)
+        if (recurring.length) {
+            const jumpLink = document.createElement('div');
+            jumpLink.className = 'jump-link';
+            jumpLink.innerHTML = `<a href="#recurring-section">↓ ${recurring.length} Recurring Template${recurring.length > 1 ? 's' : ''}</a>`;
+            dom.tasksList.appendChild(jumpLink);
+        }
+
         if (events.length) renderTaskSection('Upcoming Events', events);
         if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
         if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
         
-        if (!events.length && !todayTasks.length && !unscheduled.length) {
+        // Recurring templates at the bottom
+        if (recurring.length) {
+            const anchor = document.createElement('div');
+            anchor.id = 'recurring-section';
+            dom.tasksList.appendChild(anchor);
+            renderTaskSection('↺ Recurring Templates', recurring);
+        }
+
+        if (!events.length && !todayTasks.length && !unscheduled.length && !recurring.length) {
             dom.tasksList.innerHTML = '<div class="history-empty">All caught up!</div>';
         }
 
@@ -630,12 +660,26 @@ function renderTaskSection(title, items) {
             this.classList.add('checked');
             el.style.opacity = '0.5';
             try {
+                // Mark as completed
                 await fetch(CONFIG.MANAGE_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
                     body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                 });
-                setTimeout(() => el.remove(), 500);
+
+                // If recurring, create the next occurrence
+                if (meta.recurrence) {
+                    const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
+                    const newContent = t.content;
+                    // Capture a new thought with the next due date
+                    await fetch(CONFIG.ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                        body: JSON.stringify({ text: `${newContent} (recurring: ${meta.recurrence}, due ${nextDate})` })
+                    });
+                }
+
+                setTimeout(() => { el.remove(); loadTasksDashboard(); }, 500);
             } catch(err) {
                 this.classList.remove('checked');
                 el.style.opacity = '1';
@@ -669,6 +713,45 @@ function renderTaskSection(title, items) {
     });
 
     dom.tasksList.appendChild(container);
+}
+
+// --- RECURRENCE DATE CALCULATOR ---
+function getNextRecurrenceDate(recurrence, currentDueDate) {
+    const today = new Date();
+    const base = currentDueDate ? new Date(currentDueDate + 'T12:00:00') : today;
+    let next = new Date(base);
+    
+    const rec = (recurrence || '').toLowerCase();
+    
+    if (rec === 'daily') {
+        // Next day from today (not from old due date)
+        next = new Date(today);
+        next.setDate(next.getDate() + 1);
+    } else if (rec.startsWith('weekly')) {
+        // weekly or weekly:monday or weekly:monday,wednesday
+        next.setDate(next.getDate() + 7);
+        // If next is in the past, fast-forward to next week from today
+        while (next <= today) next.setDate(next.getDate() + 7);
+    } else if (rec.startsWith('monthly')) {
+        // monthly or monthly:15
+        const dayMatch = rec.match(/monthly:(\d+)/);
+        if (dayMatch) {
+            next.setMonth(next.getMonth() + 1);
+            next.setDate(parseInt(dayMatch[1]));
+        } else {
+            next.setMonth(next.getMonth() + 1);
+        }
+        while (next <= today) next.setMonth(next.getMonth() + 1);
+    } else if (rec.startsWith('yearly')) {
+        next.setFullYear(next.getFullYear() + 1);
+        while (next <= today) next.setFullYear(next.getFullYear() + 1);
+    } else {
+        // Fallback: add 7 days
+        next = new Date(today);
+        next.setDate(next.getDate() + 7);
+    }
+    
+    return next.toISOString().split('T')[0]; // YYYY-MM-DD
 }
 
 function getDragAfterElement(container, y) {
