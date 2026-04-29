@@ -49,7 +49,11 @@ let isRestarting = false;
 let sessionHadResults = false;
 let lastThoughtId = null;
 let lastThoughtContent = null;  // Store content for "Edit Last"
-const SUBMIT_DELAY = 4000; // Increased to 4 seconds for better thought gathering
+let lastThoughtMeta = null;     // Store metadata for "Edit Last" modal
+const SUBMIT_DELAY = 4000;
+
+// --- MIC MUTE STATE ---
+let micMuted = false;
 
 // --- EDIT MODE STATE ---
 let editingThoughtId = null;
@@ -167,8 +171,28 @@ function startListening() {
         return;
     }
     if (isListening) return;
-    if (isSpeaking) return;  // Don't start while Maximus is talking
+    if (isSpeaking) return;
+    if (micMuted) return;  // Don't start if mic is muted
     try { recognition.start(); } catch (e) { console.log("Start failed:", e.message); }
+}
+
+function toggleMicMute() {
+    micMuted = !micMuted;
+    if (micMuted) {
+        // Stop any active listening
+        clearTimeout(submitTimer); submitTimer = null;
+        stopCountdown();
+        try { recognition.stop(); } catch(e) {}
+        isListening = false;
+        fullTranscript = '';
+        dom.orb.classList.remove('listening');
+        dom.orb.classList.add('muted');
+        dom.status.innerText = '🔇 Mic muted — double-tap orb to unmute';
+    } else {
+        dom.orb.classList.remove('muted');
+        dom.status.innerText = 'Tap to speak to Maximus';
+        // Don't auto-start; let user tap when ready
+    }
 }
 
 // --- API ---
@@ -187,10 +211,12 @@ async function askMaximus(text) {
         if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
             lastThoughtId = data.thoughtId;
             lastThoughtContent = text;
+            lastThoughtMeta = data.thoughtMeta || null;
             dom.actionButtons.classList.remove('hidden');
         } else if (data.debug?.mode === 'capture') {
             lastThoughtId = data.debug?.thoughtId; 
             lastThoughtContent = text;
+            lastThoughtMeta = data.thoughtMeta || null;
             if (lastThoughtId) dom.actionButtons.classList.remove('hidden');
         }
 
@@ -317,18 +343,36 @@ async function submitEdit() {
 }
 
 // --- EVENTS ---
+let lastOrbClick = 0;
 dom.orb.addEventListener('click', () => {
-    if (isListening || submitTimer) {
-        clearTimeout(submitTimer); submitTimer = null;
-        stopCountdown(); // Hide the wait bar immediately
-        try { recognition.stop(); } catch(e) {}
-        isListening = false;
-        dom.orb.classList.remove('listening');
-        const text = fullTranscript.trim();
-        fullTranscript = '';
-        if (text && text !== 'Listening...' && text !== 'Tap to speak to Maximus') askMaximus(text);
-        else dom.status.innerText = 'Tap to speak to Maximus';
-    } else { startListening(); }
+    const now = Date.now();
+    if (now - lastOrbClick < 400) {
+        // Double-click: toggle mic mute
+        toggleMicMute();
+        lastOrbClick = 0; // Reset to prevent triple-click
+        return;
+    }
+    lastOrbClick = now;
+    
+    // Delay single-click action to wait for possible double-click
+    setTimeout(() => {
+        if (Date.now() - lastOrbClick < 400) return; // A double-click happened
+        if (micMuted) {
+            // If muted, single tap does nothing (user must double-tap to unmute)
+            return;
+        }
+        if (isListening || submitTimer) {
+            clearTimeout(submitTimer); submitTimer = null;
+            stopCountdown();
+            try { recognition.stop(); } catch(e) {}
+            isListening = false;
+            dom.orb.classList.remove('listening');
+            const text = fullTranscript.trim();
+            fullTranscript = '';
+            if (text && text !== 'Listening...' && text !== 'Tap to speak to Maximus') askMaximus(text);
+            else dom.status.innerText = 'Tap to speak to Maximus';
+        } else { startListening(); }
+    }, 350);
 });
 
 dom.send.addEventListener('click', () => {
@@ -440,7 +484,15 @@ async function undoLastThought() {
 
 function editLastThought() {
     if (!lastThoughtId || !lastThoughtContent) return;
-    enterEditMode(lastThoughtId, lastThoughtContent);
+    const meta = lastThoughtMeta || {};
+    const type = meta.type || '';
+    // If it's a task or event, open the full Task Detail Modal
+    if (type === 'task' || type === 'event') {
+        openTaskModal(lastThoughtId, lastThoughtContent, meta);
+    } else {
+        // For other types, use inline edit mode
+        enterEditMode(lastThoughtId, lastThoughtContent);
+    }
 }
 
 dom.undoBtn.addEventListener('click', undoLastThought);

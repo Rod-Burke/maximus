@@ -158,6 +158,26 @@ main {
     to { filter: brightness(1.5); }
 }
 
+/* Muted state: grey out the orb */
+.orb.muted .orb-core {
+    background: radial-gradient(circle at 35% 35%, #666, #333);
+    box-shadow: 0 0 20px rgba(100, 100, 100, 0.3);
+}
+
+.orb.muted .orb-ring {
+    border-color: rgba(100, 100, 100, 0.2);
+    animation: none;
+}
+
+.orb.muted::after {
+    content: '🔇';
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    font-size: 1.2rem;
+    z-index: 20;
+}
+
 #status-text {
     font-size: 0.85rem;
     opacity: 0.5;
