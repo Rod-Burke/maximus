@@ -356,7 +356,7 @@ dom.orb.addEventListener('click', () => {
     
     // Delay single-click action to wait for possible double-click
     setTimeout(() => {
-        if (Date.now() - lastOrbClick < 400) return; // A double-click happened
+        if (lastOrbClick === 0) return; // A double-click happened and reset it
         if (micMuted) {
             // If muted, single tap does nothing (user must double-tap to unmute)
             return;
