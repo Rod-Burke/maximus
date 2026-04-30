@@ -835,3 +835,88 @@ button#send-btn svg {
 .modal-btn-danger:active {
     background: rgba(239, 68, 68, 0.35);
 }
+
+/* --- RECLASSIFY PICKER --- */
+.reclassify-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.5rem;
+    animation: fade-up 0.2s ease-out;
+}
+
+.reclassify-label {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.15rem;
+}
+
+.mode-btn {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.8);
+    font-family: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mode-btn:active {
+    background: var(--accent-gold);
+    color: var(--bg-color);
+    border-color: var(--accent-gold);
+}
+
+/* --- EVENT FIELDS --- */
+.event-fields {
+    animation: fade-up 0.2s ease-out;
+}
+
+/* --- TOGGLE SWITCH --- */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    transition: 0.3s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+input:checked + .toggle-slider {
+    background: var(--accent-gold);
+}
+
+input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}

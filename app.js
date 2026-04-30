@@ -46,7 +46,18 @@ const dom = {
     customPanel: document.getElementById('custom-recurrence-panel'),
     customInterval: document.getElementById('custom-interval'),
     customIntervalUnit: document.getElementById('custom-interval-unit'),
-    customEndDate: document.getElementById('custom-end-date')
+    customEndDate: document.getElementById('custom-end-date'),
+    // Event fields
+    eventFields: document.getElementById('event-fields'),
+    modalAllDay: document.getElementById('modal-all-day'),
+    modalStartTime: document.getElementById('modal-start-time'),
+    modalEndTime: document.getElementById('modal-end-time'),
+    modalLocation: document.getElementById('modal-location'),
+    timeStartField: document.getElementById('time-start-field'),
+    timeEndField: document.getElementById('time-end-field'),
+    // Reclassify
+    reclassifyBtn: document.getElementById('reclassify-btn'),
+    reclassifyPicker: document.getElementById('reclassify-picker')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -217,6 +228,7 @@ async function askMaximus(text) {
         });
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
+        lastInputText = text; // Store for reclassification
         
         // Handle "Captured as" responses to show action buttons
         if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
@@ -233,11 +245,66 @@ async function askMaximus(text) {
 
         displayResponse(answer, data.debug || {});
         speakResponse(answer);
+        // Show reclassify button after every interaction
+        dom.reclassifyPicker.classList.add('hidden');
     } catch (e) {
         console.error(e);
         displayResponse("Error connecting to Maximus.", {});
     }
 }
+
+// Track last raw input for reclassification
+let lastInputText = '';
+
+// --- RECLASSIFY LOGIC ---
+dom.reclassifyBtn.addEventListener('click', () => {
+    dom.reclassifyPicker.classList.toggle('hidden');
+});
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        if (!lastInputText) return;
+        const forceMode = btn.dataset.mode;
+        dom.reclassifyPicker.classList.add('hidden');
+        dom.status.innerText = `Re-processing as ${forceMode}...`;
+        
+        // If the previous input was captured, delete it first
+        if (lastThoughtId && forceMode !== 'capture') {
+            await fetch(CONFIG.MANAGE_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                body: JSON.stringify({ action: 'delete', id: lastThoughtId })
+            }).catch(() => {});
+            lastThoughtId = null;
+        }
+        
+        try {
+            const res = await fetch(CONFIG.ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                body: JSON.stringify({
+                    text: lastInputText,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    forceMode: forceMode
+                })
+            });
+            const data = await res.json();
+            const answer = data.text || "Couldn't process that.";
+            
+            if (data.thoughtId) {
+                lastThoughtId = data.thoughtId;
+                lastThoughtContent = lastInputText;
+                lastThoughtMeta = data.thoughtMeta || null;
+                dom.actionButtons.classList.remove('hidden');
+            }
+            
+            displayResponse(`↻ ${answer}`, data.debug || {});
+            speakResponse(answer);
+        } catch (e) {
+            displayResponse("Error re-processing.", {});
+        }
+    });
+});
 
 function displayResponse(text, debug) {
     dom.status.innerText = 'Tap to speak to Maximus';
@@ -877,6 +944,14 @@ function openTaskModal(id, content, meta) {
     dom.modalDueDate.value = meta.due_date || '';
     dom.customEndDate.value = meta.recurrence_end || '';
     
+    // Event fields
+    toggleEventFields(meta.type === 'event');
+    dom.modalAllDay.checked = meta.all_day !== false; // default true
+    dom.modalStartTime.value = meta.start_time || '';
+    dom.modalEndTime.value = meta.end_time || '';
+    dom.modalLocation.value = meta.location || '';
+    toggleTimeFields(!dom.modalAllDay.checked);
+    
     // Parse recurrence into the UI
     const rec = meta.recurrence || '';
     if (rec.startsWith('custom:')) {
@@ -890,10 +965,22 @@ function openTaskModal(id, content, meta) {
         dom.modalRecurrence.value = rec;
         dom.customPanel.classList.add('hidden');
     }
-    // Clear day buttons state based on recurrence
     if (!rec.startsWith('custom:')) resetDayButtons();
     
     dom.modal.classList.remove('hidden');
+}
+
+function toggleEventFields(show) {
+    if (show) {
+        dom.eventFields.classList.remove('hidden');
+    } else {
+        dom.eventFields.classList.add('hidden');
+    }
+}
+
+function toggleTimeFields(show) {
+    dom.timeStartField.style.display = show ? '' : 'none';
+    dom.timeEndField.style.display = show ? '' : 'none';
 }
 
 function parseCustomRecurrenceToUI(rec) {
@@ -926,6 +1013,7 @@ function getCustomRecurrenceValue() {
 function closeTaskModal() {
     dom.modal.classList.add('hidden');
     dom.customPanel.classList.add('hidden');
+    dom.eventFields.classList.add('hidden');
     resetDayButtons();
     modalThoughtId = null;
 }
@@ -947,6 +1035,16 @@ dom.modalRecurrence.addEventListener('change', () => {
 // Day button toggles
 document.querySelectorAll('.day-btn').forEach(btn => {
     btn.addEventListener('click', () => btn.classList.toggle('active'));
+});
+
+// Show/hide event fields when type changes
+dom.modalType.addEventListener('change', () => {
+    toggleEventFields(dom.modalType.value === 'event');
+});
+
+// Show/hide time fields when all-day changes
+dom.modalAllDay.addEventListener('change', () => {
+    toggleTimeFields(!dom.modalAllDay.checked);
 });
 
 dom.modalSave.addEventListener('click', async () => {
@@ -975,7 +1073,12 @@ dom.modalSave.addEventListener('click', async () => {
                 due_date: dom.modalDueDate.value || null,
                 recurrence: recurrenceValue,
                 recurrence_end: dom.customEndDate.value || null,
-                notes: dom.modalNotes.value.trim() || null
+                notes: dom.modalNotes.value.trim() || null,
+                // Event-specific fields
+                all_day: dom.modalType.value === 'event' ? dom.modalAllDay.checked : null,
+                start_time: dom.modalType.value === 'event' && !dom.modalAllDay.checked ? dom.modalStartTime.value || null : null,
+                end_time: dom.modalType.value === 'event' && !dom.modalAllDay.checked ? dom.modalEndTime.value || null : null,
+                location: dom.modalType.value === 'event' ? dom.modalLocation.value.trim() || null : null
             }
         };
 

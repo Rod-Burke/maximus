@@ -55,6 +55,21 @@
                         </svg>
                         <span>Edit Last</span>
                     </button>
+                    <button id="reclassify-btn" class="action-btn reclassify-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 4v6h6M23 20v-6h-6"/>
+                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                        </svg>
+                        <span>Reclassify</span>
+                    </button>
+                </div>
+                <!-- Reclassify Mode Picker (hidden by default) -->
+                <div id="reclassify-picker" class="reclassify-picker hidden">
+                    <span class="reclassify-label">Re-process as:</span>
+                    <button class="mode-btn" data-mode="capture">💾 Save</button>
+                    <button class="mode-btn" data-mode="query">❓ Query</button>
+                    <button class="mode-btn" data-mode="briefing">📋 Briefing</button>
+                    <button class="mode-btn" data-mode="update">✏️ Update</button>
                 </div>
             </div>
             
@@ -138,6 +153,34 @@
                             <label class="modal-label">Due Date</label>
                             <input type="date" id="modal-due-date" class="modal-input">
                         </div>
+                    </div>
+
+                    <!-- Event-specific fields (hidden unless type = event) -->
+                    <div id="event-fields" class="event-fields hidden">
+                        <div class="modal-row">
+                            <div class="modal-field" style="flex: 0 0 auto;">
+                                <label class="modal-label">All Day</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="modal-all-day" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="modal-field" id="time-start-field">
+                                <label class="modal-label">Start Time</label>
+                                <input type="time" id="modal-start-time" class="modal-input">
+                            </div>
+                            <div class="modal-field" id="time-end-field">
+                                <label class="modal-label">End Time</label>
+                                <input type="time" id="modal-end-time" class="modal-input">
+                            </div>
+                        </div>
+                        <div class="modal-row">
+                            <div class="modal-field">
+                                <label class="modal-label">Location</label>
+                                <input type="text" id="modal-location" class="modal-input" placeholder="Add location...">
+                            </div>
+                        </div>
+                    </div>
                         <div class="modal-field">
                             <label class="modal-label">Recurrence</label>
                             <select id="modal-recurrence" class="modal-select">
