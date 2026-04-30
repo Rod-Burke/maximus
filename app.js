@@ -213,7 +213,7 @@ async function askMaximus(text) {
         const res = await fetch(CONFIG.ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ text, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
         });
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
