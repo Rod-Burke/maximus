@@ -31,6 +31,108 @@ body {
     height: 100%;
 }
 
+main {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+footer {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    background: rgba(15, 23, 42, 0.95);
+    border-top: 1px solid var(--glass-border);
+    z-index: 200;
+}
+
+.input-tray {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.input-tray textarea {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    background: var(--glass-bg);
+    color: white;
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.8rem;
+    min-height: 24px;
+    max-height: 120px;
+    overflow-y: auto;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.input-tray textarea:focus {
+    border-color: var(--accent-gold);
+}
+
+.input-tray textarea::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+#send-btn {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--accent-gold);
+    border: none;
+    color: var(--bg-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+}
+
+#send-btn:active {
+    transform: scale(0.9);
+    opacity: 0.8;
+}
+
+#send-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Install Banner - positioned at top to avoid blocking input */
+.banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--accent-gold);
+    color: var(--bg-color);
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 300;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.banner button {
+    background: var(--bg-color);
+    color: var(--accent-gold);
+    border: none;
+    border-radius: 20px;
+    padding: 0.3rem 1rem;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 header {
     padding: 1.5rem 1.5rem 0.5rem;
     display: flex;
