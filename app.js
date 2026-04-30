@@ -218,17 +218,30 @@ function toggleMicMute() {
 }
 
 // --- API ---
+let followUpContext = null; // Stores { userInput, maximusResponse } for conversational replies
+
 async function askMaximus(text) {
     dom.status.innerText = 'Consulting Maximus...';
     try {
+        const payload = {
+            text,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+        
+        // If in follow-up mode, include conversation context
+        if (followUpContext) {
+            payload.followUp = followUpContext;
+            exitFollowUpMode();
+        }
+        
         const res = await fetch(CONFIG.ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ text, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
-        lastInputText = text; // Store for reclassification
+        lastInputText = text;
         
         // Handle "Captured as" responses to show action buttons
         if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
@@ -245,12 +258,29 @@ async function askMaximus(text) {
 
         displayResponse(answer, data.debug || {});
         speakResponse(answer);
-        // Show reclassify button after every interaction
         dom.reclassifyPicker.classList.add('hidden');
+        
+        // If Maximus asked a question, enter follow-up mode
+        if (answer.includes('?')) {
+            enterFollowUpMode(text, answer);
+        }
     } catch (e) {
         console.error(e);
         displayResponse("Error connecting to Maximus.", {});
     }
+}
+
+function enterFollowUpMode(userInput, maximusResponse) {
+    followUpContext = { userInput, maximusResponse };
+    dom.input.placeholder = '💬 Reply to Maximus...';
+    dom.input.classList.add('reply-mode');
+    dom.status.innerText = '💬 Maximus is waiting for your reply';
+}
+
+function exitFollowUpMode() {
+    followUpContext = null;
+    dom.input.placeholder = 'Type a thought or question...';
+    dom.input.classList.remove('reply-mode');
 }
 
 // Track last raw input for reclassification
