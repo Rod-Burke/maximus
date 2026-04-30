@@ -5,6 +5,12 @@ const CONFIG = {
     EMAIL: 'Fra_roderic@outlook.com'
 };
 
+// Local timezone date helper (returns YYYY-MM-DD in user's timezone)
+function getLocalDateStr(date) {
+    const d = date || new Date();
+    return d.toLocaleDateString('en-CA'); // en-CA format = YYYY-MM-DD
+}
+
 const dom = {
     orb: document.getElementById('voice-trigger'),
     status: document.getElementById('status-text'),
@@ -548,7 +554,7 @@ async function loadTasksDashboard() {
         const recurring = [];
         const actionable = [];
 
-        const todayStr_pre = new Date().toISOString().split('T')[0];
+        const todayStr_pre = getLocalDateStr();
         activeItems.forEach(t => {
             const meta = t.metadata || {};
             const rec = (meta.recurrence || '').toLowerCase();
@@ -568,7 +574,7 @@ async function loadTasksDashboard() {
         const events = [];
         const todayTasks = [];
         const unscheduled = [];
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalDateStr();
 
         actionable.forEach(t => {
             const meta = t.metadata || {};
@@ -829,7 +835,7 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
         next.setDate(next.getDate() + 7);
     }
     
-    return next.toISOString().split('T')[0]; // YYYY-MM-DD
+    return getLocalDateStr(next); // YYYY-MM-DD in local timezone
 }
 
 function getDragAfterElement(container, y) {
