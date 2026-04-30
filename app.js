@@ -1,6 +1,7 @@
 const CONFIG = {
     ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/voice-gateway',
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
+    SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
     KEY: 'eddaa00be5289a5cd4130b01055cdef8123fa72994a9ad9784256806c2339ace',
     EMAIL: 'Fra_roderic@outlook.com'
 };
@@ -22,6 +23,7 @@ const dom = {
     tasksBtn: document.getElementById('tasks-btn'),
     tasksPanel: document.getElementById('tasks-panel'),
     closeTasks: document.getElementById('close-tasks'),
+    syncTasksBtn: document.getElementById('sync-tasks'),
     tasksList: document.getElementById('tasks-list'),
     historyPanel: document.getElementById('history-panel'),
     closeHistory: document.getElementById('close-history'),
@@ -610,6 +612,21 @@ dom.editLastBtn.addEventListener('click', editLastThought);
 // --- TASKS DASHBOARD ---
 dom.tasksBtn.addEventListener('click', () => { dom.tasksPanel.classList.remove('hidden'); loadTasksDashboard(); });
 dom.closeTasks.addEventListener('click', () => dom.tasksPanel.classList.add('hidden'));
+
+dom.syncTasksBtn.addEventListener('click', async () => {
+    dom.tasksList.innerHTML = '<div class="history-empty">Syncing with Google...</div>';
+    try {
+        await fetch(CONFIG.SYNC_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'pull' })
+        });
+        loadTasksDashboard();
+    } catch (e) {
+        alert('Sync failed.');
+        loadTasksDashboard();
+    }
+});
 
 let draggedTask = null;
 

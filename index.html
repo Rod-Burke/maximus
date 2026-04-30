@@ -97,13 +97,20 @@
 
         <!-- Tasks Panel (hidden by default) -->
         <div id="tasks-panel" class="history-panel hidden">
-            <div class="history-header">
+            <div class="history-header" style="display: flex; align-items: center; justify-content: space-between;">
                 <h2>Tasks & Events</h2>
-                <button id="close-tasks" class="icon-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="sync-tasks" class="icon-btn" title="Sync with Google">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <button id="close-tasks" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div id="tasks-list" class="history-list tasks-list">
                 <!-- Tasks populated by JS -->
