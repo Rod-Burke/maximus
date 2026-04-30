@@ -57,7 +57,8 @@ const dom = {
     timeEndField: document.getElementById('time-end-field'),
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
-    reclassifyPicker: document.getElementById('reclassify-picker')
+    reclassifyPicker: document.getElementById('reclassify-picker'),
+    modalTitle: document.getElementById('modal-title')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -997,6 +998,9 @@ function openTaskModal(id, content, meta) {
     }
     if (!rec.startsWith('custom:')) resetDayButtons();
     
+    // Set modal title based on type
+    updateModalTitle(meta.type || 'task');
+    
     dom.modal.classList.remove('hidden');
 }
 
@@ -1011,6 +1015,18 @@ function toggleEventFields(show) {
 function toggleTimeFields(show) {
     dom.timeStartField.style.display = show ? '' : 'none';
     dom.timeEndField.style.display = show ? '' : 'none';
+}
+
+function updateModalTitle(type) {
+    const titles = {
+        task: 'Task Details',
+        event: 'Event Details',
+        observation: 'Observation Details',
+        idea: 'Idea Details',
+        reference: 'Reference Details',
+        person_note: 'Person Note Details'
+    };
+    dom.modalTitle.textContent = titles[type] || 'Details';
 }
 
 function parseCustomRecurrenceToUI(rec) {
@@ -1070,6 +1086,7 @@ document.querySelectorAll('.day-btn').forEach(btn => {
 // Show/hide event fields when type changes
 dom.modalType.addEventListener('change', () => {
     toggleEventFields(dom.modalType.value === 'event');
+    updateModalTitle(dom.modalType.value);
 });
 
 // Show/hide time fields when all-day changes
