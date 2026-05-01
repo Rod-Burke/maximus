@@ -897,46 +897,72 @@ function renderTaskSection(title, items) {
             saveNewOrder(container);
         });
 
-        // Checkbox complete
+        // Checkbox complete / uncomplete
         el.querySelector('.task-checkbox').addEventListener('click', async function(e) {
             e.stopPropagation();
-            this.classList.add('checked');
-            el.style.opacity = '0.5';
-            try {
-                if (meta.recurrence) {
-                    // Recurring task: DON'T mark as completed — roll due_date forward
-                    const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
-                    // Check if recurrence has ended
-                    const endDate = meta.recurrence_end;
-                    if (endDate && nextDate > endDate) {
-                        // Recurrence is over — mark as completed
+            const wasCompleted = meta.status === 'completed';
+
+            if (wasCompleted) {
+                // UNCOMPLETE TASK
+                this.classList.remove('checked');
+                el.style.opacity = '1';
+                meta.status = 'pending';
+                try {
+                    await fetch(CONFIG.MANAGE_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'pending' }})
+                    });
+                    // If we are in search view, don't remove the element. If we are in regular view, it shouldn't be here anyway.
+                } catch(err) {
+                    this.classList.add('checked');
+                    el.style.opacity = '0.5';
+                    meta.status = 'completed';
+                    alert('Error uncompleting task.');
+                }
+            } else {
+                // COMPLETE TASK
+                this.classList.add('checked');
+                el.style.opacity = '0.5';
+                try {
+                    if (meta.recurrence) {
+                        // Recurring task: DON'T mark as completed — roll due_date forward
+                        const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
+                        // Check if recurrence has ended
+                        const endDate = meta.recurrence_end;
+                        if (endDate && nextDate > endDate) {
+                            // Recurrence is over — mark as completed
+                            await fetch(CONFIG.MANAGE_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                            });
+                        } else {
+                            // Update due_date to next occurrence
+                            await fetch(CONFIG.MANAGE_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
+                            });
+                        }
+                    } else {
+                        // Non-recurring: mark as completed
                         await fetch(CONFIG.MANAGE_ENDPOINT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
                             body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                         });
-                    } else {
-                        // Update due_date to next occurrence
-                        await fetch(CONFIG.MANAGE_ENDPOINT, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
-                        });
                     }
-                } else {
-                    // Non-recurring: mark as completed
-                    await fetch(CONFIG.MANAGE_ENDPOINT, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
-                    });
-                }
 
-                setTimeout(() => { el.remove(); loadTasksDashboard(); }, 500);
-            } catch(err) {
-                this.classList.remove('checked');
-                el.style.opacity = '1';
-                alert('Error completing task.');
+                    // Only reload dashboard if we aren't in semantic search view
+                    if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
+                        setTimeout(() => { el.remove(); loadTasksDashboard(); }, 500);
+                    }
+                } catch(err) {
+                    this.classList.remove('checked');
+                    el.style.opacity = '1';
+                    alert('Error completing task.');
+                }
             }
         });
 
