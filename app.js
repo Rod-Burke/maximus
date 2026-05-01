@@ -867,8 +867,11 @@ function renderTaskSection(title, items) {
         const recMeta = meta.recurrence ? `↺ ${meta.recurrence}` : '';
         const metaStr = [dueMeta, recMeta].filter(Boolean).join(' | ');
 
+        const isCompleted = meta.status === 'completed';
+        const checkboxClass = isCompleted ? 'task-checkbox checked' : 'task-checkbox';
+        
         el.innerHTML = `
-            <div class="task-checkbox"></div>
+            <div class="${checkboxClass}"></div>
             <div class="task-content-wrapper">
                 <div class="task-content">${t.content}</div>
                 ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
@@ -877,6 +880,10 @@ function renderTaskSection(title, items) {
                 <button class="bump-btn" title="Bump to Top">↑</button>
             </div>
         `;
+
+        if (isCompleted) {
+            el.style.opacity = '0.5';
+        }
 
         // Drag and Drop Handlers
         el.addEventListener('dragstart', () => {
