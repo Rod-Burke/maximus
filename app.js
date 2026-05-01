@@ -31,6 +31,7 @@ const dom = {
     actionButtons: document.getElementById('action-buttons'),
     undoBtn: document.getElementById('undo-btn'),
     editLastBtn: document.getElementById('edit-last-btn'),
+    detailsLastBtn: document.getElementById('details-last-btn'),
     countdownBar: document.getElementById('countdown-bar'),
     inputTray: document.querySelector('.input-tray'),
     // Modal
@@ -536,10 +537,15 @@ async function loadHistory() {
             el.innerHTML = `<div class="thought-content">${t.content}</div>
                 <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}</span></div>
                 <div class="item-actions">
-                    <button class="edit-btn" title="Edit">
+                    <button class="edit-btn" title="Edit Text">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="details-btn" title="Edit Details / Change Type">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
                         </svg>
                     </button>
                     <button class="delete-btn" title="Delete">
@@ -551,6 +557,10 @@ async function loadHistory() {
             el.querySelector('.edit-btn').addEventListener('click', () => {
                 dom.historyPanel.classList.add('hidden');
                 enterEditMode(t.id, t.content);
+            });
+            el.querySelector('.details-btn').addEventListener('click', () => {
+                dom.historyPanel.classList.add('hidden');
+                openTaskModal(t.id, t.content, t.metadata || t.payload || {});
             });
             el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
             dom.historyList.appendChild(el);
@@ -596,19 +606,18 @@ async function undoLastThought() {
 
 function editLastThought() {
     if (!lastThoughtId || !lastThoughtContent) return;
+    enterEditMode(lastThoughtId, lastThoughtContent);
+}
+
+function detailsLastThought() {
+    if (!lastThoughtId || !lastThoughtContent) return;
     const meta = lastThoughtMeta || {};
-    const type = meta.type || '';
-    // If it's a task or event, open the full Task Detail Modal
-    if (type === 'task' || type === 'event') {
-        openTaskModal(lastThoughtId, lastThoughtContent, meta);
-    } else {
-        // For other types, use inline edit mode
-        enterEditMode(lastThoughtId, lastThoughtContent);
-    }
+    openTaskModal(lastThoughtId, lastThoughtContent, meta);
 }
 
 dom.undoBtn.addEventListener('click', undoLastThought);
 dom.editLastBtn.addEventListener('click', editLastThought);
+dom.detailsLastBtn.addEventListener('click', detailsLastThought);
 
 // --- TASKS DASHBOARD ---
 dom.tasksBtn.addEventListener('click', () => { dom.tasksPanel.classList.remove('hidden'); loadTasksDashboard(); });

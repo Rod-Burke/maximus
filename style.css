@@ -301,6 +301,8 @@ main {
 /* --- ACTION BUTTONS (Undo + Edit Last) --- */
 .action-buttons {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 0.75rem;
     margin-top: 0.5rem;
     animation: fade-up 0.3s ease-out;
@@ -345,6 +347,16 @@ main {
 
 .edit-last-btn:active {
     background: rgba(59, 130, 246, 0.3);
+}
+
+.details-last-btn {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    color: var(--accent-gold);
+}
+
+.details-last-btn:active {
+    background: rgba(251, 191, 36, 0.3);
 }
 
 /* --- CHAT OUTPUT --- */
@@ -460,6 +472,7 @@ main {
 }
 
 .history-item .edit-btn,
+.history-item .details-btn,
 .history-item .delete-btn {
     width: 32px;
     height: 32px;
@@ -480,6 +493,15 @@ main {
 .history-item .edit-btn:active {
     background: rgba(59, 130, 246, 0.4);
 }
+
+.history-item .edit-btn:hover { background: rgba(59, 130, 246, 0.25); }
+
+.history-item .details-btn {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--accent-gold);
+}
+.history-item .details-btn:hover { background: rgba(251, 191, 36, 0.25); }
 
 .history-item .delete-btn {
     background: rgba(239, 68, 68, 0.15);
