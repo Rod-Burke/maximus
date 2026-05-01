@@ -528,60 +528,78 @@ async function loadHistory() {
             body: JSON.stringify({ action: 'list', limit: 30 })
         });
         const data = await res.json();
-        if (!data.thoughts?.length) { dom.historyList.innerHTML = '<div class="history-empty">No thoughts yet.</div>'; return; }
-        dom.historyList.innerHTML = '';
-        data.thoughts.forEach(t => {
-            const d = new Date(t.created_at);
-            const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const type = t.metadata?.type || t.payload?.type || 'thought';
-            const el = document.createElement('div');
-            el.className = 'history-item';
-            el.innerHTML = `<div class="thought-content">${t.content}</div>
-                <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}</span></div>
-                <div class="item-actions">
-                    <button class="edit-btn" title="Edit Text">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="details-btn" title="Edit Details / Change Type">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
-                        </svg>
-                    </button>
-                    <button class="delete-btn" title="Delete">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </button>
-                </div>`;
-            el.querySelector('.edit-btn').addEventListener('click', () => {
-                dom.historyPanel.classList.add('hidden');
-                enterEditMode(t.id, t.content);
-            });
-            el.querySelector('.details-btn').addEventListener('click', () => {
-                dom.historyPanel.classList.add('hidden');
-                openTaskModal(t.id, t.content, t.metadata || t.payload || {});
-            });
-            el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
-            dom.historyList.appendChild(el);
-        });
+        renderHistoryList(data.thoughts);
     } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading.</div>'; }
 }
 
-dom.historySearch.addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    const items = dom.historyList.querySelectorAll('.history-item');
-    items.forEach(el => {
-        const text = el.querySelector('.thought-content').innerText.toLowerCase();
-        const type = el.querySelector('.thought-type').innerText.toLowerCase();
-        if (text.includes(q) || type.includes(q)) {
-            el.style.display = '';
-        } else {
-            el.style.display = 'none';
+function renderHistoryList(thoughts) {
+    if (!thoughts?.length) { dom.historyList.innerHTML = '<div class="history-empty">No thoughts found.</div>'; return; }
+    dom.historyList.innerHTML = '';
+    thoughts.forEach(t => {
+        const d = new Date(t.created_at);
+        const ds = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const type = t.metadata?.type || t.payload?.type || 'thought';
+        let matchStr = '';
+        if (t.similarity) {
+            const perc = Math.round(t.similarity * 100);
+            matchStr = ` <span style="color:var(--accent-gold);margin-left:5px;">${perc}% Match</span>`;
         }
+        
+        const el = document.createElement('div');
+        el.className = 'history-item';
+        el.innerHTML = `<div class="thought-content">${t.content}</div>
+            <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
+            <div class="item-actions">
+                <button class="edit-btn" title="Edit Text">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+                <button class="details-btn" title="Edit Details / Change Type">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
+                    </svg>
+                </button>
+                <button class="delete-btn" title="Delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </div>`;
+        el.querySelector('.edit-btn').addEventListener('click', () => {
+            dom.historyPanel.classList.add('hidden');
+            enterEditMode(t.id, t.content);
+        });
+        el.querySelector('.details-btn').addEventListener('click', () => {
+            dom.historyPanel.classList.add('hidden');
+            openTaskModal(t.id, t.content, t.metadata || t.payload || {});
+        });
+        el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
+        dom.historyList.appendChild(el);
     });
+}
+
+let historySearchTimeout = null;
+dom.historySearch.addEventListener('input', function() {
+    clearTimeout(historySearchTimeout);
+    const q = this.value;
+    historySearchTimeout = setTimeout(async () => {
+        if (!q.trim()) {
+            loadHistory();
+        } else {
+            dom.historyList.innerHTML = '<div class="history-empty">Searching meaning...</div>';
+            try {
+                const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'search', query: q, limit: 30 })
+                });
+                const data = await res.json();
+                renderHistoryList(data.thoughts);
+            } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error searching.</div>'; }
+        }
+    }, 500);
 });
 
 async function deleteThought(id, el) {
@@ -654,17 +672,40 @@ dom.syncTasksBtn.addEventListener('click', async () => {
     }
 });
 
+let tasksSearchTimeout = null;
 dom.tasksSearch.addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    const items = dom.tasksList.querySelectorAll('.task-item');
-    items.forEach(el => {
-        const text = el.querySelector('.task-content').innerText.toLowerCase();
-        if (text.includes(q)) {
-            el.style.display = '';
+    clearTimeout(tasksSearchTimeout);
+    const q = this.value;
+    tasksSearchTimeout = setTimeout(async () => {
+        if (!q.trim()) {
+            loadTasksDashboard();
         } else {
-            el.style.display = 'none';
+            dom.tasksList.innerHTML = '<div class="history-empty">Searching tasks semantics...</div>';
+            try {
+                const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'search', query: q, limit: 50 })
+                });
+                const data = await res.json();
+                
+                // Filter to only actionable items for the tasks board
+                const filtered = data.thoughts.filter(t => {
+                    const type = t.metadata?.type || t.payload?.type || '';
+                    return type === 'task' || type === 'event';
+                });
+                
+                dom.tasksList.innerHTML = '';
+                if (!filtered.length) {
+                    dom.tasksList.innerHTML = '<div class="history-empty">No matching tasks found.</div>';
+                } else {
+                    renderTaskSection(`Semantic Matches for "${q}"`, filtered);
+                }
+            } catch (e) {
+                dom.tasksList.innerHTML = '<div class="history-empty">Error searching.</div>';
+            }
         }
-    });
+    }, 500);
 });
 
 let draggedTask = null;
