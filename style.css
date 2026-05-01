@@ -427,6 +427,27 @@ main {
     padding: 1rem;
 }
 
+.search-container {
+    padding: 0.5rem 1rem 0;
+}
+
+.search-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 .history-item {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);

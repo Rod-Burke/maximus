@@ -28,6 +28,8 @@ const dom = {
     historyPanel: document.getElementById('history-panel'),
     closeHistory: document.getElementById('close-history'),
     historyList: document.getElementById('history-list'),
+    historySearch: document.getElementById('history-search'),
+    tasksSearch: document.getElementById('tasks-search'),
     actionButtons: document.getElementById('action-buttons'),
     undoBtn: document.getElementById('undo-btn'),
     editLastBtn: document.getElementById('edit-last-btn'),
@@ -568,6 +570,20 @@ async function loadHistory() {
     } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading.</div>'; }
 }
 
+dom.historySearch.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const items = dom.historyList.querySelectorAll('.history-item');
+    items.forEach(el => {
+        const text = el.querySelector('.thought-content').innerText.toLowerCase();
+        const type = el.querySelector('.thought-type').innerText.toLowerCase();
+        if (text.includes(q) || type.includes(q)) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    });
+});
+
 async function deleteThought(id, el) {
     if (!confirm('Delete this thought?')) return;
     el.classList.add('deleting');
@@ -636,6 +652,19 @@ dom.syncTasksBtn.addEventListener('click', async () => {
         alert('Sync failed.');
         loadTasksDashboard();
     }
+});
+
+dom.tasksSearch.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const items = dom.tasksList.querySelectorAll('.task-item');
+    items.forEach(el => {
+        const text = el.querySelector('.task-content').innerText.toLowerCase();
+        if (text.includes(q)) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    });
 });
 
 let draggedTask = null;
