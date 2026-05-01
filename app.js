@@ -37,6 +37,7 @@ const dom = {
     modal: document.getElementById('task-detail-modal'),
     modalContent: document.getElementById('modal-content-input'),
     modalNotes: document.getElementById('modal-notes-input'),
+    modalNotesLinks: document.getElementById('modal-notes-links'),
     modalType: document.getElementById('modal-type'),
     modalPriority: document.getElementById('modal-priority'),
     modalDueDate: document.getElementById('modal-due-date'),
@@ -983,10 +984,28 @@ async function saveNewOrder(container) {
 // --- TASK DETAIL MODAL ---
 let modalThoughtId = null;
 
+function renderNotesLinks(text) {
+    if (!text) {
+        dom.modalNotesLinks.innerHTML = '';
+        return;
+    }
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const links = text.match(urlRegex) || [];
+    if (links.length > 0) {
+        dom.modalNotesLinks.innerHTML = links.map(url => 
+            `<a href="${url}" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">${url}</a>`
+        ).join('');
+    } else {
+        dom.modalNotesLinks.innerHTML = '';
+    }
+}
+
 function openTaskModal(id, content, meta) {
     modalThoughtId = id;
     dom.modalContent.value = content;
     dom.modalNotes.value = meta.notes || '';
+    renderNotesLinks(meta.notes);
+    
     dom.modalType.value = meta.type || 'task';
     dom.modalPriority.value = meta.priority || 'normal';
     dom.modalDueDate.value = meta.due_date || '';
@@ -1084,6 +1103,11 @@ function closeTaskModal() {
 dom.modalClose.addEventListener('click', closeTaskModal);
 dom.modal.addEventListener('click', (e) => {
     if (e.target === dom.modal) closeTaskModal();
+});
+
+// Live update links while typing in notes
+dom.modalNotes.addEventListener('input', () => {
+    renderNotesLinks(dom.modalNotes.value);
 });
 
 // Show/hide custom recurrence panel
