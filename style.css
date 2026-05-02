@@ -548,8 +548,94 @@ main {
 
 .history-empty {
     text-align: center;
-    opacity: 0.3;
-    padding: 3rem;
+    padding: 2rem;
+    opacity: 0.5;
+}
+
+/* Bulk Actions & Declutter Mode */
+#declutter-btn.active {
+    background: rgba(255, 60, 60, 0.2);
+    border-color: rgba(255, 60, 60, 0.5);
+    color: #ff5555;
+}
+
+.bulk-actions-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--glass-border);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+}
+
+.bulk-actions-bar.hidden {
+    display: none !important;
+}
+
+#bulk-count {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.bulk-delete-btn {
+    background: #e63946;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-delete-btn:hover {
+    background: #ff5252;
+}
+
+.junk-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    margin-right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.junk-checkbox.checked {
+    background: #e63946;
+    border-color: #e63946;
+}
+
+.junk-checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.history-item.selectable {
+    flex-direction: row;
+    align-items: center;
+    cursor: pointer;
+}
+
+.history-item.selectable:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.history-item.selectable .item-actions {
+    display: none;
+}
     font-weight: 300;
 }
 

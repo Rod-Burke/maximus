@@ -48,6 +48,11 @@ const dom = {
     modalSave: document.getElementById('modal-save-btn'),
     modalDelete: document.getElementById('modal-delete-btn'),
     modalClose: document.getElementById('close-modal'),
+    // Declutter Mode
+    declutterBtn: document.getElementById('declutter-btn'),
+    bulkActionsBar: document.getElementById('bulk-actions-bar'),
+    bulkCount: document.getElementById('bulk-count'),
+    bulkDeleteBtn: document.getElementById('bulk-delete-btn'),
     // Custom Recurrence
     customPanel: document.getElementById('custom-recurrence-panel'),
     customInterval: document.getElementById('custom-interval'),
@@ -516,8 +521,48 @@ dom.input.addEventListener('input', function() {
 });
 
 // --- HISTORY ---
+let isDeclutterMode = false;
+let selectedJunkIds = new Set();
+
+dom.declutterBtn.addEventListener('click', () => {
+    isDeclutterMode = !isDeclutterMode;
+    selectedJunkIds.clear();
+    dom.declutterBtn.classList.toggle('active', isDeclutterMode);
+    
+    if (isDeclutterMode) {
+        dom.bulkActionsBar.classList.remove('hidden');
+        dom.historySearch.value = '';
+        dom.historySearch.disabled = true;
+        loadJunkHistory();
+    } else {
+        dom.bulkActionsBar.classList.add('hidden');
+        dom.historySearch.disabled = false;
+        loadHistory();
+    }
+    updateBulkCount();
+});
+
 dom.historyBtn.addEventListener('click', () => { dom.historyPanel.classList.remove('hidden'); loadHistory(); });
-dom.closeHistory.addEventListener('click', () => dom.historyPanel.classList.add('hidden'));
+dom.closeHistory.addEventListener('click', () => {
+    dom.historyPanel.classList.add('hidden');
+    isDeclutterMode = false;
+    dom.declutterBtn.classList.remove('active');
+    dom.bulkActionsBar.classList.add('hidden');
+    dom.historySearch.disabled = false;
+});
+
+async function loadJunkHistory() {
+    dom.historyList.innerHTML = '<div class="history-empty">Scanning for short, accidental thoughts...</div>';
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'list_junk' })
+        });
+        const data = await res.json();
+        renderHistoryList(data.thoughts);
+    } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading junk.</div>'; }
+}
 
 async function loadHistory() {
     dom.historyList.innerHTML = '<div class="history-empty">Loading...</div>';
@@ -531,6 +576,34 @@ async function loadHistory() {
         renderHistoryList(data.thoughts);
     } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading.</div>'; }
 }
+
+function updateBulkCount() {
+    dom.bulkCount.innerText = `${selectedJunkIds.size} selected`;
+    dom.bulkDeleteBtn.style.opacity = selectedJunkIds.size > 0 ? '1' : '0.5';
+    dom.bulkDeleteBtn.disabled = selectedJunkIds.size === 0;
+}
+
+dom.bulkDeleteBtn.addEventListener('click', async () => {
+    if (selectedJunkIds.size === 0) return;
+    if (!confirm(`Do you really want to permanently Delete ${selectedJunkIds.size} thoughts?`)) return;
+    
+    dom.bulkDeleteBtn.innerText = 'Deleting...';
+    dom.bulkDeleteBtn.disabled = true;
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'bulk_delete', ids: Array.from(selectedJunkIds) })
+        });
+        selectedJunkIds.clear();
+        updateBulkCount();
+        loadJunkHistory();
+    } catch(err) {
+        alert('Bulk delete failed.');
+    } finally {
+        dom.bulkDeleteBtn.innerText = 'Delete Selected';
+    }
+});
 
 function renderHistoryList(thoughts) {
     if (!thoughts?.length) { dom.historyList.innerHTML = '<div class="history-empty">No thoughts found.</div>'; return; }
@@ -547,35 +620,63 @@ function renderHistoryList(thoughts) {
         
         const el = document.createElement('div');
         el.className = 'history-item';
-        el.innerHTML = `<div class="thought-content">${t.content}</div>
-            <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
-            <div class="item-actions">
-                <button class="edit-btn" title="Edit Text">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                </button>
-                <button class="details-btn" title="Edit Details / Change Type">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
-                    </svg>
-                </button>
-                <button class="delete-btn" title="Delete">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                </button>
-            </div>`;
-        el.querySelector('.edit-btn').addEventListener('click', () => {
-            dom.historyPanel.classList.add('hidden');
-            enterEditMode(t.id, t.content);
-        });
-        el.querySelector('.details-btn').addEventListener('click', () => {
-            dom.historyPanel.classList.add('hidden');
-            openTaskModal(t.id, t.content, t.metadata || t.payload || {});
-        });
-        el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
+        
+        if (isDeclutterMode) {
+            el.classList.add('selectable');
+            const isSelected = selectedJunkIds.has(t.id);
+            const checkClass = isSelected ? 'junk-checkbox checked' : 'junk-checkbox';
+            
+            el.innerHTML = `
+                <div class="${checkClass}"></div>
+                <div style="flex:1;">
+                    <div class="thought-content">${t.content}</div>
+                    <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
+                </div>
+            `;
+            
+            el.addEventListener('click', () => {
+                const box = el.querySelector('.junk-checkbox');
+                if (selectedJunkIds.has(t.id)) {
+                    selectedJunkIds.delete(t.id);
+                    box.classList.remove('checked');
+                } else {
+                    selectedJunkIds.add(t.id);
+                    box.classList.add('checked');
+                }
+                updateBulkCount();
+            });
+        } else {
+            el.innerHTML = `<div class="thought-content">${t.content}</div>
+                <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
+                <div class="item-actions">
+                    <button class="edit-btn" title="Edit Text">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="details-btn" title="Edit Details / Change Type">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
+                        </svg>
+                    </button>
+                    <button class="delete-btn" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>`;
+            el.querySelector('.edit-btn').addEventListener('click', () => {
+                dom.historyPanel.classList.add('hidden');
+                enterEditMode(t.id, t.content);
+            });
+            el.querySelector('.details-btn').addEventListener('click', () => {
+                dom.historyPanel.classList.add('hidden');
+                openTaskModal(t.id, t.content, t.metadata || t.payload || {});
+            });
+            el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
+        }
+        
         dom.historyList.appendChild(el);
     });
 }
@@ -584,6 +685,7 @@ let historySearchTimeout = null;
 dom.historySearch.addEventListener('input', function() {
     clearTimeout(historySearchTimeout);
     const q = this.value;
+    if (isDeclutterMode) return; // Disable search while in declutter mode
     historySearchTimeout = setTimeout(async () => {
         if (!q.trim()) {
             loadHistory();

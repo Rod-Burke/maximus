@@ -96,11 +96,21 @@
                     </svg>
                 </button>
             </div>
-            <div class="search-container">
-                <input type="text" id="history-search" class="search-input" placeholder="Search history...">
+            <div class="search-container" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" id="history-search" class="search-input" placeholder="Search history..." style="flex: 1;">
+                <button id="declutter-btn" class="icon-btn" title="Declutter Mode" style="border: 1px solid var(--glass-border); border-radius: 8px; padding: 0.75rem; height: 100%; display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
             </div>
             <div id="history-list" class="history-list">
                 <!-- Messages populated by JS -->
+            </div>
+            <!-- Bulk Actions Bar -->
+            <div id="bulk-actions-bar" class="bulk-actions-bar hidden">
+                <span id="bulk-count">0 selected</span>
+                <button id="bulk-delete-btn" class="bulk-delete-btn">Delete Selected</button>
             </div>
         </div>
 
