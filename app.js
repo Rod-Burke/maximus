@@ -868,7 +868,8 @@ async function loadTasksDashboard() {
             }
         });
 
-        const events = [];
+        const upcomingEvents = [];
+        const pastEvents = [];
         const todayTasks = [];
         const unscheduled = [];
         const todayStr = getLocalDateStr();
@@ -877,8 +878,13 @@ async function loadTasksDashboard() {
             const meta = t.metadata || {};
             const rec = (meta.recurrence || '').toLowerCase();
             const isDailyType = rec === 'daily' || rec === 'every_other_day';
+            
             if (meta.type === 'event') {
-                events.push(t);
+                if (meta.due_date && meta.due_date < todayStr) {
+                    pastEvents.push(t);
+                } else {
+                    upcomingEvents.push(t);
+                }
             } else if (isDailyType && (!meta.due_date || meta.due_date <= todayStr)) {
                 // Daily task due today (or no date yet) → Today's Priorities
                 todayTasks.push(t);
@@ -917,7 +923,8 @@ async function loadTasksDashboard() {
             dom.tasksList.appendChild(jumpLink);
         }
 
-        if (events.length) renderTaskSection('Upcoming Events', events);
+        if (pastEvents.length) renderTaskSection('Past Events', pastEvents);
+        if (upcomingEvents.length) renderTaskSection('Upcoming Events', upcomingEvents);
         if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
         if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
         
