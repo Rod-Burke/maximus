@@ -936,7 +936,7 @@ async function loadTasksDashboard() {
             renderTaskSection('↺ Recurring Templates', recurring);
         }
 
-        if (!events.length && !todayTasks.length && !unscheduled.length && !recurring.length) {
+        if (!pastEvents.length && !upcomingEvents.length && !todayTasks.length && !unscheduled.length && !recurring.length) {
             dom.tasksList.innerHTML = '<div class="history-empty">All caught up!</div>';
         }
 
