@@ -923,8 +923,8 @@ async function loadTasksDashboard() {
             dom.tasksList.appendChild(jumpLink);
         }
 
-        if (pastEvents.length) renderTaskSection('Past Events', pastEvents);
-        if (upcomingEvents.length) renderTaskSection('Upcoming Events', upcomingEvents);
+        if (pastEvents.length) renderTaskSection('Past Events', pastEvents.slice(0, 2));
+        if (upcomingEvents.length) renderTaskSection('Upcoming Events', upcomingEvents.slice(0, 4));
         if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
         if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
         
