@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maximus-v33';
+const CACHE_NAME = 'maximus-v34';
 const ASSETS = ['index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'migration.html', 'migration.js'];
 
 self.addEventListener('install', (e) => {

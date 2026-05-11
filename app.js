@@ -1007,70 +1007,86 @@ function renderTaskSection(title, items) {
         });
 
         // Checkbox complete / uncomplete
-        el.querySelector('.task-checkbox').addEventListener('click', async function(e) {
+        el.querySelector('.task-checkbox').addEventListener('click', function(e) {
             e.stopPropagation();
             const wasCompleted = meta.status === 'completed';
+            const contentEl = el.querySelector('.task-content');
 
             if (wasCompleted) {
                 // UNCOMPLETE TASK
                 this.classList.remove('checked');
                 el.style.opacity = '1';
+                if (contentEl) contentEl.style.textDecoration = 'none';
                 meta.status = 'pending';
-                try {
-                    await fetch(CONFIG.MANAGE_ENDPOINT, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'pending' }})
-                    });
-                    // If we are in search view, don't remove the element. If we are in regular view, it shouldn't be here anyway.
-                } catch(err) {
+                
+                fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'pending' }})
+                }).catch(err => {
                     this.classList.add('checked');
                     el.style.opacity = '0.5';
+                    if (contentEl) contentEl.style.textDecoration = 'line-through';
                     meta.status = 'completed';
                     alert('Error uncompleting task.');
-                }
+                });
             } else {
                 // COMPLETE TASK
                 this.classList.add('checked');
                 el.style.opacity = '0.5';
-                try {
-                    if (meta.recurrence) {
-                        // Recurring task: DON'T mark as completed — roll due_date forward
-                        const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
-                        // Check if recurrence has ended
-                        const endDate = meta.recurrence_end;
-                        if (endDate && nextDate > endDate) {
-                            // Recurrence is over — mark as completed
-                            await fetch(CONFIG.MANAGE_ENDPOINT, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
-                            });
-                        } else {
-                            // Update due_date to next occurrence
-                            await fetch(CONFIG.MANAGE_ENDPOINT, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
-                            });
-                        }
-                    } else {
-                        // Non-recurring: mark as completed
-                        await fetch(CONFIG.MANAGE_ENDPOINT, {
+                if (contentEl) contentEl.style.textDecoration = 'line-through';
+                
+                let updatePromise;
+                if (meta.recurrence) {
+                    // Recurring task: DON'T mark as completed — roll due_date forward
+                    const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
+                    // Check if recurrence has ended
+                    const endDate = meta.recurrence_end;
+                    if (endDate && nextDate > endDate) {
+                        meta.status = 'completed';
+                        // Recurrence is over — mark as completed
+                        updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
                             body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                         });
+                    } else {
+                        meta.due_date = nextDate;
+                        meta.bumped_at = null;
+                        // Update due_date to next occurrence
+                        updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
+                        });
                     }
+                } else {
+                    meta.status = 'completed';
+                    // Non-recurring: mark as completed
+                    updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                    });
+                }
 
-                    // Only reload dashboard if we aren't in semantic search view
-                    if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
-                        setTimeout(() => { el.remove(); loadTasksDashboard(); }, 500);
-                    }
-                } catch(err) {
+                updatePromise.catch(err => {
                     this.classList.remove('checked');
                     el.style.opacity = '1';
+                    if (contentEl) contentEl.style.textDecoration = 'none';
+                    if (!meta.recurrence) meta.status = 'pending';
                     alert('Error completing task.');
+                });
+
+                // Only remove the element visually if we aren't in semantic search view
+                if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
+                    setTimeout(() => { 
+                        el.remove(); 
+                        if (container.querySelectorAll('.task-item').length === 0) {
+                            if (header) header.remove();
+                            container.remove();
+                        }
+                    }, 500);
                 }
             }
         });
@@ -1421,8 +1437,18 @@ dom.modalDelete.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
             body: JSON.stringify({ action: 'delete', id: modalThoughtId })
         });
+        
+        const taskEl = document.querySelector(`.task-item[data-id="${modalThoughtId}"]`);
+        if (taskEl) {
+            const container = taskEl.closest('.task-section-container');
+            const header = container ? container.previousElementSibling : null;
+            taskEl.remove();
+            if (container && container.querySelectorAll('.task-item').length === 0) {
+                if (header && header.classList.contains('section-header')) header.remove();
+                container.remove();
+            }
+        }
         closeTaskModal();
-        loadTasksDashboard();
     } catch (e) {
         alert('Delete failed.');
     }
