@@ -382,6 +382,91 @@ main {
     font-style: italic;
 }
 
+/* --- DUPLICATE ALERT --- */
+.duplicate-alert {
+    animation: fade-up 0.4s ease-out;
+}
+
+.duplicate-header {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent-gold);
+    margin-bottom: 0.75rem;
+}
+
+.duplicate-body {
+    margin-bottom: 1rem;
+}
+
+.duplicate-label {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    margin-bottom: 0.5rem;
+}
+
+.duplicate-existing {
+    background: rgba(251, 191, 36, 0.08);
+    border-left: 3px solid var(--accent-gold);
+    padding: 0.6rem 0.8rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    font-weight: 300;
+    margin-bottom: 0.5rem;
+}
+
+.duplicate-similarity {
+    font-size: 0.7rem;
+    display: inline-block;
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--accent-gold);
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.duplicate-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.dup-btn {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.dup-btn:active {
+    transform: scale(0.96);
+}
+
+.dup-btn-add {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--accent-gold);
+}
+
+.dup-btn-add:active {
+    background: rgba(251, 191, 36, 0.3);
+}
+
+.dup-btn-skip {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
+}
+
+.dup-btn-skip:active {
+    background: rgba(239, 68, 68, 0.25);
+}
+
 @keyframes fade-up {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }

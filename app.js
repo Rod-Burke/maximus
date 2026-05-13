@@ -232,13 +232,18 @@ function toggleMicMute() {
 // --- API ---
 let followUpContext = null; // Stores { userInput, maximusResponse } for conversational replies
 
-async function askMaximus(text) {
+async function askMaximus(text, options = {}) {
     dom.status.innerText = 'Consulting Maximus...';
     try {
         const payload = {
             text,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
+        
+        // If forcing capture (user clicked "Add Anyway"), set the flag
+        if (options.forceCapture) {
+            payload.forceCapture = true;
+        }
         
         // If in follow-up mode, include conversation context
         if (followUpContext) {
@@ -254,6 +259,13 @@ async function askMaximus(text) {
         const data = await res.json();
         const answer = data.text || "Couldn't reach your brain.";
         lastInputText = text;
+        
+        // --- DUPLICATE DETECTION ---
+        if (data.duplicateCandidate) {
+            displayDuplicateAlert(data.duplicateCandidate, text);
+            speakResponse(`Possible duplicate detected. You already have a similar ${data.duplicateCandidate.similarity}% match in your brain.`);
+            return;
+        }
         
         // Handle "Captured as" responses to show action buttons
         if (answer.toLowerCase().includes('captured as') && data.thoughtId) {
@@ -280,6 +292,47 @@ async function askMaximus(text) {
         console.error(e);
         displayResponse("Error connecting to Maximus.", {});
     }
+}
+
+function displayDuplicateAlert(candidate, originalText) {
+    dom.status.innerText = 'Duplicate detected';
+    dom.actionButtons.classList.add('hidden');
+    
+    const html = `
+        <div class="duplicate-alert">
+            <div class="duplicate-header">⚠️ Possible Duplicate</div>
+            <div class="duplicate-body">
+                <div class="duplicate-label">You already have a similar entry:</div>
+                <div class="duplicate-existing">${candidate.content}</div>
+                <div class="duplicate-similarity">${candidate.similarity}% match</div>
+            </div>
+            <div class="duplicate-actions">
+                <button id="dup-add-btn" class="dup-btn dup-btn-add">Add Anyway</button>
+                <button id="dup-skip-btn" class="dup-btn dup-btn-skip">Don't Add</button>
+            </div>
+        </div>
+    `;
+    
+    dom.chat.innerHTML = html;
+    dom.chat.style.display = 'block';
+    dom.orbContainer.style.transform = 'translateY(-15px)';
+    
+    // "Add Anyway" — force-save bypassing dedup
+    document.getElementById('dup-add-btn').addEventListener('click', () => {
+        dom.chat.innerHTML = '';
+        dom.chat.style.display = 'none';
+        askMaximus(originalText, { forceCapture: true });
+    });
+    
+    // "Don't Add" — dismiss
+    document.getElementById('dup-skip-btn').addEventListener('click', () => {
+        dom.chat.innerHTML = '<div style="opacity:0.5; font-style:italic;">No duplicate added.</div>';
+        dom.status.innerText = 'Tap to speak to Maximus';
+        setTimeout(() => {
+            dom.chat.style.display = 'none';
+            dom.orbContainer.style.transform = 'translateY(0)';
+        }, 2000);
+    });
 }
 
 function enterFollowUpMode(userInput, maximusResponse) {
