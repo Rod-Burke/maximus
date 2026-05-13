@@ -39,6 +39,7 @@ const dom = {
     // Modal
     modal: document.getElementById('task-detail-modal'),
     modalContent: document.getElementById('modal-content-input'),
+    modalSummary: document.getElementById('modal-summary-input'),
     modalNotes: document.getElementById('modal-notes-input'),
     modalNotesLinks: document.getElementById('modal-notes-links'),
     modalType: document.getElementById('modal-type'),
@@ -1293,6 +1294,7 @@ function renderNotesLinks(text) {
 function openTaskModal(id, content, meta) {
     modalThoughtId = id;
     dom.modalContent.value = content;
+    dom.modalSummary.value = meta.summary || content;
     dom.modalNotes.value = meta.notes || '';
     renderNotesLinks(meta.notes);
     
@@ -1451,6 +1453,7 @@ dom.modalSave.addEventListener('click', async () => {
                 due_date: dom.modalDueDate.value || null,
                 recurrence: recurrenceValue,
                 recurrence_end: dom.customEndDate.value || null,
+                summary: dom.modalSummary.value.trim() || null,
                 notes: dom.modalNotes.value.trim() || null,
                 // Event-specific fields
                 all_day: dom.modalType.value === 'event' ? dom.modalAllDay.checked : null,

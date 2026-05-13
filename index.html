@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -154,6 +154,9 @@
                     <label class="modal-label">Content</label>
                     <textarea id="modal-content-input" class="modal-input" rows="3"></textarea>
                     
+                    <label class="modal-label">Summary <span style="opacity:0.4; font-weight:300; font-size:0.75rem;">(shown in task list)</span></label>
+                    <input type="text" id="modal-summary-input" class="modal-input" placeholder="Short display text...">
+                    
                     <label class="modal-label">Notes / Instructions</label>
                     <textarea id="modal-notes-input" class="modal-input" rows="2" placeholder="Add extra notes..."></textarea>
                     <div id="modal-notes-links" class="modal-notes-links" style="margin-top: -10px; margin-bottom: 15px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px;"></div>
@@ -283,7 +286,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=8"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
