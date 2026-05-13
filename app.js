@@ -1035,7 +1035,7 @@ function renderTaskSection(title, items) {
         el.innerHTML = `
             <div class="${checkboxClass}"></div>
             <div class="task-content-wrapper">
-                <div class="task-content">${t.content}</div>
+                <div class="task-content">${meta.summary || t.content}</div>
                 ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
             </div>
             <div class="task-actions">
