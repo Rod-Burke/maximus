@@ -1032,11 +1032,13 @@ function renderTaskSection(title, items) {
 
         const isCompleted = meta.status === 'completed';
         const checkboxClass = isCompleted ? 'task-checkbox checked' : 'task-checkbox';
-        
+        const displayText = meta.summary || t.content;
+        const hasMore = meta.summary && meta.summary !== t.content;
+
         el.innerHTML = `
             <div class="${checkboxClass}"></div>
             <div class="task-content-wrapper">
-                <div class="task-content">${meta.summary || t.content}</div>
+                <div class="task-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
                 ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
             </div>
             <div class="task-actions">

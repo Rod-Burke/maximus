@@ -793,6 +793,19 @@ main {
     line-height: 1.3;
 }
 
+.more-indicator {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    background: rgba(251, 191, 36, 0.15);
+    border-radius: 4px;
+    padding: 0 0.3rem;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    line-height: 1.4;
+}
+
 .task-meta {
     font-size: 0.7rem;
     opacity: 0.5;
