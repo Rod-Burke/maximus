@@ -73,7 +73,7 @@ const dom = {
     reclassifyPicker: document.getElementById('reclassify-picker'),
     modalTitle: document.getElementById('modal-title'),
     // Quick Capture
-    quickCaptureBtn: document.getElementById('quick-capture-btn'),
+    quickCaptureBtns: document.querySelectorAll('.quick-capture-trigger'),
     quickCaptureOverlay: document.getElementById('quick-capture-overlay'),
     quickCaptureClose: document.getElementById('quick-capture-close'),
     quickCaptureInput: document.getElementById('quick-capture-input'),
@@ -1578,13 +1578,15 @@ dom.modalComplete.addEventListener('click', async () => {
 });
 
 // --- QUICK CAPTURE ---
-dom.quickCaptureBtn.addEventListener('click', () => {
-    dom.quickCaptureOverlay.classList.remove('hidden');
-    dom.quickCaptureInput.value = '';
-    dom.quickCaptureStatus.textContent = '';
-    dom.quickCaptureSubmit.textContent = 'Capture';
-    dom.quickCaptureSubmit.disabled = false;
-    setTimeout(() => dom.quickCaptureInput.focus(), 100);
+dom.quickCaptureBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        dom.quickCaptureOverlay.classList.remove('hidden');
+        dom.quickCaptureInput.value = '';
+        dom.quickCaptureStatus.textContent = '';
+        dom.quickCaptureSubmit.textContent = 'Capture';
+        dom.quickCaptureSubmit.disabled = false;
+        setTimeout(() => dom.quickCaptureInput.focus(), 100);
+    });
 });
 
 function closeQuickCapture() {
