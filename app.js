@@ -78,7 +78,8 @@ const dom = {
     quickCaptureClose: document.getElementById('quick-capture-close'),
     quickCaptureInput: document.getElementById('quick-capture-input'),
     quickCaptureSubmit: document.getElementById('quick-capture-submit'),
-    quickCaptureStatus: document.getElementById('quick-capture-status')
+    quickCaptureStatus: document.getElementById('quick-capture-status'),
+    showCompletedBtn: document.getElementById('show-completed-btn')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -836,6 +837,11 @@ dom.syncTasksBtn.addEventListener('click', async () => {
     }
 });
 
+dom.showCompletedBtn.addEventListener('click', () => {
+    dom.showCompletedBtn.classList.toggle('active');
+    loadTasksDashboard();
+});
+
 let tasksSearchTimeout = null;
 dom.tasksSearch.addEventListener('input', function() {
     clearTimeout(tasksSearchTimeout);
@@ -885,12 +891,15 @@ async function loadTasksDashboard() {
         const data = await res.json();
         if (!data.thoughts) return;
         
-        // Filter pending tasks and events
+        // Filter tasks and events
+        const showCompleted = dom.showCompletedBtn.classList.contains('active');
         const activeItems = data.thoughts.filter(t => {
             const meta = t.metadata || t.payload?.metadata || {};
             const type = meta.type || '';
             const status = meta.status || 'pending';
-            return (type === 'task' || type === 'event') && status === 'pending';
+            if (type !== 'task' && type !== 'event') return false;
+            if (status === 'completed' && !showCompleted) return false;
+            return true;
         });
 
         // Sort: Bumped > Events with Dates > Tasks with Dates > Unscheduled
@@ -989,6 +998,12 @@ async function loadTasksDashboard() {
         if (upcomingEvents.length) renderTaskSection('Upcoming Events', upcomingEvents.slice(0, 4));
         if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
         if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
+        
+        // Completed section (only when toggle is on)
+        if (showCompleted) {
+            const completedItems = activeItems.filter(t => (t.metadata || {}).status === 'completed');
+            if (completedItems.length) renderTaskSection('✓ Completed', completedItems);
+        }
         
         // Recurring templates at the bottom
         if (recurring.length) {

@@ -978,6 +978,12 @@ button#send-btn svg {
     font-weight: 600;
 }
 
+/* --- SHOW COMPLETED TOGGLE --- */
+#show-completed-btn.active {
+    color: var(--accent-gold);
+    background: rgba(251, 191, 36, 0.15);
+}
+
 /* --- QUICK CAPTURE OVERLAY --- */
 .quick-capture-trigger svg {
     width: 20px;
