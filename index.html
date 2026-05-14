@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -263,6 +263,7 @@
                 </div>
                 <div class="modal-footer">
                     <button id="modal-delete-btn" class="modal-btn modal-btn-danger">Delete</button>
+                    <button id="modal-complete-btn" class="modal-btn modal-btn-success">✓ Complete</button>
                     <button id="modal-save-btn" class="modal-btn modal-btn-primary">Save Changes</button>
                 </div>
             </div>
@@ -286,7 +287,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

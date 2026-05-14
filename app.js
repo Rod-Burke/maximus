@@ -48,6 +48,7 @@ const dom = {
     modalRecurrence: document.getElementById('modal-recurrence'),
     modalSave: document.getElementById('modal-save-btn'),
     modalDelete: document.getElementById('modal-delete-btn'),
+    modalComplete: document.getElementById('modal-complete-btn'),
     modalClose: document.getElementById('close-modal'),
     // Declutter Mode
     declutterBtn: document.getElementById('declutter-btn'),
@@ -1331,6 +1332,11 @@ function openTaskModal(id, content, meta) {
     // Set modal title based on type
     updateModalTitle(meta.type || 'task');
     
+    // Toggle Complete button label based on current status
+    const isCompleted = meta.status === 'completed';
+    dom.modalComplete.textContent = isCompleted ? '↩ Reopen' : '✓ Complete';
+    dom.modalComplete.className = isCompleted ? 'modal-btn modal-btn-danger' : 'modal-btn modal-btn-success';
+    
     dom.modal.classList.remove('hidden');
 }
 
@@ -1509,6 +1515,58 @@ dom.modalDelete.addEventListener('click', async () => {
         closeTaskModal();
     } catch (e) {
         alert('Delete failed.');
+    }
+});
+
+dom.modalComplete.addEventListener('click', async () => {
+    if (!modalThoughtId) return;
+    
+    const taskEl = document.querySelector(`.task-item[data-id="${modalThoughtId}"]`);
+    const currentMeta = taskEl ? JSON.parse(taskEl.dataset.meta || '{}') : {};
+    const isCurrentlyCompleted = currentMeta.status === 'completed';
+    const newStatus = isCurrentlyCompleted ? 'pending' : 'completed';
+    
+    dom.modalComplete.textContent = 'Saving...';
+    dom.modalComplete.disabled = true;
+    
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'update', id: modalThoughtId, metadata: { ...currentMeta, status: newStatus }})
+        });
+        
+        if (taskEl && newStatus === 'completed') {
+            // Visual feedback then remove
+            taskEl.style.opacity = '0.5';
+            const contentEl = taskEl.querySelector('.task-content');
+            if (contentEl) contentEl.style.textDecoration = 'line-through';
+            const checkbox = taskEl.querySelector('.task-checkbox');
+            if (checkbox) checkbox.classList.add('checked');
+            
+            setTimeout(() => {
+                const container = taskEl.closest('.task-section-container');
+                const header = container ? container.previousElementSibling : null;
+                taskEl.remove();
+                if (container && container.querySelectorAll('.task-item').length === 0) {
+                    if (header && header.classList.contains('section-header')) header.remove();
+                    container.remove();
+                }
+            }, 500);
+        } else if (taskEl && newStatus === 'pending') {
+            taskEl.style.opacity = '1';
+            const contentEl = taskEl.querySelector('.task-content');
+            if (contentEl) contentEl.style.textDecoration = 'none';
+            const checkbox = taskEl.querySelector('.task-checkbox');
+            if (checkbox) checkbox.classList.remove('checked');
+            taskEl.dataset.meta = JSON.stringify({ ...currentMeta, status: 'pending' });
+        }
+        
+        closeTaskModal();
+    } catch (e) {
+        alert('Error updating task status.');
+    } finally {
+        dom.modalComplete.disabled = false;
     }
 });
 

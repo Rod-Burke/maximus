@@ -1165,6 +1165,16 @@ button#send-btn svg {
     background: rgba(239, 68, 68, 0.35);
 }
 
+.modal-btn-success {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+}
+
+.modal-btn-success:active {
+    background: rgba(34, 197, 94, 0.35);
+}
+
 /* --- RECLASSIFY PICKER --- */
 .reclassify-picker {
     display: flex;
