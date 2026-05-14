@@ -71,7 +71,14 @@ const dom = {
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
     reclassifyPicker: document.getElementById('reclassify-picker'),
-    modalTitle: document.getElementById('modal-title')
+    modalTitle: document.getElementById('modal-title'),
+    // Quick Capture
+    quickCaptureBtn: document.getElementById('quick-capture-btn'),
+    quickCaptureOverlay: document.getElementById('quick-capture-overlay'),
+    quickCaptureClose: document.getElementById('quick-capture-close'),
+    quickCaptureInput: document.getElementById('quick-capture-input'),
+    quickCaptureSubmit: document.getElementById('quick-capture-submit'),
+    quickCaptureStatus: document.getElementById('quick-capture-status')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -1567,6 +1574,69 @@ dom.modalComplete.addEventListener('click', async () => {
         alert('Error updating task status.');
     } finally {
         dom.modalComplete.disabled = false;
+    }
+});
+
+// --- QUICK CAPTURE ---
+dom.quickCaptureBtn.addEventListener('click', () => {
+    dom.quickCaptureOverlay.classList.remove('hidden');
+    dom.quickCaptureInput.value = '';
+    dom.quickCaptureStatus.textContent = '';
+    dom.quickCaptureSubmit.textContent = 'Capture';
+    dom.quickCaptureSubmit.disabled = false;
+    setTimeout(() => dom.quickCaptureInput.focus(), 100);
+});
+
+function closeQuickCapture() {
+    dom.quickCaptureOverlay.classList.add('hidden');
+    dom.quickCaptureInput.value = '';
+    dom.quickCaptureStatus.textContent = '';
+}
+
+dom.quickCaptureClose.addEventListener('click', closeQuickCapture);
+dom.quickCaptureOverlay.addEventListener('click', (e) => {
+    if (e.target === dom.quickCaptureOverlay) closeQuickCapture();
+});
+
+dom.quickCaptureSubmit.addEventListener('click', async () => {
+    const text = dom.quickCaptureInput.value.trim();
+    if (!text) return;
+    
+    dom.quickCaptureSubmit.textContent = 'Capturing...';
+    dom.quickCaptureSubmit.disabled = true;
+    dom.quickCaptureStatus.textContent = '';
+    
+    try {
+        const res = await fetch(CONFIG.ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ text, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+        });
+        const data = await res.json();
+        
+        dom.quickCaptureStatus.textContent = data.text || 'Captured!';
+        dom.quickCaptureInput.value = '';
+        dom.quickCaptureSubmit.textContent = 'Capture';
+        dom.quickCaptureSubmit.disabled = false;
+        
+        // Auto-close after a brief delay so user sees the confirmation
+        setTimeout(() => {
+            closeQuickCapture();
+            // Refresh tasks if the tasks panel is open
+            if (!dom.tasksPanel.classList.contains('hidden')) loadTasksDashboard();
+        }, 1200);
+    } catch (e) {
+        dom.quickCaptureStatus.textContent = 'Error capturing.';
+        dom.quickCaptureSubmit.textContent = 'Retry';
+        dom.quickCaptureSubmit.disabled = false;
+    }
+});
+
+// Submit on Enter (Shift+Enter for newline)
+dom.quickCaptureInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        dom.quickCaptureSubmit.click();
     }
 });
 

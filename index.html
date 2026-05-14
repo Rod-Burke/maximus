@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -21,6 +21,11 @@
                 <h1>Saint Max</h1>
             </div>
             <div class="header-actions">
+                <button id="quick-capture-btn" class="icon-btn quick-capture-trigger" title="Quick Capture">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
                 <button id="tasks-btn" class="icon-btn" title="Tasks Dashboard">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
@@ -33,6 +38,25 @@
                 </button>
             </div>
         </header>
+
+        <!-- Quick Capture Overlay -->
+        <div id="quick-capture-overlay" class="quick-capture-overlay hidden">
+            <div class="quick-capture-card">
+                <div class="quick-capture-header">
+                    <span>Quick Capture</span>
+                    <button id="quick-capture-close" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <textarea id="quick-capture-input" class="quick-capture-input" rows="3" placeholder="Type a thought, task, or event..."></textarea>
+                <div class="quick-capture-footer">
+                    <span id="quick-capture-status" class="quick-capture-status"></span>
+                    <button id="quick-capture-submit" class="quick-capture-submit">Capture</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Voice View -->
         <main id="voice-view">
@@ -287,7 +311,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
