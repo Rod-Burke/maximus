@@ -102,6 +102,8 @@ let micMuted = false;
 // --- EDIT MODE STATE ---
 let editingThoughtId = null;
 let cancelEditBtn = null; // Created dynamically
+let editSource = null;       // Tracks 'history' or 'tasks' origin for active edits
+let historyScrollTop = 0;    // Temporarily stores vertical scroll offset of History list
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -486,7 +488,7 @@ function enterEditMode(thoughtId, content) {
     dom.input.focus();
 }
 
-function exitEditMode() {
+function exitEditMode(isSubmit = false) {
     editingThoughtId = null;
     dom.input.value = '';
     dom.input.style.height = '24px'; // Reset to CSS default visually
@@ -497,6 +499,12 @@ function exitEditMode() {
     if (cancelEditBtn && dom.inputTray.contains(cancelEditBtn)) {
         dom.inputTray.removeChild(cancelEditBtn);
     }
+
+    if (isSubmit !== true && editSource === 'history') {
+        dom.historyPanel.classList.remove('hidden');
+        dom.historyList.scrollTop = historyScrollTop;
+        editSource = null;
+    }
 }
 
 async function submitEdit() {
@@ -504,7 +512,10 @@ async function submitEdit() {
     const content = dom.input.value.trim();
     if (!id || !content) return;
     
-    exitEditMode();
+    const source = editSource;
+    const scrollTop = historyScrollTop;
+    
+    exitEditMode(true);
     dom.status.innerText = 'Updating thought...';
     
     try {
@@ -516,12 +527,25 @@ async function submitEdit() {
         const data = await res.json();
         if (data.success) {
             displayResponse('✓ Thought updated and re-embedded.', {});
+            if (source === 'history') {
+                dom.historyPanel.classList.remove('hidden');
+                await loadHistory();
+                dom.historyList.scrollTop = scrollTop;
+            }
         } else {
             displayResponse('Update failed: ' + (data.error || 'Unknown error'), {});
+            if (source === 'history') {
+                dom.historyPanel.classList.remove('hidden');
+                dom.historyList.scrollTop = scrollTop;
+            }
         }
     } catch (e) {
         console.error(e);
         displayResponse('Error updating thought.', {});
+        if (source === 'history') {
+            dom.historyPanel.classList.remove('hidden');
+            dom.historyList.scrollTop = scrollTop;
+        }
     }
 }
 
@@ -730,10 +754,14 @@ function renderHistoryList(thoughts) {
                     </button>
                 </div>`;
             el.querySelector('.edit-btn').addEventListener('click', () => {
+                editSource = 'history';
+                historyScrollTop = dom.historyList.scrollTop;
                 dom.historyPanel.classList.add('hidden');
                 enterEditMode(t.id, t.content);
             });
             el.querySelector('.details-btn').addEventListener('click', () => {
+                editSource = 'history';
+                historyScrollTop = dom.historyList.scrollTop;
                 dom.historyPanel.classList.add('hidden');
                 openTaskModal(t.id, t.content, t.metadata || t.payload || {});
             });
@@ -1477,6 +1505,12 @@ function closeTaskModal() {
     dom.eventFields.classList.add('hidden');
     resetDayButtons();
     modalThoughtId = null;
+
+    if (editSource === 'history') {
+        dom.historyPanel.classList.remove('hidden');
+        dom.historyList.scrollTop = historyScrollTop;
+        editSource = null;
+    }
 }
 
 dom.modalClose.addEventListener('click', closeTaskModal);
@@ -1557,8 +1591,15 @@ dom.modalSave.addEventListener('click', async () => {
         });
         const data = await res.json();
         if (data.success) {
+            const source = editSource;
+            const scrollTop = historyScrollTop;
             closeTaskModal();
-            loadTasksDashboard();
+            if (source === 'history') {
+                await loadHistory();
+                dom.historyList.scrollTop = scrollTop;
+            } else {
+                loadTasksDashboard();
+            }
         } else {
             alert('Save failed: ' + (data.error || 'Unknown error'));
         }
@@ -1591,7 +1632,13 @@ dom.modalDelete.addEventListener('click', async () => {
                 container.remove();
             }
         }
+        const source = editSource;
+        const scrollTop = historyScrollTop;
         closeTaskModal();
+        if (source === 'history') {
+            await loadHistory();
+            dom.historyList.scrollTop = scrollTop;
+        }
     } catch (e) {
         alert('Delete failed.');
     }
@@ -1641,7 +1688,13 @@ dom.modalComplete.addEventListener('click', async () => {
             taskEl.dataset.meta = JSON.stringify({ ...currentMeta, status: 'pending' });
         }
         
+        const source = editSource;
+        const scrollTop = historyScrollTop;
         closeTaskModal();
+        if (source === 'history') {
+            await loadHistory();
+            dom.historyList.scrollTop = scrollTop;
+        }
     } catch (e) {
         alert('Error updating task status.');
     } finally {
