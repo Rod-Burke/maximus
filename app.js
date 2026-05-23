@@ -1170,21 +1170,78 @@ function renderTaskSection(title, items) {
             }
         });
 
-        // Bump to Top
+        // Bump to Top (AJAX — no page reload, keeps scroll position)
         el.querySelector('.bump-btn').addEventListener('click', async (e) => {
             e.stopPropagation();
-            el.style.opacity = '0.5';
-            try {
-                await fetch(CONFIG.MANAGE_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, bumped_at: new Date().toISOString(), order: 0 }})
-                });
-                loadTasksDashboard();
-            } catch(err) {
-                el.style.opacity = '1';
-                alert('Error bumping task.');
+
+            // --- Optimistic DOM move ---
+            // Find the "Today's Priorities" section, or fall back to the first section
+            let targetContainer = null;
+            const sectionHeaders = dom.tasksList.querySelectorAll('.section-header');
+            for (const h of sectionHeaders) {
+                if (h.innerText.includes("Today")) {
+                    targetContainer = h.nextElementSibling;
+                    break;
+                }
             }
+            // If no "Today's Priorities" section exists yet, create one
+            if (!targetContainer) {
+                const firstHeader = sectionHeaders[0];
+                const newHeader = document.createElement('div');
+                newHeader.className = 'section-header';
+                newHeader.innerText = "Today's Priorities";
+                const newContainer = document.createElement('div');
+                newContainer.className = 'task-section-container';
+                if (firstHeader) {
+                    dom.tasksList.insertBefore(newContainer, firstHeader);
+                    dom.tasksList.insertBefore(newHeader, newContainer);
+                } else {
+                    dom.tasksList.appendChild(newHeader);
+                    dom.tasksList.appendChild(newContainer);
+                }
+                targetContainer = newContainer;
+            }
+
+            // Remove from old container, clean up empty section
+            const oldContainer = el.closest('.task-section-container');
+            const oldHeader = oldContainer ? oldContainer.previousElementSibling : null;
+
+            // Animate the bump: shrink out from old position
+            el.style.transition = 'opacity 0.2s, transform 0.2s';
+            el.style.opacity = '0.3';
+            el.style.transform = 'scale(0.95)';
+
+            setTimeout(() => {
+                // Move element to top of target section
+                el.remove();
+                targetContainer.prepend(el);
+
+                // Clean up empty old section
+                if (oldContainer && oldContainer !== targetContainer && oldContainer.querySelectorAll('.task-item').length === 0) {
+                    if (oldHeader && oldHeader.classList.contains('section-header')) oldHeader.remove();
+                    oldContainer.remove();
+                }
+
+                // Animate in at new position
+                el.style.opacity = '1';
+                el.style.transform = 'scale(1)';
+                el.style.background = 'rgba(76, 175, 80, 0.15)';
+                setTimeout(() => { el.style.background = ''; el.style.transition = ''; }, 800);
+
+                // Update the stored metadata so future actions have the bumped_at
+                meta.bumped_at = new Date().toISOString();
+                meta.order = 0;
+                el.dataset.meta = JSON.stringify(meta);
+            }, 200);
+
+            // Fire-and-forget API call in background
+            fetch(CONFIG.MANAGE_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, bumped_at: new Date().toISOString(), order: 0 }})
+            }).catch(err => {
+                console.error('Bump save failed:', err);
+            });
         });
 
         // Click to open Task Detail Modal
