@@ -1133,6 +1133,14 @@ function renderTaskSection(title, items) {
         // Checkbox complete / uncomplete
         el.querySelector('.task-checkbox').addEventListener('click', function(e) {
             e.stopPropagation();
+
+            // If there's an active undo button on this item, treat clicking the checkbox as an UNDO
+            const activeUndoBtn = el.querySelector('.undo-complete-btn');
+            if (activeUndoBtn) {
+                activeUndoBtn.click();
+                return;
+            }
+
             const wasCompleted = meta.status === 'completed';
             const contentEl = el.querySelector('.task-content');
 
@@ -1155,63 +1163,98 @@ function renderTaskSection(title, items) {
                     alert('Error uncompleting task.');
                 });
             } else {
-                // COMPLETE TASK
-                this.classList.add('checked');
+                // COMPLETE TASK (with 3-second Undo countdown)
+                const checkboxEl = this;
+                checkboxEl.classList.add('checked');
                 el.style.opacity = '0.5';
                 if (contentEl) contentEl.style.textDecoration = 'line-through';
-                
-                let updatePromise;
-                if (meta.recurrence) {
-                    // Recurring task: DON'T mark as completed — roll due_date forward
-                    const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
-                    // Check if recurrence has ended
-                    const endDate = meta.recurrence_end;
-                    if (endDate && nextDate > endDate) {
+
+                const actionContainer = el.querySelector('.task-actions');
+                const bumpBtn = actionContainer.querySelector('.bump-btn');
+                if (bumpBtn) bumpBtn.style.display = 'none';
+
+                const undoBtn = document.createElement('span');
+                undoBtn.className = 'undo-complete-btn';
+                undoBtn.style.cssText = 'color: var(--accent-light, #00a8cc); font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: rgba(0, 168, 204, 0.15); font-size: 0.8rem; user-select: none;';
+                undoBtn.innerText = 'Undo 3s';
+                actionContainer.appendChild(undoBtn);
+
+                let remaining = 3;
+                const countdownInterval = setInterval(() => {
+                    remaining--;
+                    if (remaining > 0) {
+                        undoBtn.innerText = `Undo ${remaining}s`;
+                    } else {
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+
+                const saveTimeout = setTimeout(() => {
+                    undoBtn.remove();
+                    if (bumpBtn) bumpBtn.style.display = '';
+
+                    let updatePromise;
+                    if (meta.recurrence) {
+                        // Recurring task: roll due_date forward
+                        const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
+                        const endDate = meta.recurrence_end;
+                        if (endDate && nextDate > endDate) {
+                            meta.status = 'completed';
+                            updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                            });
+                        } else {
+                            meta.due_date = nextDate;
+                            meta.bumped_at = null;
+                            updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
+                            });
+                        }
+                    } else {
                         meta.status = 'completed';
-                        // Recurrence is over — mark as completed
                         updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
                             body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                         });
-                    } else {
-                        meta.due_date = nextDate;
-                        meta.bumped_at = null;
-                        // Update due_date to next occurrence
-                        updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
-                        });
                     }
-                } else {
-                    meta.status = 'completed';
-                    // Non-recurring: mark as completed
-                    updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
-                    });
-                }
 
-                updatePromise.catch(err => {
-                    this.classList.remove('checked');
+                    updatePromise.catch(err => {
+                        checkboxEl.classList.remove('checked');
+                        el.style.opacity = '1';
+                        if (contentEl) contentEl.style.textDecoration = 'none';
+                        if (!meta.recurrence) meta.status = 'pending';
+                        alert('Error completing task.');
+                    });
+
+                    // Only remove the element visually if we aren't in semantic search view
+                    if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
+                        setTimeout(() => { 
+                            el.remove(); 
+                            if (container.querySelectorAll('.task-item').length === 0) {
+                                if (header) header.remove();
+                                container.remove();
+                            }
+                        }, 500);
+                    }
+                }, 3000);
+
+                undoBtn.addEventListener('click', (undoEvent) => {
+                    undoEvent.stopPropagation();
+                    clearInterval(countdownInterval);
+                    clearTimeout(saveTimeout);
+
+                    undoBtn.remove();
+                    if (bumpBtn) bumpBtn.style.display = '';
+
+                    checkboxEl.classList.remove('checked');
                     el.style.opacity = '1';
                     if (contentEl) contentEl.style.textDecoration = 'none';
-                    if (!meta.recurrence) meta.status = 'pending';
-                    alert('Error completing task.');
                 });
-
-                // Only remove the element visually if we aren't in semantic search view
-                if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
-                    setTimeout(() => { 
-                        el.remove(); 
-                        if (container.querySelectorAll('.task-item').length === 0) {
-                            if (header) header.remove();
-                            container.remove();
-                        }
-                    }, 500);
-                }
             }
         });
 
