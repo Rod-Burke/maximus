@@ -104,6 +104,7 @@ let editingThoughtId = null;
 let cancelEditBtn = null; // Created dynamically
 let editSource = null;       // Tracks 'history' or 'tasks' origin for active edits
 let historyScrollTop = 0;    // Temporarily stores vertical scroll offset of History list
+let tasksScrollTop = 0;      // Temporarily stores vertical scroll offset of Tasks list
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -1045,6 +1046,10 @@ async function loadTasksDashboard() {
             dom.tasksList.innerHTML = '<div class="history-empty">All caught up!</div>';
         }
 
+        if (editSource === 'tasks') {
+            dom.tasksList.scrollTop = tasksScrollTop;
+            editSource = null;
+        }
     } catch (e) {
         dom.tasksList.innerHTML = '<div class="history-empty">Error loading tasks.</div>';
     }
@@ -1274,6 +1279,8 @@ function renderTaskSection(title, items) {
 
         // Click to open Task Detail Modal
         el.querySelector('.task-content-wrapper').addEventListener('click', () => {
+            editSource = 'tasks';
+            tasksScrollTop = dom.tasksList.scrollTop;
             openTaskModal(t.id, t.content, meta);
         });
 
