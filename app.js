@@ -607,6 +607,18 @@ dom.input.addEventListener('input', function() {
     this.style.height = '1px'; // Shrink to absolute minimum to accurately measure scrollHeight on mobile
     this.style.height = (this.scrollHeight) + 'px';
 });
+dom.input.addEventListener('focus', () => {
+    if (isListening || submitTimer || fullTranscript.trim()) {
+        clearTimeout(submitTimer);
+        submitTimer = null;
+        stopCountdown();
+        try { recognition.stop(); } catch(e) {}
+        isListening = false;
+        fullTranscript = '';
+        dom.orb.classList.remove('listening');
+        dom.status.innerText = 'Tap to speak to Maximus';
+    }
+});
 
 // --- HISTORY ---
 let isDeclutterMode = false;
