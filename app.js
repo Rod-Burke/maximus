@@ -1962,40 +1962,38 @@ function queueLiveAudio(float32Chunk) {
 async function initMicrophone() {
     micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
-            sampleRate: 16000,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
         }
     });
     
-    // Create AudioContext at 16kHz to match Gemini's expected input rate
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
     nextAudioStartTime = audioContext.currentTime;
     
     const sourceNode = audioContext.createMediaStreamSource(micStream);
+    const nativeSampleRate = audioContext.sampleRate;
+    console.log("Mic AudioContext sample rate:", nativeSampleRate);
     
     processorNode = audioContext.createScriptProcessor(4096, 1, 1);
     
     processorNode.onaudioprocess = (event) => {
         if (!liveVoiceActive || liveVoiceMuted) return;
-        if (liveVoiceSocket && liveVoiceSocket.readyState !== WebSocket.OPEN) return;
+        if (!liveVoiceSocket || liveVoiceSocket.readyState !== WebSocket.OPEN) return;
         
         const inputData = event.inputBuffer.getChannelData(0);
-        // AudioContext is already at 16kHz, no resampling needed
-        const pcmBuffer = float32ToPcm16(inputData);
+        const resampledData = resampleTo16k(inputData, nativeSampleRate);
+        const pcmBuffer = float32ToPcm16(resampledData);
         const base64Data = arrayBufferToBase64(pcmBuffer);
         
-        const mediaChunk = {
+        liveVoiceSocket.send(JSON.stringify({
             realtimeInput: {
                 audio: {
                     data: base64Data,
                     mimeType: "audio/pcm"
                 }
             }
-        };
-        
-        liveVoiceSocket.send(JSON.stringify(mediaChunk));
+        }));
     };
     
     sourceNode.connect(processorNode);
@@ -2024,25 +2022,40 @@ async function startLiveVoice() {
     const wsUrl = `${CONFIG.GEMINI_LIVE_ENDPOINT}?x-brain-key=${CONFIG.KEY}`;
     liveVoiceSocket = new WebSocket(wsUrl);
     
+    let micStarted = false;
+    
+    async function startMicIfNeeded() {
+        if (micStarted) return;
+        micStarted = true;
+        try {
+            await initMicrophone();
+            dom.liveVoiceStatus.textContent = "Saint Max is listening!";
+        } catch (err) {
+            console.error("Microphone access failed:", err);
+            dom.liveVoiceStatus.textContent = "Microphone access denied.";
+        }
+    }
+    
     liveVoiceSocket.onopen = async () => {
         dom.liveVoiceStatus.textContent = "Establishing voice tunnel...";
-        // Mic will start after setupComplete is received from Google
+        // Fallback: start mic after 3s if setupComplete doesn't arrive
+        setTimeout(() => {
+            if (!micStarted) {
+                console.warn("setupComplete not received within 3s, starting mic anyway.");
+                startMicIfNeeded();
+            }
+        }, 3000);
     };
     
     liveVoiceSocket.onmessage = async (event) => {
         try {
             const msg = JSON.parse(event.data);
+            console.log("Live Voice server msg:", Object.keys(msg));
             
             // Handle setupComplete — now safe to start mic
             if (msg.setupComplete) {
-                console.log("Gemini Live setup complete, starting microphone.");
-                try {
-                    await initMicrophone();
-                    dom.liveVoiceStatus.textContent = "Saint Max is listening!";
-                } catch (err) {
-                    console.error("Microphone access failed:", err);
-                    dom.liveVoiceStatus.textContent = "Microphone access denied.";
-                }
+                console.log("Gemini Live setup complete.");
+                startMicIfNeeded();
                 return;
             }
             
@@ -2060,6 +2073,11 @@ async function startLiveVoice() {
                         dom.liveVoiceCaption.textContent = `"${part.text}"`;
                     }
                 }
+            }
+            
+            // Handle turn complete
+            if (msg.serverContent && msg.serverContent.turnComplete) {
+                setWaveformState("listening");
             }
         } catch (err) {
             console.error("JSON parsing failed on Live response:", err);
