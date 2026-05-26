@@ -1960,13 +1960,20 @@ function queueLiveAudio(float32Chunk) {
 
 // Microphone capture initialization
 async function initMicrophone() {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        }
+    });
     
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    // Create AudioContext at 16kHz to match Gemini's expected input rate
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     nextAudioStartTime = audioContext.currentTime;
     
     const sourceNode = audioContext.createMediaStreamSource(micStream);
-    const nativeSampleRate = audioContext.sampleRate;
     
     processorNode = audioContext.createScriptProcessor(4096, 1, 1);
     
@@ -1975,15 +1982,15 @@ async function initMicrophone() {
         if (liveVoiceSocket && liveVoiceSocket.readyState !== WebSocket.OPEN) return;
         
         const inputData = event.inputBuffer.getChannelData(0);
-        const resampledData = resampleTo16k(inputData, nativeSampleRate);
-        const pcmBuffer = float32ToPcm16(resampledData);
+        // AudioContext is already at 16kHz, no resampling needed
+        const pcmBuffer = float32ToPcm16(inputData);
         const base64Data = arrayBufferToBase64(pcmBuffer);
         
         const mediaChunk = {
             realtimeInput: {
                 audio: {
                     data: base64Data,
-                    mimeType: "audio/pcm;rate=16000"
+                    mimeType: "audio/pcm"
                 }
             }
         };
@@ -2019,18 +2026,25 @@ async function startLiveVoice() {
     
     liveVoiceSocket.onopen = async () => {
         dom.liveVoiceStatus.textContent = "Establishing voice tunnel...";
-        try {
-            await initMicrophone();
-            dom.liveVoiceStatus.textContent = "Saint Max is listening!";
-        } catch (err) {
-            console.error("Microphone access failed:", err);
-            dom.liveVoiceStatus.textContent = "Microphone access denied.";
-        }
+        // Mic will start after setupComplete is received from Google
     };
     
     liveVoiceSocket.onmessage = async (event) => {
         try {
             const msg = JSON.parse(event.data);
+            
+            // Handle setupComplete — now safe to start mic
+            if (msg.setupComplete) {
+                console.log("Gemini Live setup complete, starting microphone.");
+                try {
+                    await initMicrophone();
+                    dom.liveVoiceStatus.textContent = "Saint Max is listening!";
+                } catch (err) {
+                    console.error("Microphone access failed:", err);
+                    dom.liveVoiceStatus.textContent = "Microphone access denied.";
+                }
+                return;
+            }
             
             // Intercept synthesized speech chunks
             if (msg.serverContent && msg.serverContent.modelTurn) {
