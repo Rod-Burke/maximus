@@ -2039,7 +2039,7 @@ async function startLiveVoice() {
     }
     
     // Step 2: Connect directly to Google's Live API using the ephemeral token
-    const googleWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${token}`;
+    const googleWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`;
     liveVoiceSocket = new WebSocket(googleWsUrl);
     
     let micStarted = false;
