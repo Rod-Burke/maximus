@@ -2049,7 +2049,12 @@ async function startLiveVoice() {
     
     liveVoiceSocket.onmessage = async (event) => {
         try {
-            const msg = JSON.parse(event.data);
+            // Handle Blob data from WebSocket
+            let rawData = event.data;
+            if (rawData instanceof Blob) {
+                rawData = await rawData.text();
+            }
+            const msg = JSON.parse(rawData);
             console.log("Live Voice server msg:", Object.keys(msg));
             
             // Handle setupComplete — now safe to start mic
