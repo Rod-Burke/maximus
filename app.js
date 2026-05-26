@@ -2,7 +2,8 @@ const CONFIG = {
     ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/voice-gateway',
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
     SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
-    GEMINI_LIVE_ENDPOINT: 'wss://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live',
+    GEMINI_LIVE_TOKEN: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live/token',
+    GEMINI_LIVE_TOOL: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live/tool',
     KEY: 'eddaa00be5289a5cd4130b01055cdef8123fa72994a9ad9784256806c2339ace',
     EMAIL: 'Fra_roderic@outlook.com'
 };
@@ -2019,8 +2020,27 @@ async function startLiveVoice() {
     dom.liveVoiceMute.textContent = "Mute Mic";
     dom.liveVoiceMute.classList.remove('muted');
     
-    const wsUrl = `${CONFIG.GEMINI_LIVE_ENDPOINT}?x-brain-key=${CONFIG.KEY}`;
-    liveVoiceSocket = new WebSocket(wsUrl);
+    // Step 1: Fetch ephemeral token from our server
+    let token;
+    try {
+        const tokenRes = await fetch(CONFIG.GEMINI_LIVE_TOKEN, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY }
+        });
+        if (!tokenRes.ok) throw new Error(`Token fetch failed: ${tokenRes.status}`);
+        const tokenData = await tokenRes.json();
+        token = tokenData.token;
+        console.log("Ephemeral token obtained.");
+    } catch (err) {
+        console.error("Failed to get ephemeral token:", err);
+        dom.liveVoiceStatus.textContent = "Failed to connect. Try again.";
+        setTimeout(() => endLiveVoice(), 2000);
+        return;
+    }
+    
+    // Step 2: Connect directly to Google's Live API using the ephemeral token
+    const googleWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${token}`;
+    liveVoiceSocket = new WebSocket(googleWsUrl);
     
     let micStarted = false;
     
@@ -2036,8 +2056,66 @@ async function startLiveVoice() {
         }
     }
     
-    liveVoiceSocket.onopen = async () => {
+    liveVoiceSocket.onopen = () => {
         dom.liveVoiceStatus.textContent = "Establishing voice tunnel...";
+        
+        // Step 3: Send setup message directly to Google
+        const localDate = new Date().toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        
+        const setupPayload = {
+            setup: {
+                model: 'models/gemini-2.5-flash-native-audio-latest',
+                generationConfig: {
+                    responseModalities: ['AUDIO'],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: 'Puck' }
+                        }
+                    }
+                },
+                systemInstruction: {
+                    parts: [{
+                        text: `You are Roderic's private Open Brain real-time voice assistant called Saint Max. Today is ${localDate}.
+Speak in complete, natural, and flowing sentences. Do not mention system or code details.
+CRITICAL INSTRUCTIONS:
+- You have access to Roderic's private memories and to-dos via function tools (search_thoughts and capture_thought).
+- You have access to Google Search natively (via googleSearch). If he asks for weather, news, or current facts, automatically perform a web search to answer.
+- Always use the tools when he asks about his notes, tasks, yesterday, or today's priorities.
+- NEVER speak in markdown. Do not use asterisks, lists, bold formatting, or bullet points. Speak as a companion in flowing plain-text speech only.`
+                    }]
+                },
+                tools: [
+                    { googleSearch: {} },
+                    {
+                        functionDeclarations: [
+                            {
+                                name: 'search_thoughts',
+                                description: "Searches Roderic's personal Open Brain memories, tasks, and historical notes for past facts, reminders, or ideas.",
+                                parameters: {
+                                    type: 'OBJECT',
+                                    properties: { query: { type: 'STRING', description: 'The semantic query to search for' } },
+                                    required: ['query']
+                                }
+                            },
+                            {
+                                name: 'capture_thought',
+                                description: "Records a new task, event, observation, or reference in Roderic's private brain database.",
+                                parameters: {
+                                    type: 'OBJECT',
+                                    properties: { content: { type: 'STRING', description: 'The clear text thought content to capture' } },
+                                    required: ['content']
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+        
+        liveVoiceSocket.send(JSON.stringify(setupPayload));
+        
         // Fallback: start mic after 3s if setupComplete doesn't arrive
         setTimeout(() => {
             if (!micStarted) {
@@ -2055,12 +2133,38 @@ async function startLiveVoice() {
                 rawData = await rawData.text();
             }
             const msg = JSON.parse(rawData);
-            console.log("Live Voice server msg:", Object.keys(msg));
             
-            // Handle setupComplete — now safe to start mic
+            // Handle setupComplete
             if (msg.setupComplete) {
                 console.log("Gemini Live setup complete.");
                 startMicIfNeeded();
+                return;
+            }
+            
+            // Handle tool calls — execute via our Supabase HTTP endpoint
+            if (msg.toolCall) {
+                const { functionCalls } = msg.toolCall;
+                const responses = [];
+                
+                for (const call of functionCalls) {
+                    try {
+                        const toolRes = await fetch(CONFIG.GEMINI_LIVE_TOOL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ name: call.name, args: call.args, id: call.id })
+                        });
+                        const result = await toolRes.json();
+                        responses.push({ response: result.response, id: result.id });
+                    } catch (toolErr) {
+                        console.error(`Tool ${call.name} failed:`, toolErr);
+                        responses.push({ response: { output: { error: 'Tool execution failed' } }, id: call.id });
+                    }
+                }
+                
+                // Send tool responses back to Google
+                liveVoiceSocket.send(JSON.stringify({
+                    toolResponse: { functionResponses: responses }
+                }));
                 return;
             }
             
@@ -2085,7 +2189,7 @@ async function startLiveVoice() {
                 setWaveformState("listening");
             }
         } catch (err) {
-            console.error("JSON parsing failed on Live response:", err);
+            console.error("Error processing Live response:", err);
         }
     };
     
@@ -2094,8 +2198,8 @@ async function startLiveVoice() {
     };
     
     liveVoiceSocket.onerror = (err) => {
-        console.error("WebSocket socket failure:", err);
-        dom.liveVoiceStatus.textContent = "Connection issue. Reconnecting...";
+        console.error("WebSocket failure:", err);
+        dom.liveVoiceStatus.textContent = "Connection issue.";
     };
 }
 
