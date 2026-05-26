@@ -2,6 +2,7 @@ const CONFIG = {
     ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/voice-gateway',
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
     SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
+    GEMINI_LIVE_ENDPOINT: 'wss://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live',
     KEY: 'eddaa00be5289a5cd4130b01055cdef8123fa72994a9ad9784256806c2339ace',
     EMAIL: 'Fra_roderic@outlook.com'
 };
@@ -79,7 +80,16 @@ const dom = {
     quickCaptureInput: document.getElementById('quick-capture-input'),
     quickCaptureSubmit: document.getElementById('quick-capture-submit'),
     quickCaptureStatus: document.getElementById('quick-capture-status'),
-    showCompletedBtn: document.getElementById('show-completed-btn')
+    showCompletedBtn: document.getElementById('show-completed-btn'),
+    // Saint Max Live Voice Call Panel
+    liveVoiceBtn: document.getElementById('live-voice-btn'),
+    liveVoicePanel: document.getElementById('live-voice-panel'),
+    liveVoiceClose: document.getElementById('live-voice-close'),
+    liveVoiceMute: document.getElementById('live-voice-mute'),
+    liveVoiceEnd: document.getElementById('live-voice-end'),
+    liveVoiceStatus: document.getElementById('live-voice-status'),
+    liveVoiceCaption: document.getElementById('live-voice-caption'),
+    voiceWaveform: document.getElementById('voice-waveform')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -98,6 +108,16 @@ const SUBMIT_DELAY = 4000;
 
 // --- MIC MUTE STATE ---
 let micMuted = false;
+
+// --- SAINT MAX LIVE VOICE STATE ---
+let liveVoiceSocket = null;
+let audioContext = null;
+let micStream = null;
+let processorNode = null;
+let liveVoiceActive = false;
+let liveVoiceMuted = false;
+let nextAudioStartTime = 0;
+let waveformTimer = null;
 
 // --- EDIT MODE STATE ---
 let editingThoughtId = null;
@@ -1828,6 +1848,287 @@ dom.quickCaptureInput.addEventListener('keydown', (e) => {
         dom.quickCaptureSubmit.click();
     }
 });
+
+// --- SAINT MAX LIVE VOICE REAL-TIME ORCHESTRATION ---
+
+// Float32 input downsampler to 16 kHz mono PCM
+function resampleTo16k(inputBuffer, fromSampleRate) {
+    const ratio = fromSampleRate / 16000;
+    const newLength = Math.round(inputBuffer.length / ratio);
+    const result = new Float32Array(newLength);
+    let offsetResult = 0;
+    let offsetInput = 0;
+    while (offsetResult < result.length) {
+        const nextOffsetInput = Math.round((offsetResult + 1) * ratio);
+        let accum = 0, count = 0;
+        for (let i = offsetInput; i < nextOffsetInput && i < inputBuffer.length; i++) {
+            accum += inputBuffer[i];
+            count++;
+        }
+        result[offsetResult] = count > 0 ? accum / count : 0;
+        offsetResult++;
+        offsetInput = nextOffsetInput;
+    }
+    return result;
+}
+
+// Convert float32 array (-1.0 to 1.0) to raw Little-Endian 16-bit PCM ArrayBuffer
+function float32ToPcm16(float32Array) {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < float32Array.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
+}
+
+// Convert raw Little-Endian 16-bit PCM ArrayBuffer to Float32Array
+function pcm16ToFloat32(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    const length = arrayBuffer.byteLength / 2;
+    const result = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+        result[i] = view.getInt16(i * 2, true) / 32768.0;
+    }
+    return result;
+}
+
+// Convert ArrayBuffer to Base64 String
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+}
+
+// Convert Base64 String to ArrayBuffer
+function base64ToArrayBuffer(base64) {
+    const binary = window.atob(base64);
+    const buffer = new ArrayBuffer(binary.length);
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return buffer;
+}
+
+// Set Webflow visual states
+function setWaveformState(state) {
+    if (!dom.voiceWaveform) return;
+    if (state === "speaking") {
+        dom.voiceWaveform.classList.remove('listening');
+        dom.voiceWaveform.classList.add('speaking');
+    } else if (state === "listening") {
+        dom.voiceWaveform.classList.remove('speaking');
+        dom.voiceWaveform.classList.add('listening');
+    } else {
+        dom.voiceWaveform.classList.remove('speaking', 'listening');
+    }
+}
+
+// Web Audio API buffer scheduling queue (eliminates speaker clicks & gaps)
+function queueLiveAudio(float32Chunk) {
+    if (!audioContext || audioContext.state === 'suspended') return;
+    
+    const audioBuffer = audioContext.createBuffer(1, float32Chunk.length, 24000);
+    audioBuffer.getChannelData(0).set(float32Chunk);
+    
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+    
+    const now = audioContext.currentTime;
+    if (nextAudioStartTime < now) {
+        nextAudioStartTime = now + 0.04;
+    }
+    
+    source.start(nextAudioStartTime);
+    nextAudioStartTime += audioBuffer.duration;
+    
+    // Wave animation sync
+    setWaveformState("speaking");
+    clearTimeout(waveformTimer);
+    waveformTimer = setTimeout(() => {
+        if (audioContext.currentTime >= nextAudioStartTime) {
+            setWaveformState("listening");
+        }
+    }, (nextAudioStartTime - now) * 1000);
+}
+
+// Microphone capture initialization
+async function initMicrophone() {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    nextAudioStartTime = audioContext.currentTime;
+    
+    const sourceNode = audioContext.createMediaStreamSource(micStream);
+    const nativeSampleRate = audioContext.sampleRate;
+    
+    processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+    
+    processorNode.onaudioprocess = (event) => {
+        if (!liveVoiceActive || liveVoiceMuted) return;
+        if (liveVoiceSocket && liveVoiceSocket.readyState !== WebSocket.OPEN) return;
+        
+        const inputData = event.inputBuffer.getChannelData(0);
+        const resampledData = resampleTo16k(inputData, nativeSampleRate);
+        const pcmBuffer = float32ToPcm16(resampledData);
+        const base64Data = arrayBufferToBase64(pcmBuffer);
+        
+        const mediaChunk = {
+            realtimeInput: {
+                mediaChunks: [
+                    {
+                        mimeType: "audio/pcm",
+                        data: base64Data
+                    }
+                ]
+            }
+        };
+        
+        liveVoiceSocket.send(JSON.stringify(mediaChunk));
+    };
+    
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioContext.destination);
+}
+
+// Establish real-time WebSocket connection to Supabase Proxy
+async function startLiveVoice() {
+    if (liveVoiceActive) return;
+    
+    // Deactivate standard dictation recognition while live voice call is active
+    try { recognition?.stop(); } catch(e){}
+    isListening = false;
+    
+    dom.liveVoicePanel.classList.remove('hidden');
+    dom.liveVoiceBtn.classList.add('active');
+    dom.liveVoiceStatus.textContent = "Connecting to Saint Max...";
+    dom.liveVoiceCaption.textContent = '"Listening..."';
+    setWaveformState("listening");
+    
+    liveVoiceActive = true;
+    liveVoiceMuted = false;
+    dom.liveVoiceMute.textContent = "Mute Mic";
+    dom.liveVoiceMute.classList.remove('muted');
+    
+    const wsUrl = `${CONFIG.GEMINI_LIVE_ENDPOINT}?x-brain-key=${CONFIG.KEY}`;
+    liveVoiceSocket = new WebSocket(wsUrl);
+    
+    liveVoiceSocket.onopen = async () => {
+        dom.liveVoiceStatus.textContent = "Establishing voice tunnel...";
+        try {
+            await initMicrophone();
+            dom.liveVoiceStatus.textContent = "Saint Max is listening!";
+        } catch (err) {
+            console.error("Microphone access failed:", err);
+            dom.liveVoiceStatus.textContent = "Microphone access denied.";
+        }
+    };
+    
+    liveVoiceSocket.onmessage = async (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            
+            // Intercept synthesized speech chunks
+            if (msg.serverContent && msg.serverContent.modelTurn) {
+                const parts = msg.serverContent.modelTurn.parts;
+                for (const part of parts) {
+                    if (part.inlineData && part.inlineData.data) {
+                        const base64Audio = part.inlineData.data;
+                        const arrayBuffer = base64ToArrayBuffer(base64Audio);
+                        const float32Data = pcm16ToFloat32(arrayBuffer);
+                        queueLiveAudio(float32Data);
+                    }
+                    if (part.text) {
+                        dom.liveVoiceCaption.textContent = `"${part.text}"`;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("JSON parsing failed on Live response:", err);
+        }
+    };
+    
+    liveVoiceSocket.onclose = () => {
+        endLiveVoice();
+    };
+    
+    liveVoiceSocket.onerror = (err) => {
+        console.error("WebSocket socket failure:", err);
+        dom.liveVoiceStatus.textContent = "Connection issue. Reconnecting...";
+    };
+}
+
+// Gracefully close all sockets, mic handles, and streams
+function endLiveVoice() {
+    if (!liveVoiceActive) return;
+    liveVoiceActive = false;
+    
+    console.log("Shutting down real-time audio session.");
+    
+    if (liveVoiceSocket) {
+        try { liveVoiceSocket.close(); } catch(e){}
+        liveVoiceSocket = null;
+    }
+    
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+    }
+    
+    if (processorNode) {
+        try { processorNode.disconnect(); } catch(e){}
+        processorNode = null;
+    }
+    
+    if (audioContext) {
+        try { audioContext.close(); } catch(e){}
+        audioContext = null;
+    }
+    
+    dom.liveVoicePanel.classList.add('hidden');
+    dom.liveVoiceBtn.classList.remove('active');
+    setWaveformState("none");
+    
+    // Automatically restart standard push-to-talk recognition
+    setTimeout(() => {
+        try { recognition?.start(); } catch(e){}
+    }, 1200);
+}
+
+// Toggle mute state
+function toggleLiveVoiceMute() {
+    liveVoiceMuted = !liveVoiceMuted;
+    if (liveVoiceMuted) {
+        dom.liveVoiceMute.textContent = "Unmute Mic";
+        dom.liveVoiceMute.classList.add('muted');
+        dom.liveVoiceStatus.textContent = "Microphone muted";
+        setWaveformState("none");
+    } else {
+        dom.liveVoiceMute.textContent = "Mute Mic";
+        dom.liveVoiceMute.classList.remove('muted');
+        dom.liveVoiceStatus.textContent = "Saint Max is listening!";
+        setWaveformState("listening");
+    }
+}
+
+// Event bindings
+dom.liveVoiceBtn.addEventListener('click', () => {
+    if (liveVoiceActive) {
+        endLiveVoice();
+    } else {
+        startLiveVoice();
+    }
+});
+
+dom.liveVoiceClose.addEventListener('click', endLiveVoice);
+dom.liveVoiceEnd.addEventListener('click', endLiveVoice);
+dom.liveVoiceMute.addEventListener('click', toggleLiveVoiceMute);
 
 // --- AUTO-START ---
 window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });
