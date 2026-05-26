@@ -1981,12 +1981,10 @@ async function initMicrophone() {
         
         const mediaChunk = {
             realtimeInput: {
-                mediaChunks: [
-                    {
-                        mimeType: "audio/pcm",
-                        data: base64Data
-                    }
-                ]
+                audio: {
+                    data: base64Data,
+                    mimeType: "audio/pcm;rate=16000"
+                }
             }
         };
         
