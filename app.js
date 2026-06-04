@@ -2726,13 +2726,10 @@ ctDom.improveSubmitBtn.addEventListener('click', async () => {
     }
 });
 
-// Close improve dialog
+// Close improve dialog - only via X button, NOT backdrop click (prevents accidental loss of work)
 ctDom.closeImprove.addEventListener('click', () => {
     ctDom.improveDialog.classList.add('hidden');
     ctImproveTaskId = null;
-});
-ctDom.improveDialog.addEventListener('click', (e) => {
-    if (e.target === ctDom.improveDialog) { ctDom.improveDialog.classList.add('hidden'); ctImproveTaskId = null; }
 });
 
 // --- ADD CODING TASK MODAL ---
