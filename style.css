@@ -1898,7 +1898,7 @@ input:checked + .toggle-slider::before {
     border: 1px solid var(--glass-border);
     border-radius: 16px;
     width: 95%;
-    max-width: 720px;
+    max-width: 950px;
     max-height: 90vh;
     overflow-y: auto;
     animation: fade-up 0.3s ease-out;
@@ -1957,8 +1957,8 @@ input:checked + .toggle-slider::before {
     padding: 0.7rem;
     font-size: 0.85rem;
     line-height: 1.5;
-    min-height: 120px;
-    max-height: 200px;
+    min-height: 200px;
+    max-height: 50vh;
     overflow-y: auto;
     color: rgba(255, 255, 255, 0.7);
     font-family: 'Outfit', sans-serif;
@@ -1975,10 +1975,24 @@ input:checked + .toggle-slider::before {
     border-color: rgba(168, 85, 247, 0.6);
 }
 
-.improve-label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* Contenteditable rich text editor */
+.improve-editable-rich {
+    color: rgba(255, 255, 255, 0.9);
+    cursor: text;
+    outline: none;
+    border-color: rgba(168, 85, 247, 0.3);
+    min-height: 250px;
+}
+
+.improve-editable-rich:focus {
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}
+
+.improve-editable-rich:empty::before {
+    content: 'Improved text will appear here...';
+    color: rgba(255, 255, 255, 0.25);
+    font-style: italic;
 }
 
 /* Rendered markdown in improve dialog */

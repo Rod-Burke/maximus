@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=51">
+    <link rel="stylesheet" href="style.css?v=52">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -315,12 +315,8 @@
                             <div id="improve-original" class="improve-text-box"></div>
                         </div>
                         <div class="improve-panel-right">
-                            <div class="improve-label-row">
-                                <label class="improve-label">✅ Improved Text</label>
-                                <button id="improve-edit-toggle" class="ct-action-btn ct-btn-improve" style="font-size:0.7rem; padding:0.2rem 0.5rem;">✏️ Edit Raw</button>
-                            </div>
-                            <div id="improve-result-rendered" class="improve-text-box improve-rendered"></div>
-                            <textarea id="improve-result" class="improve-text-box improve-editable hidden"></textarea>
+                            <label class="improve-label">✅ Improved Text <span style="opacity:0.4; font-size:0.7rem;">(click to edit directly)</span></label>
+                            <div id="improve-result-rendered" class="improve-text-box improve-rendered improve-editable-rich" contenteditable="true"></div>
                         </div>
                     </div>
                     <div class="improve-suggestions" id="improve-suggestions">
@@ -575,7 +571,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=51"></script>
+    <script src="app.js?v=52"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
