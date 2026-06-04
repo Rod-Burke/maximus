@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=52">
+    <link rel="stylesheet" href="style.css?v=53">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -312,7 +312,7 @@
                     <div class="improve-panels">
                         <div class="improve-panel-left">
                             <label class="improve-label">📝 Original Text</label>
-                            <div id="improve-original" class="improve-text-box"></div>
+                            <div id="improve-original" class="improve-text-box improve-rendered"></div>
                         </div>
                         <div class="improve-panel-right">
                             <label class="improve-label">✅ Improved Text <span style="opacity:0.4; font-size:0.7rem;">(click to edit directly)</span></label>
@@ -571,7 +571,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=52"></script>
+    <script src="app.js?v=53"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

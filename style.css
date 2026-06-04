@@ -1769,6 +1769,29 @@ input:checked + .toggle-slider::before {
     display: block;
 }
 
+.ct-description-rendered {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.7rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.85);
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+}
+
+.ct-btn-rawtoggle {
+    background: rgba(100, 116, 139, 0.15);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    color: #94a3b8;
+}
+
+.ct-btn-rawtoggle:hover {
+    background: rgba(100, 116, 139, 0.25);
+}
+
 .ct-description-area {
     width: 100%;
     min-height: 80px;

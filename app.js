@@ -2545,7 +2545,8 @@ function renderCodingTaskCard(t) {
             </div>
         </div>
         <div class="ct-expanded">
-            <textarea class="ct-description-area" rows="4">${escapeHtml(t.content)}</textarea>
+            <div class="ct-description-rendered improve-rendered">${simpleMarkdownToHtml(t.content)}</div>
+            <textarea class="ct-description-area hidden" rows="6">${escapeHtml(t.content)}</textarea>
             <div class="ct-actions-row">
                 <select class="ct-inline-select ct-status-select" title="Status">
                     ${Object.entries(STATUS_LABELS).map(([v, l]) =>
@@ -2558,8 +2559,9 @@ function renderCodingTaskCard(t) {
                     <option value="low" ${priority === 'low' ? 'selected' : ''}>🟢 Low</option>
                 </select>
                 <button class="ct-action-btn ct-btn-improve">✨ Improve</button>
+                <button class="ct-action-btn ct-btn-rawtoggle">📝 Raw</button>
                 <button class="ct-action-btn ct-btn-edit">📝 Edit</button>
-                <button class="ct-action-btn ct-btn-save">💾 Save</button>
+                <button class="ct-action-btn ct-btn-save hidden">💾 Save</button>
                 <button class="ct-action-btn ct-btn-delete">🗑</button>
             </div>
         </div>
@@ -2598,17 +2600,47 @@ function renderCodingTaskCard(t) {
         await updateCodingTaskMeta(t.id, meta);
     });
 
+    // Raw toggle: switch between rich preview and raw textarea
+    const renderedDiv = el.querySelector('.ct-description-rendered');
+    const rawTextarea = el.querySelector('.ct-description-area');
+    const rawToggleBtn = el.querySelector('.ct-btn-rawtoggle');
+    const saveBtn = el.querySelector('.ct-btn-save');
+
+    rawToggleBtn.addEventListener('click', () => {
+        const isRichVisible = !renderedDiv.classList.contains('hidden');
+        if (isRichVisible) {
+            // Switch to raw
+            rawTextarea.value = t.content; // ensure current content
+            renderedDiv.classList.add('hidden');
+            rawTextarea.classList.remove('hidden');
+            saveBtn.classList.remove('hidden');
+            rawToggleBtn.textContent = '👁 Preview';
+            rawTextarea.focus();
+        } else {
+            // Switch back to rich
+            t.content = rawTextarea.value; // sync
+            renderedDiv.innerHTML = simpleMarkdownToHtml(rawTextarea.value);
+            renderedDiv.classList.remove('hidden');
+            rawTextarea.classList.add('hidden');
+            saveBtn.classList.add('hidden');
+            rawToggleBtn.textContent = '📝 Raw';
+        }
+    });
+
     // Improve button
     el.querySelector('.ct-btn-improve').addEventListener('click', () => {
-        const currentText = el.querySelector('.ct-description-area').value;
+        const currentText = rawTextarea.classList.contains('hidden') ? t.content : rawTextarea.value;
         openImproveDialog(t.id, currentText, meta);
     });
 
     // Save button
     el.querySelector('.ct-btn-save').addEventListener('click', async () => {
-        const newContent = el.querySelector('.ct-description-area').value.trim();
+        const newContent = rawTextarea.value.trim();
         if (!newContent) return;
+        t.content = newContent;
         await saveCodingTaskDescription(t.id, newContent, el);
+        // Update rich preview
+        renderedDiv.innerHTML = simpleMarkdownToHtml(newContent);
     });
 
     // Edit button → open full Task Detail Modal
@@ -2683,8 +2715,8 @@ async function deleteCodingTask(id, cardEl) {
 
 async function openImproveDialog(taskId, content, meta) {
     ctImproveTaskId = taskId;
-    ctDom.improveOriginal.textContent = content;
-    ctDom.improveResult.value = '';
+    ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(content);
+    ctDom.improveResult.innerHTML = '';
     ctDom.improveSuggestionsList.innerHTML = '';
     ctDom.readinessBarFill.style.width = '0%';
     ctDom.readinessLabel.textContent = '📊 Readiness: —/10';
@@ -2746,7 +2778,7 @@ function updateReadinessUI(score, notes) {
 // Improve Again
 ctDom.improveAgainBtn.addEventListener('click', async () => {
     const currentImproved = ctDom.improveResult.innerText;
-    ctDom.improveOriginal.textContent = currentImproved;
+    ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(currentImproved);
     ctDom.improveResult.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Improving again...</div>';
     ctDom.improveResult.contentEditable = 'false';
 
