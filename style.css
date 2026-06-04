@@ -1957,6 +1957,58 @@ input:checked + .toggle-slider::before {
     border-color: rgba(168, 85, 247, 0.6);
 }
 
+.improve-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Rendered markdown in improve dialog */
+.improve-rendered {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.improve-rendered h1,
+.improve-rendered h2,
+.improve-rendered h3 {
+    color: var(--accent-gold);
+    margin: 0.6em 0 0.3em;
+    font-weight: 500;
+}
+
+.improve-rendered h1 { font-size: 1rem; }
+.improve-rendered h2 { font-size: 0.9rem; }
+.improve-rendered h3 { font-size: 0.85rem; }
+
+.improve-rendered p {
+    margin: 0.3em 0;
+    line-height: 1.5;
+}
+
+.improve-rendered ul,
+.improve-rendered ol {
+    margin: 0.3em 0;
+    padding-left: 1.2em;
+}
+
+.improve-rendered li {
+    margin-bottom: 0.2em;
+    line-height: 1.4;
+}
+
+.improve-rendered strong {
+    color: white;
+    font-weight: 600;
+}
+
+.improve-rendered code {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+    font-size: 0.82em;
+    font-family: monospace;
+}
+
 .improve-suggestions {
     margin-bottom: 0.75rem;
 }

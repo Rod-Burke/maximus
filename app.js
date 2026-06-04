@@ -2346,6 +2346,8 @@ const ctDom = {
     closeImprove: document.getElementById('close-improve-ct'),
     improveOriginal: document.getElementById('improve-original'),
     improveResult: document.getElementById('improve-result'),
+    improveResultRendered: document.getElementById('improve-result-rendered'),
+    improveEditToggle: document.getElementById('improve-edit-toggle'),
     improveSuggestionsList: document.getElementById('improve-suggestions-list'),
     readinessBarFill: document.getElementById('readiness-bar-fill'),
     readinessLabel: document.getElementById('readiness-label'),
@@ -2353,6 +2355,34 @@ const ctDom = {
     improveAgainBtn: document.getElementById('improve-again-btn'),
     improveSubmitBtn: document.getElementById('improve-submit-btn'),
 };
+
+// Simple markdown to HTML converter
+function simpleMarkdownToHtml(md) {
+    if (!md) return '';
+    let html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')  // escape HTML
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>\n?)+/g, (match) => '<ul>' + match + '</ul>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+    return '<p>' + html + '</p>';
+}
+
+function setImproveRenderedText(text) {
+    ctDom.improveResult.value = text;
+    ctDom.improveResultRendered.innerHTML = simpleMarkdownToHtml(text);
+    // Show rendered, hide textarea
+    ctDom.improveResultRendered.classList.remove('hidden');
+    ctDom.improveResult.classList.add('hidden');
+    ctDom.improveEditToggle.textContent = '✏️ Edit Raw';
+}
 
 let ctImproveTaskId = null; // Track which task is being improved
 
@@ -2604,8 +2634,9 @@ async function openImproveDialog(taskId, content, meta) {
     ctDom.improveDialog.classList.remove('hidden');
 
     // Call LLM
-    ctDom.improveResult.value = 'Improving with Gemini...';
-    ctDom.improveResult.disabled = true;
+    ctDom.improveResultRendered.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Improving with Gemini...</div>';
+    ctDom.improveResultRendered.classList.remove('hidden');
+    ctDom.improveResult.classList.add('hidden');
 
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
@@ -2615,8 +2646,7 @@ async function openImproveDialog(taskId, content, meta) {
         });
         const data = await res.json();
 
-        ctDom.improveResult.value = data.improved_text || content;
-        ctDom.improveResult.disabled = false;
+        setImproveRenderedText(data.improved_text || content);
 
         // Suggestions
         ctDom.improveSuggestionsList.innerHTML = '';
@@ -2638,8 +2668,7 @@ async function openImproveDialog(taskId, content, meta) {
         updateReadinessUI(score, data.readiness_notes || '');
 
     } catch (e) {
-        ctDom.improveResult.value = content;
-        ctDom.improveResult.disabled = false;
+        setImproveRenderedText(content);
         console.error('Improve error:', e);
     }
 }
@@ -2659,8 +2688,9 @@ function updateReadinessUI(score, notes) {
 ctDom.improveAgainBtn.addEventListener('click', async () => {
     const currentImproved = ctDom.improveResult.value;
     ctDom.improveOriginal.textContent = currentImproved;
-    ctDom.improveResult.value = 'Improving again...';
-    ctDom.improveResult.disabled = true;
+    ctDom.improveResultRendered.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Improving again...</div>';
+    ctDom.improveResultRendered.classList.remove('hidden');
+    ctDom.improveResult.classList.add('hidden');
 
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
@@ -2669,8 +2699,7 @@ ctDom.improveAgainBtn.addEventListener('click', async () => {
             body: JSON.stringify({ action: 'improve_coding_task', content: currentImproved })
         });
         const data = await res.json();
-        ctDom.improveResult.value = data.improved_text || currentImproved;
-        ctDom.improveResult.disabled = false;
+        setImproveRenderedText(data.improved_text || currentImproved);
 
         ctDom.improveSuggestionsList.innerHTML = '';
         (data.suggestions || []).forEach(s => {
@@ -2681,8 +2710,25 @@ ctDom.improveAgainBtn.addEventListener('click', async () => {
 
         updateReadinessUI(data.readiness_score || 5, data.readiness_notes || '');
     } catch (e) {
-        ctDom.improveResult.value = currentImproved;
-        ctDom.improveResult.disabled = false;
+        setImproveRenderedText(currentImproved);
+    }
+});
+
+// Edit toggle: switch between rendered preview and raw textarea
+ctDom.improveEditToggle.addEventListener('click', () => {
+    const isRendered = !ctDom.improveResultRendered.classList.contains('hidden');
+    if (isRendered) {
+        // Switch to raw edit
+        ctDom.improveResultRendered.classList.add('hidden');
+        ctDom.improveResult.classList.remove('hidden');
+        ctDom.improveEditToggle.textContent = '👁 Preview';
+        ctDom.improveResult.focus();
+    } else {
+        // Switch back to rendered preview, sync textarea content
+        ctDom.improveResultRendered.innerHTML = simpleMarkdownToHtml(ctDom.improveResult.value);
+        ctDom.improveResultRendered.classList.remove('hidden');
+        ctDom.improveResult.classList.add('hidden');
+        ctDom.improveEditToggle.textContent = '✏️ Edit Raw';
     }
 });
 
