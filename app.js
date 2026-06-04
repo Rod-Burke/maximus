@@ -2543,7 +2543,8 @@ function renderCodingTaskCard(t) {
                 <div class="ct-meta-row">
                     <span class="ct-badge status-${status}">${STATUS_LABELS[status] || status}</span>
                     <span class="ct-badge project">${PROJECT_LABELS[project] || project}</span>
-                    <span class="ct-badge complexity">${complexity}</span>
+                    <span class="ct-badge priority-badge priority-${priority}">${priority === 'high' ? '🔴 High' : priority === 'low' ? '🟢 Low' : '🟡 Medium'}</span>
+                    <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
             </div>
         </div>
@@ -2591,6 +2592,12 @@ function renderCodingTaskCard(t) {
         const newPriority = this.value;
         const dot = el.querySelector('.ct-priority-dot');
         dot.className = `ct-priority-dot ${newPriority}`;
+        // Update the priority badge in header too
+        const badge = el.querySelector('.priority-badge');
+        if (badge) {
+            badge.className = `ct-badge priority-badge priority-${newPriority}`;
+            badge.textContent = newPriority === 'high' ? '🔴 High' : newPriority === 'low' ? '🟢 Low' : '🟡 Medium';
+        }
         ct.priority = newPriority;
         await updateCodingTaskMeta(t.id, meta);
     });
