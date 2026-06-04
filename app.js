@@ -2380,6 +2380,7 @@ const ctDom = {
     addBtn: document.getElementById('add-coding-task-btn'),
     filterProject: document.getElementById('ct-filter-project'),
     filterStatus: document.getElementById('ct-filter-status'),
+    ctSearch: document.getElementById('ct-search'),
     // Add Modal
     addModal: document.getElementById('add-ct-modal'),
     addContent: document.getElementById('add-ct-content'),
@@ -2451,6 +2452,23 @@ ctDom.closeBtn.addEventListener('click', () => ctDom.panel.classList.add('hidden
 // Filters
 ctDom.filterProject.addEventListener('change', loadCodingTasks);
 ctDom.filterStatus.addEventListener('change', loadCodingTasks);
+
+// Search: client-side filter on rendered cards
+let ctSearchTimeout = null;
+ctDom.ctSearch.addEventListener('input', () => {
+    clearTimeout(ctSearchTimeout);
+    ctSearchTimeout = setTimeout(() => {
+        const query = ctDom.ctSearch.value.toLowerCase().trim();
+        const cards = ctDom.list.querySelectorAll('.ct-card');
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            card.style.display = query === '' || text.includes(query) ? '' : 'none';
+        });
+        // Also hide/show status counts bar
+        const countsBar = ctDom.list.querySelector('.ct-status-counts');
+        if (countsBar) countsBar.style.display = query ? 'none' : '';
+    }, 200);
+});
 
 async function loadCodingTasks() {
     ctDom.list.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Loading coding tasks...</div>';

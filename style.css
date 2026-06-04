@@ -1678,6 +1678,29 @@ input:checked + .toggle-slider::before {
     animation: fade-up 0.2s ease-out;
 }
 
+/* Search input */
+.ct-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ct-search-input:focus {
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.ct-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
 /* Task Card */
 .ct-card {
     background: var(--glass-bg);
