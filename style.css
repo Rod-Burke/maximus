@@ -1769,6 +1769,16 @@ input:checked + .toggle-slider::before {
     display: block;
 }
 
+/* Done tasks: dimmed but still clickable */
+.ct-card.ct-done {
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+}
+
+.ct-card.ct-done:hover {
+    opacity: 0.7;
+}
+
 .ct-description-rendered {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--glass-border);

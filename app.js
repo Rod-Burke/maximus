@@ -2522,7 +2522,8 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    el.className = 'ct-card';
+    const doneStatuses = ['done', 'done_in_maximus'];
+    el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
     const priority = ct.priority || 'medium';
@@ -2582,6 +2583,12 @@ function renderCodingTaskCard(t) {
         badge.className = `ct-badge status-${newStatus}`;
         badge.textContent = STATUS_LABELS[newStatus] || newStatus;
         ct.status = newStatus;
+        // Toggle done styling
+        if (newStatus === 'done' || newStatus === 'done_in_maximus') {
+            el.classList.add('ct-done');
+        } else {
+            el.classList.remove('ct-done');
+        }
         await updateCodingTaskMeta(t.id, meta);
     });
 
