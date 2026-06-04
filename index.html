@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=54">
+    <link rel="stylesheet" href="style.css?v=55">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -350,8 +350,8 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <label class="modal-label">Content</label>
-                    <textarea id="modal-content-input" class="modal-input" rows="3"></textarea>
+                    <label class="modal-label">Content <span style="opacity:0.4; font-weight:300; font-size:0.75rem;">(click to edit)</span></label>
+                    <div id="modal-content-input" class="modal-input modal-content-rich improve-rendered improve-editable-rich" contenteditable="true"></div>
                     
                     <label class="modal-label">Summary <span style="opacity:0.4; font-weight:300; font-size:0.75rem;">(shown in task list)</span></label>
                     <input type="text" id="modal-summary-input" class="modal-input" placeholder="Short display text...">
@@ -571,7 +571,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=54"></script>
+    <script src="app.js?v=55"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

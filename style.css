@@ -1332,6 +1332,14 @@ button#send-btn svg {
     background: rgba(34, 197, 94, 0.35);
 }
 
+/* Rich text content in task detail modal */
+.modal-content-rich {
+    min-height: 120px;
+    max-height: 40vh;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
 /* --- RECLASSIFY PICKER --- */
 .reclassify-picker {
     display: flex;

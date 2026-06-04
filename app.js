@@ -1544,7 +1544,7 @@ function renderNotesLinks(text) {
 
 function openTaskModal(id, content, meta) {
     modalThoughtId = id;
-    dom.modalContent.value = content;
+    dom.modalContent.innerHTML = simpleMarkdownToHtml(content);
     dom.modalSummary.value = meta.summary || content;
     dom.modalNotes.value = meta.notes || '';
     renderNotesLinks(meta.notes);
@@ -1712,7 +1712,7 @@ dom.modalType.addEventListener('change', () => {
 // Improve button in task detail modal → launches the same improve dialog
 dom.modalCtImproveBtn.addEventListener('click', () => {
     if (!modalThoughtId) return;
-    const content = dom.modalContent.value;
+    const content = dom.modalContent.innerText;
     const meta = { coding_task: { project: dom.modalCtProject.value, status: dom.modalCtStatus.value } };
     openImproveDialog(modalThoughtId, content, meta);
 });
@@ -1725,7 +1725,7 @@ dom.modalAllDay.addEventListener('change', () => {
 dom.modalSave.addEventListener('click', async () => {
     if (!modalThoughtId) return;
     const id = modalThoughtId;
-    const newContent = dom.modalContent.value.trim();
+    const newContent = dom.modalContent.innerText.trim();
     if (!newContent) { alert('Content cannot be empty.'); return; }
 
     dom.modalSave.textContent = 'Saving...';
