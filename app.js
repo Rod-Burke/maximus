@@ -2321,7 +2321,472 @@ dom.liveVoiceClose.addEventListener('click', endLiveVoice);
 dom.liveVoiceEnd.addEventListener('click', endLiveVoice);
 dom.liveVoiceMute.addEventListener('click', toggleLiveVoiceMute);
 
+// ===== CODING TASKS MODULE =====
+
+const ctDom = {
+    panel: document.getElementById('coding-tasks-panel'),
+    btn: document.getElementById('coding-tasks-btn'),
+    closeBtn: document.getElementById('close-coding-tasks'),
+    list: document.getElementById('coding-tasks-list'),
+    addBtn: document.getElementById('add-coding-task-btn'),
+    filterProject: document.getElementById('ct-filter-project'),
+    filterStatus: document.getElementById('ct-filter-status'),
+    // Add Modal
+    addModal: document.getElementById('add-ct-modal'),
+    addContent: document.getElementById('add-ct-content'),
+    addProject: document.getElementById('add-ct-project'),
+    addPriority: document.getElementById('add-ct-priority'),
+    addComplexity: document.getElementById('add-ct-complexity'),
+    addStatus: document.getElementById('add-ct-status'),
+    addSubmit: document.getElementById('add-ct-submit'),
+    addCancel: document.getElementById('add-ct-cancel'),
+    closeAddModal: document.getElementById('close-add-ct'),
+    // Improve Dialog
+    improveDialog: document.getElementById('improve-ct-dialog'),
+    closeImprove: document.getElementById('close-improve-ct'),
+    improveOriginal: document.getElementById('improve-original'),
+    improveResult: document.getElementById('improve-result'),
+    improveSuggestionsList: document.getElementById('improve-suggestions-list'),
+    readinessBarFill: document.getElementById('readiness-bar-fill'),
+    readinessLabel: document.getElementById('readiness-label'),
+    readinessNotes: document.getElementById('readiness-notes'),
+    improveAgainBtn: document.getElementById('improve-again-btn'),
+    improveSubmitBtn: document.getElementById('improve-submit-btn'),
+};
+
+let ctImproveTaskId = null; // Track which task is being improved
+
+const PROJECT_LABELS = {
+    chatops: 'Chat Ops', quote_manager: 'Quote Mgr', liturgy_explorer: 'Liturgy',
+    homily_pipeline: 'Homily', stream_management: 'Streams', backups_devops: 'DevOps',
+    maximus_core: 'Maximus', open_brain: 'Open Brain', infrastructure: 'Infra',
+    uncategorized: 'Other'
+};
+
+const STATUS_LABELS = {
+    draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
+    ready_for_maximus: 'Ready for Maximus', done_in_maximus: 'Done in Maximus',
+    ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress', done: 'Done'
+};
+
+// Panel open/close
+ctDom.btn.addEventListener('click', () => { ctDom.panel.classList.remove('hidden'); loadCodingTasks(); });
+ctDom.closeBtn.addEventListener('click', () => ctDom.panel.classList.add('hidden'));
+
+// Filters
+ctDom.filterProject.addEventListener('change', loadCodingTasks);
+ctDom.filterStatus.addEventListener('change', loadCodingTasks);
+
+async function loadCodingTasks() {
+    ctDom.list.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Loading coding tasks...</div>';
+    try {
+        const body = { action: 'list_coding_tasks' };
+        const project = ctDom.filterProject.value;
+        const status = ctDom.filterStatus.value;
+        if (project) body.project = project;
+        if (status) body.status = status;
+
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!data.thoughts) { ctDom.list.innerHTML = '<div class="history-empty">Error loading tasks.</div>'; return; }
+
+        renderCodingTasksList(data.thoughts);
+    } catch (e) {
+        console.error('Load coding tasks error:', e);
+        ctDom.list.innerHTML = '<div class="history-empty">Error loading coding tasks.</div>';
+    }
+}
+
+function renderCodingTasksList(tasks) {
+    ctDom.list.innerHTML = '';
+
+    if (!tasks.length) {
+        ctDom.list.innerHTML = '<div class="history-empty">No coding tasks found. Add one with the + button.</div>';
+        return;
+    }
+
+    // Status counts
+    const counts = {};
+    tasks.forEach(t => {
+        const s = t.metadata?.coding_task?.status || 'draft';
+        counts[s] = (counts[s] || 0) + 1;
+    });
+    const countsBar = document.createElement('div');
+    countsBar.className = 'ct-status-counts';
+    for (const [s, c] of Object.entries(counts)) {
+        const chip = document.createElement('span');
+        chip.className = 'ct-count-chip';
+        chip.innerHTML = `<strong>${c}</strong>${STATUS_LABELS[s] || s}`;
+        countsBar.appendChild(chip);
+    }
+    ctDom.list.appendChild(countsBar);
+
+    // Sort: priority high > medium > low, then by sort_order, then by created_at
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    tasks.sort((a, b) => {
+        const pa = priorityOrder[a.metadata?.coding_task?.priority || 'medium'] ?? 1;
+        const pb = priorityOrder[b.metadata?.coding_task?.priority || 'medium'] ?? 1;
+        if (pa !== pb) return pa - pb;
+        const sa = a.metadata?.coding_task?.sort_order ?? 50;
+        const sb = b.metadata?.coding_task?.sort_order ?? 50;
+        if (sa !== sb) return sa - sb;
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    tasks.forEach(t => {
+        const card = renderCodingTaskCard(t);
+        ctDom.list.appendChild(card);
+    });
+}
+
+function renderCodingTaskCard(t) {
+    const meta = t.metadata || {};
+    const ct = meta.coding_task || {};
+    const el = document.createElement('div');
+    el.className = 'ct-card';
+    el.dataset.id = t.id;
+
+    const priority = ct.priority || 'medium';
+    const status = ct.status || 'draft';
+    const project = ct.project || 'uncategorized';
+    const complexity = ct.complexity || 'moderate';
+    const summary = meta.summary || t.content.substring(0, 80);
+
+    el.innerHTML = `
+        <div class="ct-card-header">
+            <div class="ct-priority-dot ${priority}"></div>
+            <div class="ct-card-main">
+                <div class="ct-summary">${escapeHtml(summary)}</div>
+                <div class="ct-meta-row">
+                    <span class="ct-badge status-${status}">${STATUS_LABELS[status] || status}</span>
+                    <span class="ct-badge project">${PROJECT_LABELS[project] || project}</span>
+                    <span class="ct-badge complexity">${complexity}</span>
+                </div>
+            </div>
+        </div>
+        <div class="ct-expanded">
+            <textarea class="ct-description-area" rows="4">${escapeHtml(t.content)}</textarea>
+            <div class="ct-actions-row">
+                <select class="ct-inline-select ct-status-select" title="Status">
+                    ${Object.entries(STATUS_LABELS).map(([v, l]) =>
+                        `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`
+                    ).join('')}
+                </select>
+                <select class="ct-inline-select ct-priority-select" title="Priority">
+                    <option value="high" ${priority === 'high' ? 'selected' : ''}>🔴 High</option>
+                    <option value="medium" ${priority === 'medium' ? 'selected' : ''}>🟡 Medium</option>
+                    <option value="low" ${priority === 'low' ? 'selected' : ''}>🟢 Low</option>
+                </select>
+                <button class="ct-action-btn ct-btn-improve">✨ Improve</button>
+                <button class="ct-action-btn ct-btn-save">💾 Save</button>
+                <button class="ct-action-btn ct-btn-delete">🗑</button>
+            </div>
+        </div>
+    `;
+
+    // Toggle expand on card click
+    el.querySelector('.ct-card-header').addEventListener('click', () => {
+        el.classList.toggle('expanded');
+    });
+
+    // Prevent clicks inside expanded from closing
+    el.querySelector('.ct-expanded').addEventListener('click', (e) => e.stopPropagation());
+
+    // Status change
+    el.querySelector('.ct-status-select').addEventListener('change', async function() {
+        const newStatus = this.value;
+        const badge = el.querySelector('.ct-badge[class*="status-"]');
+        badge.className = `ct-badge status-${newStatus}`;
+        badge.textContent = STATUS_LABELS[newStatus] || newStatus;
+        ct.status = newStatus;
+        await updateCodingTaskMeta(t.id, meta);
+    });
+
+    // Priority change
+    el.querySelector('.ct-priority-select').addEventListener('change', async function() {
+        const newPriority = this.value;
+        const dot = el.querySelector('.ct-priority-dot');
+        dot.className = `ct-priority-dot ${newPriority}`;
+        ct.priority = newPriority;
+        await updateCodingTaskMeta(t.id, meta);
+    });
+
+    // Improve button
+    el.querySelector('.ct-btn-improve').addEventListener('click', () => {
+        const currentText = el.querySelector('.ct-description-area').value;
+        openImproveDialog(t.id, currentText, meta);
+    });
+
+    // Save button
+    el.querySelector('.ct-btn-save').addEventListener('click', async () => {
+        const newContent = el.querySelector('.ct-description-area').value.trim();
+        if (!newContent) return;
+        await saveCodingTaskDescription(t.id, newContent, el);
+    });
+
+    // Delete button
+    el.querySelector('.ct-btn-delete').addEventListener('click', async () => {
+        if (!confirm('Delete this coding task?')) return;
+        await deleteCodingTask(t.id, el);
+    });
+
+    return el;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function updateCodingTaskMeta(id, metadata) {
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'update', id, metadata })
+        });
+    } catch (e) {
+        console.error('Update coding task meta error:', e);
+    }
+}
+
+async function saveCodingTaskDescription(id, content, cardEl) {
+    const saveBtn = cardEl.querySelector('.ct-btn-save');
+    saveBtn.textContent = 'Saving...';
+    saveBtn.disabled = true;
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'update', id, content })
+        });
+        saveBtn.textContent = '✓ Saved';
+        saveBtn.style.color = '#22c55e';
+        setTimeout(() => { saveBtn.textContent = '💾 Save'; saveBtn.style.color = ''; saveBtn.disabled = false; }, 1500);
+    } catch (e) {
+        saveBtn.textContent = '✗ Failed';
+        setTimeout(() => { saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; }, 2000);
+    }
+}
+
+async function deleteCodingTask(id, cardEl) {
+    cardEl.style.opacity = '0.3';
+    cardEl.style.transform = 'scale(0.95)';
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'delete', id })
+        });
+        setTimeout(() => cardEl.remove(), 300);
+    } catch (e) {
+        cardEl.style.opacity = '1';
+        cardEl.style.transform = '';
+        alert('Delete failed.');
+    }
+}
+
+// --- IMPROVE DIALOG ---
+
+async function openImproveDialog(taskId, content, meta) {
+    ctImproveTaskId = taskId;
+    ctDom.improveOriginal.textContent = content;
+    ctDom.improveResult.value = '';
+    ctDom.improveSuggestionsList.innerHTML = '';
+    ctDom.readinessBarFill.style.width = '0%';
+    ctDom.readinessLabel.textContent = '📊 Readiness: —/10';
+    ctDom.readinessNotes.textContent = '';
+    ctDom.improveDialog.classList.remove('hidden');
+
+    // Call LLM
+    ctDom.improveResult.value = 'Improving with Gemini...';
+    ctDom.improveResult.disabled = true;
+
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'improve_coding_task', content })
+        });
+        const data = await res.json();
+
+        ctDom.improveResult.value = data.improved_text || content;
+        ctDom.improveResult.disabled = false;
+
+        // Suggestions
+        ctDom.improveSuggestionsList.innerHTML = '';
+        if (data.suggestions?.length) {
+            data.suggestions.forEach(s => {
+                const li = document.createElement('li');
+                li.textContent = s;
+                ctDom.improveSuggestionsList.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.textContent = 'No additional clarifications needed.';
+            li.style.color = '#22c55e';
+            ctDom.improveSuggestionsList.appendChild(li);
+        }
+
+        // Readiness
+        const score = data.readiness_score || 5;
+        updateReadinessUI(score, data.readiness_notes || '');
+
+    } catch (e) {
+        ctDom.improveResult.value = content;
+        ctDom.improveResult.disabled = false;
+        console.error('Improve error:', e);
+    }
+}
+
+function updateReadinessUI(score, notes) {
+    const pct = (score / 10) * 100;
+    ctDom.readinessBarFill.style.width = pct + '%';
+    // Color: red < 4, yellow 4-6, green > 6
+    if (score <= 3) ctDom.readinessBarFill.style.background = '#ef4444';
+    else if (score <= 6) ctDom.readinessBarFill.style.background = '#fbbf24';
+    else ctDom.readinessBarFill.style.background = '#22c55e';
+    ctDom.readinessLabel.textContent = `📊 Readiness: ${score}/10`;
+    ctDom.readinessNotes.textContent = notes;
+}
+
+// Improve Again
+ctDom.improveAgainBtn.addEventListener('click', async () => {
+    const currentImproved = ctDom.improveResult.value;
+    ctDom.improveOriginal.textContent = currentImproved;
+    ctDom.improveResult.value = 'Improving again...';
+    ctDom.improveResult.disabled = true;
+
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'improve_coding_task', content: currentImproved })
+        });
+        const data = await res.json();
+        ctDom.improveResult.value = data.improved_text || currentImproved;
+        ctDom.improveResult.disabled = false;
+
+        ctDom.improveSuggestionsList.innerHTML = '';
+        (data.suggestions || []).forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = s;
+            ctDom.improveSuggestionsList.appendChild(li);
+        });
+
+        updateReadinessUI(data.readiness_score || 5, data.readiness_notes || '');
+    } catch (e) {
+        ctDom.improveResult.value = currentImproved;
+        ctDom.improveResult.disabled = false;
+    }
+});
+
+// Submit & Close
+ctDom.improveSubmitBtn.addEventListener('click', async () => {
+    if (!ctImproveTaskId) return;
+    const improvedText = ctDom.improveResult.value.trim();
+    if (!improvedText) return;
+
+    ctDom.improveSubmitBtn.textContent = 'Saving...';
+    ctDom.improveSubmitBtn.disabled = true;
+
+    try {
+        // Update the content and set status to done_in_maximus
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({
+                action: 'update',
+                id: ctImproveTaskId,
+                content: improvedText,
+                metadata: {
+                    coding_task: {
+                        status: 'done_in_maximus',
+                        last_improved_at: new Date().toISOString(),
+                        readiness_score: parseInt(ctDom.readinessLabel.textContent.match(/\d+/)?.[0] || '5'),
+                        readiness_notes: ctDom.readinessNotes.textContent
+                    }
+                }
+            })
+        });
+
+        ctDom.improveDialog.classList.add('hidden');
+        ctImproveTaskId = null;
+        loadCodingTasks(); // Refresh the list
+    } catch (e) {
+        alert('Failed to save improvement.');
+    } finally {
+        ctDom.improveSubmitBtn.textContent = '✅ Submit & Close';
+        ctDom.improveSubmitBtn.disabled = false;
+    }
+});
+
+// Close improve dialog
+ctDom.closeImprove.addEventListener('click', () => {
+    ctDom.improveDialog.classList.add('hidden');
+    ctImproveTaskId = null;
+});
+ctDom.improveDialog.addEventListener('click', (e) => {
+    if (e.target === ctDom.improveDialog) { ctDom.improveDialog.classList.add('hidden'); ctImproveTaskId = null; }
+});
+
+// --- ADD CODING TASK MODAL ---
+
+ctDom.addBtn.addEventListener('click', () => {
+    // Pre-fill project from current filter if one is selected
+    const currentProject = ctDom.filterProject.value;
+    if (currentProject) ctDom.addProject.value = currentProject;
+    ctDom.addContent.value = '';
+    ctDom.addModal.classList.remove('hidden');
+    ctDom.addContent.focus();
+});
+
+function closeAddCtModal() {
+    ctDom.addModal.classList.add('hidden');
+}
+
+ctDom.closeAddModal.addEventListener('click', closeAddCtModal);
+ctDom.addCancel.addEventListener('click', closeAddCtModal);
+ctDom.addModal.addEventListener('click', (e) => { if (e.target === ctDom.addModal) closeAddCtModal(); });
+
+ctDom.addSubmit.addEventListener('click', async () => {
+    const content = ctDom.addContent.value.trim();
+    if (!content) { alert('Please enter a task description.'); return; }
+
+    ctDom.addSubmit.textContent = 'Creating...';
+    ctDom.addSubmit.disabled = true;
+
+    try {
+        await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({
+                action: 'add_coding_task',
+                content,
+                project: ctDom.addProject.value,
+                priority: ctDom.addPriority.value,
+                complexity: ctDom.addComplexity.value,
+                status: ctDom.addStatus.value
+            })
+        });
+
+        closeAddCtModal();
+        loadCodingTasks();
+    } catch (e) {
+        alert('Failed to create task.');
+    } finally {
+        ctDom.addSubmit.textContent = 'Create Task';
+        ctDom.addSubmit.disabled = false;
+    }
+});
+
 // --- AUTO-START ---
+
 window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });
 
 // --- PWA ---

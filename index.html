@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=46">
+    <link rel="stylesheet" href="style.css?v=47">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -21,6 +21,13 @@
                 <h1>Saint Max</h1>
             </div>
             <div class="header-actions">
+                <button id="coding-tasks-btn" class="icon-btn" title="Coding Tasks">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                        <line x1="14" y1="4" x2="10" y2="20"/>
+                    </svg>
+                </button>
                 <button id="tasks-btn" class="icon-btn" title="Tasks Dashboard">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
@@ -172,6 +179,162 @@
             </div>
             <div id="tasks-list" class="history-list tasks-list">
                 <!-- Tasks populated by JS -->
+            </div>
+        </div>
+
+        <!-- Coding Tasks Panel (hidden by default) -->
+        <div id="coding-tasks-panel" class="history-panel hidden">
+            <div class="history-header">
+                <h2>⚡ Coding Tasks</h2>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="add-coding-task-btn" class="icon-btn" title="Add Coding Task">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                    </button>
+                    <button id="close-coding-tasks" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Filter Bar -->
+            <div class="ct-filter-bar">
+                <select id="ct-filter-project" class="ct-filter-select">
+                    <option value="">All Projects</option>
+                    <option value="chatops">Chat Ops</option>
+                    <option value="quote_manager">Quote Manager</option>
+                    <option value="liturgy_explorer">Liturgy Explorer</option>
+                    <option value="homily_pipeline">Homily Pipeline</option>
+                    <option value="stream_management">Stream Management</option>
+                    <option value="backups_devops">Backups & DevOps</option>
+                    <option value="maximus_core">Maximus Core</option>
+                    <option value="open_brain">Open Brain</option>
+                    <option value="infrastructure">Infrastructure</option>
+                </select>
+                <select id="ct-filter-status" class="ct-filter-select">
+                    <option value="">All Statuses</option>
+                    <option value="draft">Draft</option>
+                    <option value="needs_clarification">Needs Clarification</option>
+                    <option value="needs_plan">Needs Plan</option>
+                    <option value="ready_for_maximus">Ready for Maximus</option>
+                    <option value="done_in_maximus">Done in Maximus</option>
+                    <option value="ready_in_antigravity">Ready in Antigravity</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
+            <div id="coding-tasks-list" class="history-list ct-list">
+                <!-- Coding tasks populated by JS -->
+            </div>
+        </div>
+
+        <!-- Add Coding Task Modal -->
+        <div id="add-ct-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add Coding Task</h2>
+                    <button id="close-add-ct" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <label class="modal-label">Description</label>
+                    <textarea id="add-ct-content" class="modal-input" rows="4" placeholder="Describe the coding task..."></textarea>
+                    <div class="modal-row">
+                        <div class="modal-field">
+                            <label class="modal-label">Project</label>
+                            <select id="add-ct-project" class="modal-select">
+                                <option value="chatops">Chat Ops</option>
+                                <option value="quote_manager">Quote Manager</option>
+                                <option value="liturgy_explorer">Liturgy Explorer</option>
+                                <option value="homily_pipeline">Homily Pipeline</option>
+                                <option value="stream_management">Stream Management</option>
+                                <option value="backups_devops">Backups & DevOps</option>
+                                <option value="maximus_core">Maximus Core</option>
+                                <option value="open_brain">Open Brain</option>
+                                <option value="infrastructure">Infrastructure</option>
+                            </select>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-label">Priority</label>
+                            <select id="add-ct-priority" class="modal-select">
+                                <option value="medium">🟡 Medium</option>
+                                <option value="high">🔴 High</option>
+                                <option value="low">🟢 Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-row">
+                        <div class="modal-field">
+                            <label class="modal-label">Complexity</label>
+                            <select id="add-ct-complexity" class="modal-select">
+                                <option value="moderate">Moderate</option>
+                                <option value="trivial">Trivial</option>
+                                <option value="easy">Easy</option>
+                                <option value="complex">Complex</option>
+                                <option value="major">Major</option>
+                            </select>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-label">Status</label>
+                            <select id="add-ct-status" class="modal-select">
+                                <option value="draft">Draft</option>
+                                <option value="needs_clarification">Needs Clarification</option>
+                                <option value="needs_plan">Needs Plan</option>
+                                <option value="ready_for_maximus">Ready for Maximus</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="add-ct-cancel" class="modal-btn modal-btn-danger">Cancel</button>
+                    <button id="add-ct-submit" class="modal-btn modal-btn-primary">Create Task</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Improve Coding Task Dialog -->
+        <div id="improve-ct-dialog" class="modal-overlay hidden">
+            <div class="improve-dialog-content">
+                <div class="improve-dialog-header">
+                    <h2>✨ Improve Task</h2>
+                    <button id="close-improve-ct" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="improve-dialog-body">
+                    <div class="improve-panels">
+                        <div class="improve-panel-left">
+                            <label class="improve-label">📝 Original Text</label>
+                            <div id="improve-original" class="improve-text-box"></div>
+                        </div>
+                        <div class="improve-panel-right">
+                            <label class="improve-label">✅ Improved Text</label>
+                            <textarea id="improve-result" class="improve-text-box improve-editable"></textarea>
+                        </div>
+                    </div>
+                    <div class="improve-suggestions" id="improve-suggestions">
+                        <label class="improve-label">💡 Suggested Clarifications</label>
+                        <ul id="improve-suggestions-list"></ul>
+                    </div>
+                    <div class="improve-readiness" id="improve-readiness">
+                        <div class="readiness-bar-track">
+                            <div id="readiness-bar-fill" class="readiness-bar-fill"></div>
+                        </div>
+                        <span id="readiness-label">📊 Readiness: —/10</span>
+                        <span id="readiness-notes" class="readiness-notes"></span>
+                    </div>
+                </div>
+                <div class="improve-dialog-footer">
+                    <button id="improve-again-btn" class="modal-btn modal-btn-secondary">🔄 Improve Again</button>
+                    <button id="improve-submit-btn" class="modal-btn modal-btn-primary">✅ Submit & Close</button>
+                </div>
             </div>
         </div>
 
@@ -359,7 +522,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=46"></script>
+    <script src="app.js?v=47"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
