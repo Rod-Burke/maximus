@@ -2561,6 +2561,7 @@ function renderCodingTaskCard(t) {
                     <option value="low" ${priority === 'low' ? 'selected' : ''}>🟢 Low</option>
                 </select>
                 <button class="ct-action-btn ct-btn-improve">✨ Improve</button>
+                <button class="ct-action-btn ct-btn-edit">📝 Edit</button>
                 <button class="ct-action-btn ct-btn-save">💾 Save</button>
                 <button class="ct-action-btn ct-btn-delete">🗑</button>
             </div>
@@ -2605,6 +2606,11 @@ function renderCodingTaskCard(t) {
         const newContent = el.querySelector('.ct-description-area').value.trim();
         if (!newContent) return;
         await saveCodingTaskDescription(t.id, newContent, el);
+    });
+
+    // Edit button → open full Task Detail Modal
+    el.querySelector('.ct-btn-edit').addEventListener('click', () => {
+        openTaskModal(t.id, t.content, meta);
     });
 
     // Delete button
