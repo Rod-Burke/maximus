@@ -685,17 +685,69 @@ async function loadJunkHistory() {
     } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading junk.</div>'; }
 }
 
-async function loadHistory() {
+const HISTORY_PAGE_SIZE = 30;
+let historyOffset = 0;
+let historyTotal = 0;
+
+async function loadHistory(offset = 0) {
+    historyOffset = offset;
     dom.historyList.innerHTML = '<div class="history-empty">Loading...</div>';
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'list', limit: 30 })
+            body: JSON.stringify({ action: 'list', limit: HISTORY_PAGE_SIZE, offset: historyOffset })
         });
         const data = await res.json();
+        historyTotal = data.total || 0;
         renderHistoryList(data.thoughts);
+        renderPaginationControls();
     } catch (e) { dom.historyList.innerHTML = '<div class="history-empty">Error loading.</div>'; }
+}
+
+function renderPaginationControls() {
+    // Remove existing pagination if any
+    const existing = dom.historyList.querySelector('.history-pagination');
+    if (existing) existing.remove();
+    
+    const hasMore = (historyOffset + HISTORY_PAGE_SIZE) < historyTotal;
+    const isFirstPage = historyOffset === 0;
+    const currentPage = Math.floor(historyOffset / HISTORY_PAGE_SIZE) + 1;
+    const totalPages = Math.ceil(historyTotal / HISTORY_PAGE_SIZE);
+    
+    if (!hasMore && isFirstPage) return; // Only one page, no controls needed
+    
+    const pagination = document.createElement('div');
+    pagination.className = 'history-pagination';
+    
+    let html = `<span class="page-indicator">Page ${currentPage} of ${totalPages}</span>`;
+    
+    if (!isFirstPage) {
+        html += `<button class="pagination-btn first-page-btn">← First Page</button>`;
+    }
+    if (hasMore) {
+        html += `<button class="pagination-btn next-page-btn">Load Next Page →</button>`;
+    }
+    
+    pagination.innerHTML = html;
+    
+    const nextBtn = pagination.querySelector('.next-page-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            loadHistory(historyOffset + HISTORY_PAGE_SIZE);
+            dom.historyList.scrollTop = 0;
+        });
+    }
+    
+    const firstBtn = pagination.querySelector('.first-page-btn');
+    if (firstBtn) {
+        firstBtn.addEventListener('click', () => {
+            loadHistory(0);
+            dom.historyList.scrollTop = 0;
+        });
+    }
+    
+    dom.historyList.appendChild(pagination);
 }
 
 function updateBulkCount() {
