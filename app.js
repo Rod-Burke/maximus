@@ -70,6 +70,12 @@ const dom = {
     modalLocation: document.getElementById('modal-location'),
     timeStartField: document.getElementById('time-start-field'),
     timeEndField: document.getElementById('time-end-field'),
+    // Coding Task fields in modal
+    codingTaskFields: document.getElementById('coding-task-fields'),
+    modalCtProject: document.getElementById('modal-ct-project'),
+    modalCtComplexity: document.getElementById('modal-ct-complexity'),
+    modalCtStatus: document.getElementById('modal-ct-status'),
+    modalCtImproveBtn: document.getElementById('modal-ct-improve-btn'),
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
     reclassifyPicker: document.getElementById('reclassify-picker'),
@@ -1574,6 +1580,19 @@ function openTaskModal(id, content, meta) {
     // Set modal title based on type
     updateModalTitle(meta.type || 'task');
     
+    // Coding task fields
+    const isCodingTask = (meta.type === 'coding_task');
+    toggleCodingTaskFields(isCodingTask);
+    if (isCodingTask && meta.coding_task) {
+        dom.modalCtProject.value = meta.coding_task.project || 'uncategorized';
+        dom.modalCtComplexity.value = meta.coding_task.complexity || 'moderate';
+        dom.modalCtStatus.value = meta.coding_task.status || 'draft';
+    } else {
+        dom.modalCtProject.value = 'uncategorized';
+        dom.modalCtComplexity.value = 'moderate';
+        dom.modalCtStatus.value = 'draft';
+    }
+    
     // Toggle Complete button label based on current status
     const isCompleted = meta.status === 'completed';
     dom.modalComplete.textContent = isCompleted ? '↩ Reopen' : '✓ Complete';
@@ -1598,6 +1617,7 @@ function toggleTimeFields(show) {
 function updateModalTitle(type) {
     const titles = {
         task: 'Task Details',
+        coding_task: '⚡ Coding Task Details',
         event: 'Event Details',
         observation: 'Observation Details',
         idea: 'Idea Details',
@@ -1605,6 +1625,14 @@ function updateModalTitle(type) {
         person_note: 'Person Note Details'
     };
     dom.modalTitle.textContent = titles[type] || 'Details';
+}
+
+function toggleCodingTaskFields(show) {
+    if (show) {
+        dom.codingTaskFields.classList.remove('hidden');
+    } else {
+        dom.codingTaskFields.classList.add('hidden');
+    }
 }
 
 function parseCustomRecurrenceToUI(rec) {
@@ -1638,6 +1666,7 @@ function closeTaskModal() {
     dom.modal.classList.add('hidden');
     dom.customPanel.classList.add('hidden');
     dom.eventFields.classList.add('hidden');
+    dom.codingTaskFields.classList.add('hidden');
     resetDayButtons();
     modalThoughtId = null;
 
@@ -1674,8 +1703,18 @@ document.querySelectorAll('.day-btn').forEach(btn => {
 
 // Show/hide event fields when type changes
 dom.modalType.addEventListener('change', () => {
-    toggleEventFields(dom.modalType.value === 'event');
-    updateModalTitle(dom.modalType.value);
+    const newType = dom.modalType.value;
+    toggleEventFields(newType === 'event');
+    toggleCodingTaskFields(newType === 'coding_task');
+    updateModalTitle(newType);
+});
+
+// Improve button in task detail modal → launches the same improve dialog
+dom.modalCtImproveBtn.addEventListener('click', () => {
+    if (!modalThoughtId) return;
+    const content = dom.modalContent.value;
+    const meta = { coding_task: { project: dom.modalCtProject.value, status: dom.modalCtStatus.value } };
+    openImproveDialog(modalThoughtId, content, meta);
 });
 
 // Show/hide time fields when all-day changes
@@ -1715,7 +1754,17 @@ dom.modalSave.addEventListener('click', async () => {
                 all_day: dom.modalType.value === 'event' ? dom.modalAllDay.checked : null,
                 start_time: dom.modalType.value === 'event' && !dom.modalAllDay.checked ? dom.modalStartTime.value || null : null,
                 end_time: dom.modalType.value === 'event' && !dom.modalAllDay.checked ? dom.modalEndTime.value || null : null,
-                location: dom.modalType.value === 'event' ? dom.modalLocation.value.trim() || null : null
+                location: dom.modalType.value === 'event' ? dom.modalLocation.value.trim() || null : null,
+                // Coding task fields
+                ...(dom.modalType.value === 'coding_task' ? {
+                    coding_task: {
+                        project: dom.modalCtProject.value,
+                        complexity: dom.modalCtComplexity.value,
+                        status: dom.modalCtStatus.value,
+                        priority: dom.modalPriority.value === 'high' ? 'high' : dom.modalPriority.value === 'low' ? 'low' : 'medium',
+                        workspace: ['chatops','quote_manager','liturgy_explorer','homily_pipeline','stream_management','backups_devops'].includes(dom.modalCtProject.value) ? 'airmaria' : 'openbrain',
+                    }
+                } : {})
             }
         };
 
