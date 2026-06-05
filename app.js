@@ -2448,6 +2448,7 @@ const STATUS_LABELS = {
 // Panel open/close
 ctDom.btn.addEventListener('click', () => { ctDom.panel.classList.remove('hidden'); loadCodingTasks(); });
 ctDom.closeBtn.addEventListener('click', () => ctDom.panel.classList.add('hidden'));
+document.getElementById('refresh-coding-tasks').addEventListener('click', loadCodingTasks);
 
 // Filters
 ctDom.filterProject.addEventListener('change', loadCodingTasks);
