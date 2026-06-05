@@ -2626,6 +2626,12 @@ function renderCodingTaskCard(t) {
         await updateCodingTaskMeta(t.id, meta);
     });
 
+    // Rich text editing + raw toggle refs
+    const renderedDiv = el.querySelector('.ct-description-rendered');
+    const rawTextarea = el.querySelector('.ct-description-area');
+    const rawToggleBtn = el.querySelector('.ct-btn-rawtoggle');
+    const saveBtn = el.querySelector('.ct-btn-save');
+
     // Track original content for dirty detection
     let savedContent = t.content;
     let isDirty = false;
