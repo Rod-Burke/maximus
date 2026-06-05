@@ -2736,6 +2736,160 @@ async function deleteCodingTask(id, cardEl) {
     }
 }
 
+// --- INTERACTIVE SUGGESTIONS ---
+
+function renderInteractiveSuggestions(suggestions) {
+    ctDom.improveSuggestionsList.innerHTML = '';
+    
+    if (!suggestions || suggestions.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'No additional clarifications needed.';
+        li.style.color = '#22c55e';
+        ctDom.improveSuggestionsList.appendChild(li);
+        return;
+    }
+
+    suggestions.forEach((s, idx) => {
+        // Handle legacy plain string suggestions
+        if (typeof s === 'string') {
+            s = { question: s, type: 'text_input' };
+        }
+
+        const li = document.createElement('li');
+        li.className = 'suggestion-widget';
+        li.dataset.idx = idx;
+        li.dataset.type = s.type || 'text_input';
+
+        const questionEl = document.createElement('div');
+        questionEl.className = 'suggestion-question';
+        questionEl.textContent = s.question;
+        li.appendChild(questionEl);
+
+        if (s.type === 'multiple_choice' && s.options) {
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'suggestion-options';
+
+            // Render each option as a checkbox
+            s.options.forEach((opt, optIdx) => {
+                const label = document.createElement('label');
+                label.className = 'suggestion-option';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'suggestion-cb';
+                cb.dataset.option = opt;
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(' ' + opt));
+                optionsDiv.appendChild(label);
+            });
+
+            // "Other" option with text field
+            const otherLabel = document.createElement('label');
+            otherLabel.className = 'suggestion-option suggestion-other';
+            const otherCb = document.createElement('input');
+            otherCb.type = 'checkbox';
+            otherCb.className = 'suggestion-cb suggestion-cb-other';
+            otherLabel.appendChild(otherCb);
+            otherLabel.appendChild(document.createTextNode(' Other: '));
+            const otherInput = document.createElement('input');
+            otherInput.type = 'text';
+            otherInput.className = 'suggestion-other-input';
+            otherInput.placeholder = 'specify...';
+            otherInput.addEventListener('input', () => { otherCb.checked = otherInput.value.length > 0; });
+            otherLabel.appendChild(otherInput);
+            optionsDiv.appendChild(otherLabel);
+
+            // "Not needed" option
+            const notNeededLabel = document.createElement('label');
+            notNeededLabel.className = 'suggestion-option suggestion-not-needed';
+            const notNeededCb = document.createElement('input');
+            notNeededCb.type = 'checkbox';
+            notNeededCb.className = 'suggestion-cb suggestion-cb-not-needed';
+            notNeededLabel.appendChild(notNeededCb);
+            notNeededLabel.appendChild(document.createTextNode(' Not needed'));
+            optionsDiv.appendChild(notNeededLabel);
+
+            li.appendChild(optionsDiv);
+        } else {
+            // text_input type
+            const inputDiv = document.createElement('div');
+            inputDiv.className = 'suggestion-options';
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.className = 'suggestion-text-answer';
+            textInput.placeholder = 'Your answer...';
+            inputDiv.appendChild(textInput);
+
+            // "You decide" checkbox
+            const youDecideLabel = document.createElement('label');
+            youDecideLabel.className = 'suggestion-option';
+            const youDecideCb = document.createElement('input');
+            youDecideCb.type = 'checkbox';
+            youDecideCb.className = 'suggestion-cb suggestion-cb-you-decide';
+            youDecideCb.addEventListener('change', () => {
+                if (youDecideCb.checked) textInput.value = '';
+            });
+            youDecideLabel.appendChild(youDecideCb);
+            youDecideLabel.appendChild(document.createTextNode(' You decide'));
+            inputDiv.appendChild(youDecideLabel);
+
+            li.appendChild(inputDiv);
+        }
+
+        ctDom.improveSuggestionsList.appendChild(li);
+    });
+}
+
+function collectClarificationAnswers() {
+    const widgets = ctDom.improveSuggestionsList.querySelectorAll('.suggestion-widget');
+    const answers = [];
+
+    widgets.forEach(w => {
+        const question = w.querySelector('.suggestion-question')?.textContent;
+        if (!question) return;
+
+        if (w.dataset.type === 'multiple_choice') {
+            // Check for "Not needed"
+            const notNeeded = w.querySelector('.suggestion-cb-not-needed');
+            if (notNeeded?.checked) {
+                answers.push(`**Q:** ${question}\n**A:** Not needed`);
+                return;
+            }
+
+            // Collect checked options
+            const selected = [];
+            w.querySelectorAll('.suggestion-cb:not(.suggestion-cb-other):not(.suggestion-cb-not-needed)').forEach(cb => {
+                if (cb.checked) selected.push(cb.dataset.option);
+            });
+
+            // Check "Other"
+            const otherCb = w.querySelector('.suggestion-cb-other');
+            const otherInput = w.querySelector('.suggestion-other-input');
+            if (otherCb?.checked && otherInput?.value.trim()) {
+                selected.push(otherInput.value.trim());
+            }
+
+            if (selected.length > 0) {
+                answers.push(`**Q:** ${question}\n**A:** ${selected.join(', ')}`);
+            }
+        } else {
+            // text_input
+            const youDecide = w.querySelector('.suggestion-cb-you-decide');
+            if (youDecide?.checked) {
+                answers.push(`**Q:** ${question}\n**A:** You decide (agent's discretion)`);
+                return;
+            }
+
+            const textInput = w.querySelector('.suggestion-text-answer');
+            if (textInput?.value.trim()) {
+                answers.push(`**Q:** ${question}\n**A:** ${textInput.value.trim()}`);
+            }
+        }
+    });
+
+    return answers.length > 0 ? answers.join('\n\n') : '';
+}
+
 // --- IMPROVE DIALOG ---
 
 async function openImproveDialog(taskId, content, meta) {
@@ -2765,18 +2919,7 @@ async function openImproveDialog(taskId, content, meta) {
 
         // Suggestions
         ctDom.improveSuggestionsList.innerHTML = '';
-        if (data.suggestions?.length) {
-            data.suggestions.forEach(s => {
-                const li = document.createElement('li');
-                li.textContent = s;
-                ctDom.improveSuggestionsList.appendChild(li);
-            });
-        } else {
-            const li = document.createElement('li');
-            li.textContent = 'No additional clarifications needed.';
-            li.style.color = '#22c55e';
-            ctDom.improveSuggestionsList.appendChild(li);
-        }
+        renderInteractiveSuggestions(data.suggestions || []);
 
         // Readiness
         const score = data.readiness_score || 5;
@@ -2802,8 +2945,14 @@ function updateReadinessUI(score, notes) {
 
 // Improve Again
 ctDom.improveAgainBtn.addEventListener('click', async () => {
+    // Collect answers from clarifications and combine with improved text
     const currentImproved = ctDom.improveResult.innerText;
-    ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(currentImproved);
+    const answers = collectClarificationAnswers();
+    let combinedContent = currentImproved;
+    if (answers) {
+        combinedContent += '\n\n## User Clarifications\n' + answers;
+    }
+    ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(combinedContent);
     ctDom.improveResult.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Improving again...</div>';
     ctDom.improveResult.contentEditable = 'false';
 
@@ -2811,22 +2960,18 @@ ctDom.improveAgainBtn.addEventListener('click', async () => {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'improve_coding_task', content: currentImproved })
+            body: JSON.stringify({ action: 'improve_coding_task', content: combinedContent })
         });
         const data = await res.json();
-        setImproveRenderedText(data.improved_text || currentImproved);
+        setImproveRenderedText(data.improved_text || combinedContent);
         ctDom.improveResult.contentEditable = 'true';
 
         ctDom.improveSuggestionsList.innerHTML = '';
-        (data.suggestions || []).forEach(s => {
-            const li = document.createElement('li');
-            li.textContent = s;
-            ctDom.improveSuggestionsList.appendChild(li);
-        });
+        renderInteractiveSuggestions(data.suggestions || []);
 
         updateReadinessUI(data.readiness_score || 5, data.readiness_notes || '');
     } catch (e) {
-        setImproveRenderedText(currentImproved);
+        setImproveRenderedText(combinedContent);
         ctDom.improveResult.contentEditable = 'true';
     }
 });
@@ -2834,8 +2979,14 @@ ctDom.improveAgainBtn.addEventListener('click', async () => {
 // Submit & Close
 ctDom.improveSubmitBtn.addEventListener('click', async () => {
     if (!ctImproveTaskId) return;
-    const improvedText = ctDom.improveResult.innerText.trim();
+    let improvedText = ctDom.improveResult.innerText.trim();
     if (!improvedText) return;
+
+    // Append any answered clarifications to the saved content
+    const answers = collectClarificationAnswers();
+    if (answers) {
+        improvedText += '\n\n## User Clarifications\n' + answers;
+    }
 
     ctDom.improveSubmitBtn.textContent = 'Saving...';
     ctDom.improveSubmitBtn.disabled = true;

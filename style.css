@@ -2125,6 +2125,84 @@ input:checked + .toggle-slider::before {
     color: rgba(255, 255, 255, 0.75);
 }
 
+/* Interactive suggestion widgets */
+.suggestion-widget {
+    padding: 0.6rem 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.suggestion-question {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 0.4rem;
+    font-size: 0.82rem;
+}
+
+.suggestion-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+}
+
+.suggestion-option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 0.15rem 0;
+}
+
+.suggestion-option:hover {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.suggestion-cb {
+    accent-color: #a855f7;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.suggestion-other-input,
+.suggestion-text-answer {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.5rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.suggestion-other-input {
+    width: 140px;
+}
+
+.suggestion-text-answer {
+    width: 100%;
+}
+
+.suggestion-other-input:focus,
+.suggestion-text-answer:focus {
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.suggestion-other-input::placeholder,
+.suggestion-text-answer::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.suggestion-not-needed {
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+}
+
 .improve-readiness {
     display: flex;
     align-items: center;
