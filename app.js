@@ -2541,7 +2541,7 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'done_in_maximus'];
+    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
@@ -2604,7 +2604,7 @@ function renderCodingTaskCard(t) {
         badge.textContent = STATUS_LABELS[newStatus] || newStatus;
         ct.status = newStatus;
         // Toggle done styling
-        if (newStatus === 'done' || newStatus === 'done_in_maximus') {
+        if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
             el.classList.add('ct-done');
         } else {
             el.classList.remove('ct-done');
@@ -2744,7 +2744,7 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
 
             // Toggle done styling
-            if (newStatus === 'done' || newStatus === 'done_in_maximus') {
+            if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
                 cardEl.classList.add('ct-done');
             } else {
                 cardEl.classList.remove('ct-done');
