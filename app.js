@@ -2579,6 +2579,7 @@ function renderCodingTaskCard(t) {
                     <option value="low" ${priority === 'low' ? 'selected' : ''}>🟢 Low</option>
                 </select>
                 <button class="ct-action-btn ct-btn-improve">✨ Improve</button>
+                <button class="ct-action-btn ct-btn-evaluate">🔄 Reevaluate</button>
                 <button class="ct-action-btn ct-btn-rawtoggle">📝 Raw</button>
                 <button class="ct-action-btn ct-btn-edit">📝 Edit</button>
                 <button class="ct-action-btn ct-btn-save hidden">💾 Save</button>
@@ -2682,11 +2683,18 @@ function renderCodingTaskCard(t) {
         renderedDiv.innerHTML = simpleMarkdownToHtml(newContent);
         // Hide save after successful save if in rich mode
         if (!isRaw) saveBtn.classList.add('hidden');
+        // Auto-evaluate after save
+        evaluateCodingTask(t.id, newContent, el, meta);
     });
 
     // Edit button → open full Task Detail Modal
     el.querySelector('.ct-btn-edit').addEventListener('click', () => {
         openTaskModal(t.id, t.content, meta);
+    });
+
+    // Reevaluate button
+    el.querySelector('.ct-btn-evaluate').addEventListener('click', () => {
+        evaluateCodingTask(t.id, t.content, el, meta);
     });
 
     // Delete button
@@ -2702,6 +2710,68 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+async function evaluateCodingTask(id, content, cardEl, meta) {
+    const evalBtn = cardEl.querySelector('.ct-btn-evaluate');
+    const origText = evalBtn.textContent;
+    evalBtn.textContent = '⏳ Evaluating...';
+    evalBtn.disabled = true;
+
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'evaluate_coding_task', content })
+        });
+        const data = await res.json();
+
+        if (data.suggested_status) {
+            const ct = meta.coding_task || {};
+            const newStatus = data.suggested_status;
+            ct.status = newStatus;
+            ct.readiness_score = data.readiness_score || 5;
+            ct.readiness_notes = data.readiness_notes || '';
+            meta.coding_task = ct;
+
+            // Update the card UI
+            const statusSelect = cardEl.querySelector('.ct-status-select');
+            if (statusSelect) statusSelect.value = newStatus;
+            const statusBadge = cardEl.querySelector('.ct-badge[class*="status-"]');
+            if (statusBadge) {
+                statusBadge.className = `ct-badge status-${newStatus}`;
+                statusBadge.textContent = STATUS_LABELS[newStatus] || newStatus;
+            }
+
+            // Toggle done styling
+            if (newStatus === 'done' || newStatus === 'done_in_maximus') {
+                cardEl.classList.add('ct-done');
+            } else {
+                cardEl.classList.remove('ct-done');
+            }
+
+            // Persist to DB
+            await updateCodingTaskMeta(id, meta);
+
+            evalBtn.textContent = `✅ ${STATUS_LABELS[newStatus] || newStatus} (${data.readiness_score}/10)`;
+            evalBtn.style.color = '#22c55e';
+            setTimeout(() => {
+                evalBtn.textContent = '🔄 Reevaluate';
+                evalBtn.style.color = '';
+                evalBtn.disabled = false;
+            }, 3000);
+        } else {
+            evalBtn.textContent = origText;
+            evalBtn.disabled = false;
+        }
+    } catch (e) {
+        console.error('Evaluate error:', e);
+        evalBtn.textContent = '✗ Failed';
+        setTimeout(() => {
+            evalBtn.textContent = origText;
+            evalBtn.disabled = false;
+        }, 2000);
+    }
 }
 
 async function updateCodingTaskMeta(id, metadata) {

@@ -1810,6 +1810,16 @@ input:checked + .toggle-slider::before {
     opacity: 0.7;
 }
 
+.ct-btn-evaluate {
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    color: #22d3ee;
+}
+
+.ct-btn-evaluate:hover {
+    background: rgba(6, 182, 212, 0.22);
+}
+
 .ct-description-rendered {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--glass-border);
