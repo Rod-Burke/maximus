@@ -2565,7 +2565,7 @@ function renderCodingTaskCard(t) {
             </div>
         </div>
         <div class="ct-expanded">
-            <div class="ct-description-rendered improve-rendered">${simpleMarkdownToHtml(t.content)}</div>
+            <div class="ct-description-rendered improve-rendered improve-editable-rich" contenteditable="true">${simpleMarkdownToHtml(t.content)}</div>
             <textarea class="ct-description-area hidden" rows="6">${escapeHtml(t.content)}</textarea>
             <div class="ct-actions-row">
                 <select class="ct-inline-select ct-status-select" title="Status">
@@ -2626,17 +2626,21 @@ function renderCodingTaskCard(t) {
         await updateCodingTaskMeta(t.id, meta);
     });
 
-    // Raw toggle: switch between rich preview and raw textarea
-    const renderedDiv = el.querySelector('.ct-description-rendered');
-    const rawTextarea = el.querySelector('.ct-description-area');
-    const rawToggleBtn = el.querySelector('.ct-btn-rawtoggle');
-    const saveBtn = el.querySelector('.ct-btn-save');
+    // Track original content for dirty detection
+    let savedContent = t.content;
+    let isDirty = false;
+
+    // Auto-show Save when rich text is edited
+    renderedDiv.addEventListener('input', () => {
+        isDirty = true;
+        saveBtn.classList.remove('hidden');
+    });
 
     rawToggleBtn.addEventListener('click', () => {
         const isRichVisible = !renderedDiv.classList.contains('hidden');
         if (isRichVisible) {
-            // Switch to raw
-            rawTextarea.value = t.content; // ensure current content
+            // Switch to raw — sync current rich text to textarea
+            rawTextarea.value = renderedDiv.innerText;
             renderedDiv.classList.add('hidden');
             rawTextarea.classList.remove('hidden');
             saveBtn.classList.remove('hidden');
@@ -2644,29 +2648,34 @@ function renderCodingTaskCard(t) {
             rawTextarea.focus();
         } else {
             // Switch back to rich
-            t.content = rawTextarea.value; // sync
-            renderedDiv.innerHTML = simpleMarkdownToHtml(rawTextarea.value);
+            const rawVal = rawTextarea.value;
+            renderedDiv.innerHTML = simpleMarkdownToHtml(rawVal);
             renderedDiv.classList.remove('hidden');
             rawTextarea.classList.add('hidden');
-            saveBtn.classList.add('hidden');
+            if (!isDirty) saveBtn.classList.add('hidden');
             rawToggleBtn.textContent = '📝 Raw';
         }
     });
 
     // Improve button
     el.querySelector('.ct-btn-improve').addEventListener('click', () => {
-        const currentText = rawTextarea.classList.contains('hidden') ? t.content : rawTextarea.value;
+        const currentText = rawTextarea.classList.contains('hidden') ? renderedDiv.innerText : rawTextarea.value;
         openImproveDialog(t.id, currentText, meta);
     });
 
-    // Save button
+    // Save button — reads from whichever mode is active
     el.querySelector('.ct-btn-save').addEventListener('click', async () => {
-        const newContent = rawTextarea.value.trim();
+        const isRaw = !rawTextarea.classList.contains('hidden');
+        const newContent = (isRaw ? rawTextarea.value : renderedDiv.innerText).trim();
         if (!newContent) return;
         t.content = newContent;
+        savedContent = newContent;
+        isDirty = false;
         await saveCodingTaskDescription(t.id, newContent, el);
-        // Update rich preview
+        // Re-render rich preview with clean markdown
         renderedDiv.innerHTML = simpleMarkdownToHtml(newContent);
+        // Hide save after successful save if in rich mode
+        if (!isRaw) saveBtn.classList.add('hidden');
     });
 
     // Edit button → open full Task Detail Modal
