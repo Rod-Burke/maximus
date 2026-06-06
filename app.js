@@ -2407,6 +2407,7 @@ const ctDom = {
     list: document.getElementById('coding-tasks-list'),
     addBtn: document.getElementById('add-coding-task-btn'),
     filterProject: document.getElementById('ct-filter-project'),
+    copySearchBtn: document.getElementById('ct-copy-search-btn'),
     filterStatus: document.getElementById('ct-filter-status'),
     ctSearch: document.getElementById('ct-search'),
     // Add Modal
@@ -2482,6 +2483,33 @@ document.getElementById('refresh-coding-tasks').addEventListener('click', loadCo
 // Filters
 ctDom.filterProject.addEventListener('change', loadCodingTasks);
 ctDom.filterStatus.addEventListener('change', loadCodingTasks);
+
+// Copy Search Phrase
+if (ctDom.copySearchBtn) {
+    ctDom.copySearchBtn.addEventListener('click', () => {
+        const projectVal = ctDom.filterProject.value;
+        let textToCopy = '';
+        if (!projectVal) {
+            textToCopy = "Whats Ready";
+        } else {
+            const selectedOption = ctDom.filterProject.options[ctDom.filterProject.selectedIndex];
+            const projectName = selectedOption ? selectedOption.text : 'Other';
+            textToCopy = `What's ready in ${projectName}`;
+        }
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalText = ctDom.copySearchBtn.textContent;
+            ctDom.copySearchBtn.textContent = 'Copied!';
+            ctDom.copySearchBtn.classList.add('copied');
+            setTimeout(() => {
+                ctDom.copySearchBtn.textContent = originalText;
+                ctDom.copySearchBtn.classList.remove('copied');
+            }, 1500);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+    });
+}
 
 // Search: client-side filter on rendered cards
 let ctSearchTimeout = null;
