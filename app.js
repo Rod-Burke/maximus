@@ -1511,16 +1511,44 @@ function getDragAfterElement(container, y) {
 
 async function saveNewOrder(container) {
     const items = [...container.querySelectorAll('.task-item')];
-    // We update the order in the background so the UI feels instant
-    items.forEach((el, index) => {
-        const id = el.dataset.id;
-        const meta = JSON.parse(el.dataset.meta || '{}');
-        fetch(CONFIG.MANAGE_ENDPOINT, {
+    const tasks = items.map((el, index) => {
+        return {
+            id: el.dataset.id,
+            order: index
+        };
+    });
+
+    if (tasks.length === 0) return;
+
+    const oldStatus = dom.status.innerText;
+    dom.status.innerText = "Saving task order...";
+
+    try {
+        const response = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'update', id: id, metadata: { ...meta, order: index }})
-        }).catch(() => {});
-    });
+            body: JSON.stringify({
+                action: 'batch_update_order',
+                tasks: tasks
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            dom.status.innerText = "Order saved and syncing to Google Tasks...";
+            setTimeout(() => {
+                if (dom.status.innerText === "Order saved and syncing to Google Tasks...") {
+                    dom.status.innerText = "Tap to speak to Maximus";
+                }
+            }, 3000);
+        } else {
+            dom.status.innerText = "Error saving task order";
+            setTimeout(() => { dom.status.innerText = oldStatus; }, 3000);
+        }
+    } catch (e) {
+        console.error("Batch save order failed:", e);
+        dom.status.innerText = "Connection error saving order";
+        setTimeout(() => { dom.status.innerText = oldStatus; }, 3000);
+    }
 }
 
 // --- TASK DETAIL MODAL ---
@@ -2442,7 +2470,8 @@ const PROJECT_LABELS = {
 const STATUS_LABELS = {
     draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
     ready_for_maximus: 'Ready for Maximus', done_in_maximus: 'Done in Maximus',
-    ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress', done: 'Done'
+    ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress',
+    needs_verification: 'Needs Verification', done: 'Done'
 };
 
 // Panel open/close
@@ -2541,7 +2570,7 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan'];
+    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan', 'needs_verification'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
@@ -2584,6 +2613,20 @@ function renderCodingTaskCard(t) {
                 <button class="ct-action-btn ct-btn-edit">📝 Edit</button>
                 <button class="ct-action-btn ct-btn-save hidden">💾 Save</button>
                 <button class="ct-action-btn ct-btn-delete">🗑</button>
+            </div>
+            <div class="ct-verification-section" style="display:${(ct.verification_items && ct.verification_items.length > 0) ? 'block' : 'none'}">
+                <div class="ct-verification-header">
+                    <span class="ct-verification-title">🔍 Verification Checklist</span>
+                    <span class="ct-verification-progress"></span>
+                </div>
+                <ul class="ct-verification-list"></ul>
+                <div class="ct-verification-actions">
+                    <button class="ct-action-btn ct-btn-mark-done" style="display:none">✅ All Verified → Mark Done</button>
+                </div>
+                <div class="ct-sendback-section" style="display:${status === 'needs_verification' ? 'block' : 'none'}">
+                    <textarea class="ct-sendback-input" rows="2" placeholder="Describe what needs rework..."></textarea>
+                    <button class="ct-action-btn ct-btn-sendback">↩ Send Back for Rework</button>
+                </div>
             </div>
         </div>
     `;
@@ -2697,6 +2740,122 @@ function renderCodingTaskCard(t) {
         evaluateCodingTask(t.id, t.content, el, meta);
     });
 
+    // Verification checklist logic
+    const vList = el.querySelector('.ct-verification-list');
+    const vProgress = el.querySelector('.ct-verification-progress');
+    const markDoneBtn = el.querySelector('.ct-btn-mark-done');
+    const sendbackSection = el.querySelector('.ct-sendback-section');
+    const sendbackInput = el.querySelector('.ct-sendback-input');
+    const sendbackBtn = el.querySelector('.ct-btn-sendback');
+
+    function updateVerificationUI() {
+        const items = ct.verification_items || [];
+        if (items.length === 0) return;
+
+        vList.innerHTML = '';
+        let checkedCount = 0;
+
+        items.forEach((item, idx) => {
+            const li = document.createElement('li');
+            li.className = 'ct-verification-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'ct-verification-cb';
+            checkbox.checked = !!item.checked;
+            if (item.checked) checkedCount++;
+
+            const label = document.createElement('span');
+            label.className = 'ct-verification-label' + (item.checked ? ' verified' : '');
+            label.textContent = item.label;
+
+            const notesInput = document.createElement('input');
+            notesInput.type = 'text';
+            notesInput.className = 'ct-verification-item-notes';
+            notesInput.placeholder = 'Add notes/assessment...';
+            notesInput.value = item.notes || '';
+
+            checkbox.addEventListener('change', async () => {
+                item.checked = checkbox.checked;
+                label.className = 'ct-verification-label' + (checkbox.checked ? ' verified' : '');
+                updateVerificationUI();
+                await updateCodingTaskMeta(t.id, meta);
+            });
+
+            notesInput.addEventListener('blur', async () => {
+                if (item.notes !== notesInput.value) {
+                    item.notes = notesInput.value;
+                    await updateCodingTaskMeta(t.id, meta);
+                }
+            });
+
+            const topRow = document.createElement('div');
+            topRow.className = 'ct-verification-item-row';
+            topRow.appendChild(checkbox);
+            topRow.appendChild(label);
+
+            li.appendChild(topRow);
+            li.appendChild(notesInput);
+            vList.appendChild(li);
+        });
+
+        vProgress.textContent = `${checkedCount}/${items.length} verified`;
+
+        if (checkedCount === items.length && items.length > 0 && status === 'needs_verification') {
+            markDoneBtn.style.display = 'inline-block';
+        } else {
+            markDoneBtn.style.display = 'none';
+        }
+    }
+
+    if (ct.verification_items && ct.verification_items.length > 0) {
+        updateVerificationUI();
+    }
+
+    // Mark Done handler
+    markDoneBtn.addEventListener('click', async () => {
+        ct.status = 'done';
+        const badge = el.querySelector('.ct-badge[class*="status-"]');
+        badge.className = 'ct-badge status-done';
+        badge.textContent = STATUS_LABELS['done'];
+        el.querySelector('.ct-status-select').value = 'done';
+        el.classList.add('ct-done');
+        sendbackSection.style.display = 'none';
+        markDoneBtn.style.display = 'none';
+        await updateCodingTaskMeta(t.id, meta);
+    });
+
+    // Send Back handler
+    sendbackBtn.addEventListener('click', async () => {
+        const reworkNotes = sendbackInput.value.trim();
+        if (!reworkNotes) {
+            alert('Please describe what needs rework before sending back.');
+            return;
+        }
+
+        ct.status = 'ready_in_antigravity';
+        ct.rework_notes = reworkNotes;
+        
+        // Clear checklist checked statuses so they can be re-verified
+        if (ct.verification_items) {
+            ct.verification_items.forEach(item => {
+                item.checked = false;
+            });
+        }
+
+        const badge = el.querySelector('.ct-badge[class*="status-"]');
+        badge.className = 'ct-badge status-ready_in_antigravity';
+        badge.textContent = STATUS_LABELS['ready_in_antigravity'];
+        el.querySelector('.ct-status-select').value = 'ready_in_antigravity';
+        el.classList.remove('ct-done');
+        
+        sendbackSection.style.display = 'none';
+        updateVerificationUI();
+        
+        await updateCodingTaskMeta(t.id, meta);
+        alert('Task sent back to Antigravity.');
+    });
+
     // Delete button
     el.querySelector('.ct-btn-delete').addEventListener('click', async () => {
         if (!confirm('Delete this coding task?')) return;
@@ -2744,7 +2903,7 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
 
             // Toggle done styling
-            if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
+            if (['done', 'done_in_maximus', 'needs_plan', 'needs_verification'].includes(newStatus)) {
                 cardEl.classList.add('ct-done');
             } else {
                 cardEl.classList.remove('ct-done');
