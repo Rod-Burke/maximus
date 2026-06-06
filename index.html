@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=65">
+    <link rel="stylesheet" href="style.css?v=66">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -220,6 +220,7 @@
                     <option value="infrastructure">Infrastructure</option>
                 </select>
                 <button id="ct-copy-search-btn" class="ct-copy-btn" title="Copy ready search query to clipboard">Copy</button>
+                <button id="ct-project-info-btn" class="ct-copy-btn" title="Show information about the selected project">Info</button>
                 <select id="ct-filter-status" class="ct-filter-select">
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
@@ -302,6 +303,26 @@
                 <div class="modal-footer">
                     <button id="add-ct-cancel" class="modal-btn modal-btn-danger">Cancel</button>
                     <button id="add-ct-submit" class="modal-btn modal-btn-primary">Create Task</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Info Modal -->
+        <div id="project-info-modal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2 id="project-info-title">Project Info</h2>
+                    <button id="close-project-info" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="project-info-text" style="font-size: 0.95rem; line-height: 1.6; color: rgba(255, 255, 255, 0.85); margin: 0.5rem 0 1rem 0;"></p>
+                </div>
+                <div class="modal-footer" style="justify-content: flex-end; padding: 0.75rem 1.25rem;">
+                    <button id="project-info-ok" class="modal-btn modal-btn-primary" style="flex: none; min-width: 80px;">OK</button>
                 </div>
             </div>
         </div>
@@ -581,7 +602,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=65"></script>
+    <script src="app.js?v=66"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

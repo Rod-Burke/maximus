@@ -2408,6 +2408,7 @@ const ctDom = {
     addBtn: document.getElementById('add-coding-task-btn'),
     filterProject: document.getElementById('ct-filter-project'),
     copySearchBtn: document.getElementById('ct-copy-search-btn'),
+    projectInfoBtn: document.getElementById('ct-project-info-btn'),
     filterStatus: document.getElementById('ct-filter-status'),
     ctSearch: document.getElementById('ct-search'),
     // Add Modal
@@ -2429,9 +2430,14 @@ const ctDom = {
     improveSuggestionsList: document.getElementById('improve-suggestions-list'),
     readinessBarFill: document.getElementById('readiness-bar-fill'),
     readinessLabel: document.getElementById('readiness-label'),
-    readinessNotes: document.getElementById('readiness-notes'),
     improveAgainBtn: document.getElementById('improve-again-btn'),
     improveSubmitBtn: document.getElementById('improve-submit-btn'),
+    // Project Info Modal
+    projectInfoModal: document.getElementById('project-info-modal'),
+    projectInfoTitle: document.getElementById('project-info-title'),
+    projectInfoText: document.getElementById('project-info-text'),
+    closeProjectInfo: document.getElementById('close-project-info'),
+    projectInfoOk: document.getElementById('project-info-ok'),
 };
 
 // Simple markdown to HTML converter
@@ -2508,6 +2514,56 @@ if (ctDom.copySearchBtn) {
         }).catch(err => {
             console.error('Failed to copy text: ', err);
         });
+    });
+}
+
+// Project Descriptions data and Event Handler
+const PROJECT_DESCRIPTIONS = {
+    chatops: "UI panel and administrative tools for chat moderation, message history, participant intentions, and prayer orchestration.",
+    quote_manager: "Management of saint quotes, Eucharistic reflections, liturgical seasons, categories, and quote group tracking.",
+    liturgy_explorer: "Liturgical readings, mass calendar explorer, weekday fetcher, readings parser, and missal database synchronization.",
+    homily_pipeline: "AI homily processing pipeline, including audio uploads, FFmpeg/Whisper transcribing, text refinement, and YouTube publishing.",
+    stream_management: "Live stream scheduler, title/description templates, stream state tracking, and canceled stream handlers.",
+    backups_devops: "Database backups, data exports, system health monitoring, environment configs, and server integrations.",
+    maximus_core: "Central PWA dashboard, voice capturing, voice agenda query system, task tracking, and sync pipelines.",
+    open_brain: "Supabase vector database for storing thoughts, tasks, references, and embeddings for semantic search.",
+    infrastructure: "Server configs, API routes, Supabase edge functions, database migrations, and performance optimization.",
+    uncategorized: "General tasks and uncategorized features not tied to a specific sub-project."
+};
+
+if (ctDom.projectInfoBtn) {
+    ctDom.projectInfoBtn.addEventListener('click', () => {
+        const projectVal = ctDom.filterProject.value;
+        const selectedOption = ctDom.filterProject.options[ctDom.filterProject.selectedIndex];
+        const projectName = selectedOption ? selectedOption.text : 'All Projects';
+        
+        let descText = '';
+        if (!projectVal) {
+            descText = "Unified dashboard displaying coding tasks across all subsystems of Saint Max and AirMaria.";
+        } else {
+            descText = PROJECT_DESCRIPTIONS[projectVal] || "No description available for this project.";
+        }
+        
+        if (ctDom.projectInfoTitle && ctDom.projectInfoText && ctDom.projectInfoModal) {
+            ctDom.projectInfoTitle.textContent = `${projectName} Info`;
+            ctDom.projectInfoText.textContent = descText;
+            ctDom.projectInfoModal.classList.remove('hidden');
+        }
+    });
+}
+
+// Close Project Info modal
+if (ctDom.closeProjectInfo && ctDom.projectInfoModal) {
+    ctDom.closeProjectInfo.addEventListener('click', () => ctDom.projectInfoModal.classList.add('hidden'));
+}
+if (ctDom.projectInfoOk && ctDom.projectInfoModal) {
+    ctDom.projectInfoOk.addEventListener('click', () => ctDom.projectInfoModal.classList.add('hidden'));
+}
+if (ctDom.projectInfoModal) {
+    ctDom.projectInfoModal.addEventListener('click', (e) => {
+        if (e.target === ctDom.projectInfoModal) {
+            ctDom.projectInfoModal.classList.add('hidden');
+        }
     });
 }
 
