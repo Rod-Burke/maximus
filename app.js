@@ -2478,7 +2478,7 @@ const STATUS_LABELS = {
     draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
     ready_for_maximus: 'Ready for Maximus', done_in_maximus: 'Done in Maximus',
     ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress',
-    needs_verification: 'Needs Verification', done: 'Done'
+    needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
 };
 
 // Panel open/close
@@ -2729,7 +2729,7 @@ function renderCodingTaskCard(t) {
                 </div>
                 <ul class="ct-verification-list"></ul>
                 <div class="ct-verification-actions">
-                    <button class="ct-action-btn ct-btn-mark-done" style="display:none">✅ All Verified → Mark Done</button>
+                    <button class="ct-action-btn ct-btn-mark-done" style="display:none">✅ All Verified → Send for Logging</button>
                 </div>
                 <div class="ct-sendback-section" style="display:${status === 'needs_verification' ? 'block' : 'none'}">
                     <textarea class="ct-sendback-input" rows="2" placeholder="Describe what needs rework..."></textarea>
@@ -2940,12 +2940,11 @@ function renderCodingTaskCard(t) {
 
     // Mark Done handler
     markDoneBtn.addEventListener('click', async () => {
-        ct.status = 'done';
+        ct.status = 'needs_logging';
         const badge = el.querySelector('.ct-badge[class*="status-"]');
-        badge.className = 'ct-badge status-done';
-        badge.textContent = STATUS_LABELS['done'];
-        el.querySelector('.ct-status-select').value = 'done';
-        el.classList.add('ct-done');
+        badge.className = 'ct-badge status-needs_logging';
+        badge.textContent = STATUS_LABELS['needs_logging'];
+        el.querySelector('.ct-status-select').value = 'needs_logging';
         sendbackSection.style.display = 'none';
         markDoneBtn.style.display = 'none';
         await updateCodingTaskMeta(t.id, meta);
@@ -2979,13 +2978,6 @@ function renderCodingTaskCard(t) {
         ct.status = 'ready_in_antigravity';
         ct.rework_notes = reworkNotes;
         
-        // Clear checklist checked statuses so they can be re-verified
-        if (ct.verification_items) {
-            ct.verification_items.forEach(item => {
-                item.checked = false;
-            });
-        }
-
         const badge = el.querySelector('.ct-badge[class*="status-"]');
         badge.className = 'ct-badge status-ready_in_antigravity';
         badge.textContent = STATUS_LABELS['ready_in_antigravity'];
