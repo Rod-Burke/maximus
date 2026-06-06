@@ -2654,7 +2654,7 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan', 'needs_verification'];
+    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
@@ -2846,29 +2846,47 @@ function renderCodingTaskCard(t) {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = 'ct-verification-cb';
-            checkbox.checked = !!item.checked;
-            if (item.checked) checkedCount++;
+            
+            // Handle both plain strings and object structure
+            const isObj = (typeof item === 'object' && item !== null);
+            const labelText = isObj ? (item.label || '') : item;
+            const isChecked = isObj ? !!item.checked : false;
+            const itemNotes = isObj ? (item.notes || '') : '';
+
+            checkbox.checked = isChecked;
+            if (isChecked) checkedCount++;
 
             const label = document.createElement('span');
-            label.className = 'ct-verification-label' + (item.checked ? ' verified' : '');
-            label.textContent = item.label;
+            label.className = 'ct-verification-label' + (isChecked ? ' verified' : '');
+            label.textContent = labelText;
 
             const notesInput = document.createElement('input');
             notesInput.type = 'text';
             notesInput.className = 'ct-verification-item-notes';
             notesInput.placeholder = 'Add notes/assessment...';
-            notesInput.value = item.notes || '';
+            notesInput.value = itemNotes;
 
             checkbox.addEventListener('change', async () => {
-                item.checked = checkbox.checked;
-                label.className = 'ct-verification-label' + (checkbox.checked ? ' verified' : '');
+                const currentChecked = checkbox.checked;
+                if (typeof items[idx] === 'string') {
+                    items[idx] = { label: items[idx], checked: currentChecked, notes: '' };
+                } else {
+                    items[idx].checked = currentChecked;
+                }
+                label.className = 'ct-verification-label' + (currentChecked ? ' verified' : '');
                 updateVerificationUI();
                 await updateCodingTaskMeta(t.id, meta);
             });
 
             notesInput.addEventListener('blur', async () => {
-                if (item.notes !== notesInput.value) {
-                    item.notes = notesInput.value;
+                const notesVal = notesInput.value.trim();
+                const currentNotes = typeof items[idx] === 'string' ? '' : (items[idx].notes || '');
+                if (currentNotes !== notesVal) {
+                    if (typeof items[idx] === 'string') {
+                        items[idx] = { label: items[idx], checked: false, notes: notesVal };
+                    } else {
+                        items[idx].notes = notesVal;
+                    }
                     await updateCodingTaskMeta(t.id, meta);
                 }
             });
@@ -2987,7 +3005,7 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
 
             // Toggle done styling
-            if (['done', 'done_in_maximus', 'needs_plan', 'needs_verification'].includes(newStatus)) {
+            if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
                 cardEl.classList.add('ct-done');
             } else {
                 cardEl.classList.remove('ct-done');
