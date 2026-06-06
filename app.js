@@ -2674,11 +2674,27 @@ function renderCodingTasksList(tasks) {
     });
 }
 
+function getPromptTextForStatus(status, summary, taskId) {
+    const cleanSummary = summary.trim();
+    switch (status) {
+        case 'needs_plan':
+            return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId})`;
+        case 'done_in_maximus':
+            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution.`;
+        case 'ready_in_antigravity':
+            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId})`;
+        case 'needs_logging':
+            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) and mark it done.`;
+        default:
+            return '';
+    }
+}
+
 function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan'];
+    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan', 'needs_logging'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
@@ -2700,6 +2716,7 @@ function renderCodingTaskCard(t) {
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
             </div>
+            <button class="ct-action-prompt-btn ${['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
         </div>
         <div class="ct-expanded">
             <div class="ct-description-rendered improve-rendered improve-editable-rich" contenteditable="true">${simpleMarkdownToHtml(t.content)}</div>
@@ -2755,11 +2772,12 @@ function renderCodingTaskCard(t) {
         badge.textContent = STATUS_LABELS[newStatus] || newStatus;
         ct.status = newStatus;
         // Toggle done styling
-        if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
+        if (doneStatuses.includes(newStatus)) {
             el.classList.add('ct-done');
         } else {
             el.classList.remove('ct-done');
         }
+        updatePromptBtnVisibility(newStatus);
         await updateCodingTaskMeta(t.id, meta);
     });
 
@@ -2947,8 +2965,39 @@ function renderCodingTaskCard(t) {
         el.querySelector('.ct-status-select').value = 'needs_logging';
         sendbackSection.style.display = 'none';
         markDoneBtn.style.display = 'none';
+        el.classList.add('ct-done');
+        updatePromptBtnVisibility('needs_logging');
         await updateCodingTaskMeta(t.id, meta);
     });
+
+    const promptBtn = el.querySelector('.ct-action-prompt-btn');
+    if (promptBtn) {
+        promptBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentStatus = ct.status || 'draft';
+            const promptText = getPromptTextForStatus(currentStatus, summary, t.id);
+            if (promptText) {
+                navigator.clipboard.writeText(promptText).then(() => {
+                    const originalHTML = promptBtn.innerHTML;
+                    promptBtn.innerHTML = '✅ Copied!';
+                    promptBtn.classList.add('copied');
+                    setTimeout(() => {
+                        promptBtn.innerHTML = originalHTML;
+                        promptBtn.classList.remove('copied');
+                    }, 1500);
+                });
+            }
+        });
+    }
+
+    function updatePromptBtnVisibility(currentStatus) {
+        if (!promptBtn) return;
+        if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(currentStatus)) {
+            promptBtn.classList.remove('hidden');
+        } else {
+            promptBtn.classList.add('hidden');
+        }
+    }
 
     // Send Back handler
     sendbackBtn.addEventListener('click', async () => {
@@ -3038,10 +3087,18 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
 
             // Toggle done styling
-            if (['done', 'done_in_maximus', 'needs_plan'].includes(newStatus)) {
+            if (['done', 'done_in_maximus', 'needs_plan', 'needs_logging'].includes(newStatus)) {
                 cardEl.classList.add('ct-done');
             } else {
                 cardEl.classList.remove('ct-done');
+            }
+            const promptBtn = cardEl.querySelector('.ct-action-prompt-btn');
+            if (promptBtn) {
+                if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(newStatus)) {
+                    promptBtn.classList.remove('hidden');
+                } else {
+                    promptBtn.classList.add('hidden');
+                }
             }
 
             // Persist to DB
