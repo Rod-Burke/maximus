@@ -2487,7 +2487,10 @@ ctDom.closeBtn.addEventListener('click', () => ctDom.panel.classList.add('hidden
 document.getElementById('refresh-coding-tasks').addEventListener('click', loadCodingTasks);
 
 // Filters
-ctDom.filterProject.addEventListener('change', loadCodingTasks);
+ctDom.filterProject.addEventListener('change', () => {
+    loadCodingTasks();
+    updateProjectInfoTooltip();
+});
 ctDom.filterStatus.addEventListener('change', loadCodingTasks);
 
 // Copy Search Phrase
@@ -2496,11 +2499,11 @@ if (ctDom.copySearchBtn) {
         const projectVal = ctDom.filterProject.value;
         let textToCopy = '';
         if (!projectVal) {
-            textToCopy = "Whats Ready";
+            textToCopy = "Whats Ready?";
         } else {
             const selectedOption = ctDom.filterProject.options[ctDom.filterProject.selectedIndex];
             const projectName = selectedOption ? selectedOption.text : 'Other';
-            textToCopy = `What's ready in ${projectName}`;
+            textToCopy = `What's ready in ${projectName}?`;
         }
         
         navigator.clipboard.writeText(textToCopy).then(() => {
@@ -2530,6 +2533,27 @@ const PROJECT_DESCRIPTIONS = {
     infrastructure: "Server configs, API routes, Supabase edge functions, database migrations, and performance optimization.",
     uncategorized: "General tasks and uncategorized features not tied to a specific sub-project."
 };
+
+function updateProjectInfoTooltip() {
+    if (!ctDom.projectInfoBtn) return;
+    const projectVal = ctDom.filterProject.value;
+    const selectedOption = ctDom.filterProject.options[ctDom.filterProject.selectedIndex];
+    const projectName = selectedOption ? selectedOption.text : 'All Projects';
+    
+    let desc = '';
+    if (!projectVal) {
+        desc = "Unified dashboard displaying coding tasks across all subsystems of Saint Max and AirMaria.";
+    } else {
+        desc = PROJECT_DESCRIPTIONS[projectVal] || "No description available for this project.";
+    }
+    
+    const words = desc.split(/\s+/);
+    const summary = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+    ctDom.projectInfoBtn.title = `${summary} - Click for more info`;
+}
+
+// Initialize tooltip on page load
+updateProjectInfoTooltip();
 
 if (ctDom.projectInfoBtn) {
     ctDom.projectInfoBtn.addEventListener('click', () => {
@@ -2929,9 +2953,26 @@ function renderCodingTaskCard(t) {
 
     // Send Back handler
     sendbackBtn.addEventListener('click', async () => {
-        const reworkNotes = sendbackInput.value.trim();
+        let reworkNotes = sendbackInput.value.trim();
         if (!reworkNotes) {
-            alert('Please describe what needs rework before sending back.');
+            // Aggregate notes from the checklist items
+            const notesList = [];
+            if (ct.verification_items) {
+                ct.verification_items.forEach(item => {
+                    const label = (typeof item === 'object' && item !== null) ? item.label : item;
+                    const notes = (typeof item === 'object' && item !== null) ? (item.notes || '') : '';
+                    if (notes.trim()) {
+                        notesList.push(`- ${label}: ${notes.trim()}`);
+                    }
+                });
+            }
+            if (notesList.length > 0) {
+                reworkNotes = "Feedback on checklist items:\n" + notesList.join('\n');
+            }
+        }
+
+        if (!reworkNotes) {
+            alert('Please describe what needs rework before sending back (either in the box below or by adding notes to checklist items).');
             return;
         }
 
