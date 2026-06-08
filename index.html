@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=71">
+    <link rel="stylesheet" href="style.css?v=75">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -147,33 +147,34 @@
             </div>
         </div>
 
-        <!-- Tasks Panel (hidden by default) -->
-        <div id="tasks-panel" class="history-panel hidden">
-            <div class="history-header" style="display: flex; align-items: center; justify-content: space-between;">
-                <h2>Tasks & Events</h2>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button class="icon-btn quick-capture-trigger" title="Quick Capture">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <path d="M12 5v14M5 12h14"/>
-                        </svg>
-                    </button>
-                    <button id="show-completed-btn" class="icon-btn" title="Show Completed">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </button>
-                    <button id="sync-tasks" class="icon-btn" title="Sync with Google">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                    <button id="close-tasks" class="icon-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+         <!-- Tasks Panel (hidden by default) -->
+         <div id="tasks-panel" class="history-panel hidden">
+             <div class="history-header" style="display: flex; align-items: center; justify-content: space-between;">
+                 <h2>Tasks & Events</h2>
+                 <div style="display: flex; gap: 0.5rem; align-items: center;">
+                     <button class="icon-btn quick-capture-trigger" title="Quick Capture">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                             <path d="M12 5v14M5 12h14"/>
+                         </svg>
+                     </button>
+                     <button id="show-completed-btn" class="icon-btn" title="Show Completed">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                         </svg>
+                     </button>
+                     <button id="sync-tasks" class="ct-copy-btn" title="Sync with Google" style="padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600;">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="flex-shrink: 0;">
+                             <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
+                         </svg>
+                         <span>Sync</span>
+                     </button>
+                     <button id="close-tasks" class="icon-btn">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                             <path d="M6 18L18 6M6 6l12 12"/>
+                         </svg>
+                     </button>
+                 </div>
+             </div>
             <div class="search-container">
                 <input type="text" id="tasks-search" class="search-input" placeholder="Search tasks...">
             </div>
@@ -604,7 +605,7 @@
         <button id="install-btn">Install</button>
     </div>
 
-    <script src="app.js?v=71"> </script>
+    <script src="app.js?v=75"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

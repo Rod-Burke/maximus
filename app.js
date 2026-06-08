@@ -945,14 +945,18 @@ dom.closeTasks.addEventListener('click', () => dom.tasksPanel.classList.add('hid
 dom.syncTasksBtn.addEventListener('click', async () => {
     dom.tasksList.innerHTML = '<div class="history-empty">Syncing with Google...</div>';
     try {
-        await fetch(CONFIG.SYNC_ENDPOINT, {
+        const res = await fetch(CONFIG.SYNC_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
             body: JSON.stringify({ action: 'pull' })
         });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Server returned status ${res.status}`);
+        }
         loadTasksDashboard();
     } catch (e) {
-        alert('Sync failed.');
+        alert('Sync failed: ' + e.message);
         loadTasksDashboard();
     }
 });
@@ -1154,6 +1158,7 @@ function renderTaskSection(title, items) {
 
     const container = document.createElement('div');
     container.className = 'task-section-container';
+    container.dataset.sectionTitle = title;
     
     // Dropzone logic for reordering
     container.addEventListener('dragover', e => {
@@ -1203,10 +1208,62 @@ function renderTaskSection(title, items) {
             el.classList.add('drag-ghost');
         });
 
-        el.addEventListener('dragend', () => {
+        el.addEventListener('dragend', async () => {
             el.classList.remove('drag-ghost');
             draggedTask = null;
-            saveNewOrder(container);
+            
+            const newContainer = el.closest('.task-section-container');
+            const oldContainer = container;
+            
+            if (newContainer && newContainer !== oldContainer) {
+                const newSection = newContainer.dataset.sectionTitle;
+                let taskMeta = JSON.parse(el.dataset.meta || '{}');
+                const todayStr = getLocalDateStr();
+                
+                if (newSection === "Today's Priorities") {
+                    if (!taskMeta.due_date) {
+                        taskMeta.due_date = todayStr;
+                    }
+                    taskMeta.bumped_at = null;
+                } else if (newSection === "Unscheduled Tasks") {
+                    taskMeta.due_date = null;
+                    taskMeta.bumped_at = null;
+                }
+                
+                el.dataset.meta = JSON.stringify(taskMeta);
+                
+                // Update UI metadata string immediately
+                const metaTextEl = el.querySelector('.task-meta');
+                const newDueMeta = taskMeta.due_date ? `Due: ${taskMeta.due_date}` : '';
+                const newRecMeta = taskMeta.recurrence ? `↺ ${taskMeta.recurrence}` : '';
+                const newMetaStr = [newDueMeta, newRecMeta].filter(Boolean).join(' | ');
+                
+                if (metaTextEl) {
+                    if (newMetaStr) {
+                        metaTextEl.innerText = newMetaStr;
+                    } else {
+                        metaTextEl.remove();
+                    }
+                } else if (newMetaStr) {
+                    const wrapper = el.querySelector('.task-content-wrapper');
+                    const newMetaEl = document.createElement('div');
+                    newMetaEl.className = 'task-meta';
+                    newMetaEl.innerText = newMetaStr;
+                    wrapper.appendChild(newMetaEl);
+                }
+
+                try {
+                    await fetch(CONFIG.MANAGE_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                        body: JSON.stringify({ action: 'update', id: t.id, metadata: taskMeta })
+                    });
+                } catch (err) {
+                    console.error("Failed to update transitioned task metadata:", err);
+                }
+            }
+            
+            await saveNewOrder();
         });
 
         // Checkbox complete / uncomplete
@@ -1509,8 +1566,8 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-async function saveNewOrder(container) {
-    const items = [...container.querySelectorAll('.task-item')];
+async function saveNewOrder() {
+    const items = [...dom.tasksList.querySelectorAll('.task-item')];
     const tasks = items.map((el, index) => {
         return {
             id: el.dataset.id,
@@ -2430,6 +2487,7 @@ const ctDom = {
     improveSuggestionsList: document.getElementById('improve-suggestions-list'),
     readinessBarFill: document.getElementById('readiness-bar-fill'),
     readinessLabel: document.getElementById('readiness-label'),
+    readinessNotes: document.getElementById('readiness-notes'),
     improveAgainBtn: document.getElementById('improve-again-btn'),
     improveSubmitBtn: document.getElementById('improve-submit-btn'),
     // Project Info Modal
