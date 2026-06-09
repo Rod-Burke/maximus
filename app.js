@@ -2732,17 +2732,28 @@ function renderCodingTasksList(tasks) {
     });
 }
 
+// Mapping of task statuses to their corresponding markdown files
+const STATUS_MD_FILES = {
+    needs_plan: 'implementation_plan.md',
+    done_in_maximus: 'task.md',
+    ready_in_antigravity: 'task.md',
+    needs_logging: 'walkthrough.md'
+};
+
 function getPromptTextForStatus(status, summary, taskId) {
     const cleanSummary = summary.trim();
+    const mdFile = STATUS_MD_FILES[status] || '';
+    const mdSuffix = mdFile ? ` as per ${mdFile}, including the specified follow-up.` : '';
+    
     switch (status) {
         case 'needs_plan':
-            return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId})`;
+            return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId})${mdSuffix}`;
         case 'done_in_maximus':
-            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution.`;
+            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution${mdSuffix}`;
         case 'ready_in_antigravity':
-            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId})`;
+            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId})${mdSuffix}`;
         case 'needs_logging':
-            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) and mark it done.`;
+            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) and mark it done${mdSuffix}`;
         default:
             return '';
     }
