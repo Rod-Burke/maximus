@@ -1946,6 +1946,11 @@ input:checked + .toggle-slider::before {
     background: rgba(168, 85, 247, 0.25);
 }
 
+.modal-btn.ct-btn-improve:active {
+    background: rgba(168, 85, 247, 0.35);
+    transform: scale(0.97);
+}
+
 .ct-btn-edit {
     background: rgba(59, 130, 246, 0.15);
     border: 1px solid rgba(59, 130, 246, 0.3);

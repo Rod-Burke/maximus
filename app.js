@@ -1010,7 +1010,7 @@ async function loadTasksDashboard() {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'list', limit: 300 })
+            body: JSON.stringify({ action: 'list', limit: 1000, types: ['task', 'event'] })
         });
         const data = await res.json();
         if (!data.thoughts) return;
