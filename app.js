@@ -3594,3 +3594,16 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); defe
 document.getElementById('install-btn').addEventListener('click', () => {
     if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(r => { if (r.outcome === 'accepted') document.getElementById('install-banner').classList.add('hidden'); deferredPrompt = null; }); }
 });
+
+// --- DYNAMIC VERSION ---
+const appScript = document.querySelector('script[src^="app.js"]');
+if (appScript) {
+    const urlParams = new URLSearchParams(appScript.src.split('?')[1] || '');
+    const v = urlParams.get('v');
+    if (v) {
+        const versionEl = document.querySelector('.app-version');
+        if (versionEl) {
+            versionEl.textContent = `v${v}`;
+        }
+    }
+}
