@@ -8,6 +8,100 @@ const CONFIG = {
     EMAIL: 'Fra_roderic@outlook.com'
 };
 
+// Session/Auth Initialization
+function initAuth() {
+    const token = localStorage.getItem('maximus_session_token');
+    const overlay = document.getElementById('login-overlay');
+    
+    if (token) {
+        CONFIG.KEY = token;
+        if (overlay) overlay.classList.add('hidden');
+    } else {
+        CONFIG.KEY = ''; // Clear default key to force authentication
+        if (overlay) overlay.classList.remove('hidden');
+    }
+}
+
+// Attach event listener to the login form
+document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const errorEl = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit');
+    const btnText = submitBtn?.querySelector('.btn-text');
+    const btnSpinner = submitBtn?.querySelector('.btn-spinner');
+
+    const username = usernameInput?.value.trim();
+    const password = passwordInput?.value;
+
+    if (!username || !password) return;
+
+    // Show loading spinner
+    if (btnText) btnText.classList.add('hidden');
+    if (btnSpinner) btnSpinner.classList.remove('hidden');
+    if (submitBtn) submitBtn.disabled = true;
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        const response = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'login',
+                username: username,
+                password: password
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || 'Invalid credentials');
+        }
+
+        const data = await response.json();
+        if (data.token) {
+            localStorage.setItem('maximus_session_token', data.token);
+            CONFIG.KEY = data.token;
+            
+            // Hide login overlay with transition
+            const overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+            
+            // Auto start speech recognition if active
+            try { recognition?.start(); } catch(err){}
+        } else {
+            throw new Error('Authentication did not return a session token.');
+        }
+    } catch (err) {
+        console.error('Authentication error:', err);
+        if (errorEl) {
+            errorEl.textContent = err.message || 'Connection error';
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        // Hide loading spinner
+        if (btnText) btnText.classList.remove('hidden');
+        if (btnSpinner) btnSpinner.classList.add('hidden');
+        if (submitBtn) submitBtn.disabled = false;
+    }
+});
+
+// Logout handler
+document.getElementById('logout-btn')?.addEventListener('click', () => {
+    if (confirm('Are you sure you want to log out?')) {
+        localStorage.removeItem('maximus_session_token');
+        CONFIG.KEY = ''; // Clear key
+        try { recognition?.stop(); } catch(e){}
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+    }
+});
+
+initAuth();
+
 // Local timezone date helper (returns YYYY-MM-DD in user's timezone)
 function getLocalDateStr(date) {
     const d = date || new Date();
@@ -2737,23 +2831,27 @@ const STATUS_MD_FILES = {
     needs_plan: 'implementation_plan.md',
     done_in_maximus: 'task.md',
     ready_in_antigravity: 'task.md',
+    in_progress: 'task.md',
+    needs_verification: 'walkthrough.md',
     needs_logging: 'walkthrough.md'
 };
 
 function getPromptTextForStatus(status, summary, taskId) {
     const cleanSummary = summary.trim();
-    const mdFile = STATUS_MD_FILES[status] || '';
-    const mdSuffix = mdFile ? ` as per ${mdFile}, including the specified follow-up.` : '';
     
     switch (status) {
         case 'needs_plan':
-            return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId})${mdSuffix}`;
+            return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId}) in implementation_plan.md. The subsequent execution will follow in task.md once approved.`;
         case 'done_in_maximus':
-            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution${mdSuffix}`;
+            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'ready_in_antigravity':
-            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId})${mdSuffix}`;
+            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
+        case 'in_progress':
+            return `Please continue execution of task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
+        case 'needs_verification':
+            return `Please verify the completed work for task: "${cleanSummary}" (ID: ${taskId}) using the checklist in walkthrough.md.`;
         case 'needs_logging':
-            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) and mark it done${mdSuffix}`;
+            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) in walkthrough.md and mark it done.`;
         default:
             return '';
     }
@@ -2785,7 +2883,7 @@ function renderCodingTaskCard(t) {
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
             </div>
-            <button class="ct-action-prompt-btn ${['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
+            <button class="ct-action-prompt-btn ${['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
         </div>
         <div class="ct-expanded">
             <div class="ct-description-rendered improve-rendered improve-editable-rich" contenteditable="true">${simpleMarkdownToHtml(t.content)}</div>
@@ -3061,7 +3159,7 @@ function renderCodingTaskCard(t) {
 
     function updatePromptBtnVisibility(currentStatus) {
         if (!promptBtn) return;
-        if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(currentStatus)) {
+        if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(currentStatus)) {
             promptBtn.classList.remove('hidden');
         } else {
             promptBtn.classList.add('hidden');
@@ -3163,7 +3261,7 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
             const promptBtn = cardEl.querySelector('.ct-action-prompt-btn');
             if (promptBtn) {
-                if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'needs_logging'].includes(newStatus)) {
+                if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(newStatus)) {
                     promptBtn.classList.remove('hidden');
                 } else {
                     promptBtn.classList.add('hidden');
@@ -3586,13 +3684,32 @@ ctDom.addSubmit.addEventListener('click', async () => {
 
 // --- AUTO-START ---
 
-window.addEventListener('load', () => { setTimeout(() => { try { recognition?.start(); } catch(e){} }, 1000); });
+window.addEventListener('load', () => { 
+    setTimeout(() => { 
+        try { 
+            if (localStorage.getItem('maximus_session_token')) {
+                recognition?.start(); 
+            }
+        } catch(e){} 
+    }, 1000); 
+});
 
 // --- PWA ---
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('install-banner').classList.remove('hidden'); });
 document.getElementById('install-btn').addEventListener('click', () => {
-    if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(r => { if (r.outcome === 'accepted') document.getElementById('install-banner').classList.add('hidden'); deferredPrompt = null; }); }
+    if (deferredPrompt) { 
+        deferredPrompt.prompt(); 
+        deferredPrompt.userChoice.then(r => { 
+            if (r.outcome === 'accepted') {
+                document.getElementById('install-banner').classList.add('hidden');
+            }
+            deferredPrompt = null; 
+        }); 
+    }
+});
+document.getElementById('install-close-btn')?.addEventListener('click', () => {
+    document.getElementById('install-banner').classList.add('hidden');
 });
 
 // --- DYNAMIC VERSION ---

@@ -8,12 +8,38 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=81">
+    <link rel="stylesheet" href="style.css?v=82">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay hidden">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo-sym">✞</div>
+                <h2>Saint Max</h2>
+                <p>Secure authentication gateway</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" placeholder="Enter username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="login-error hidden"></div>
+                <button type="submit" id="login-submit">
+                    <span class="btn-text">Authenticate</span>
+                    <div class="btn-spinner hidden"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="app-container">
         <header>
             <div class="logo">
@@ -36,6 +62,13 @@
                 <button id="history-btn" class="icon-btn" title="Message History">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </button>
+                <button id="logout-btn" class="icon-btn" title="Log Out">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
                     </svg>
                 </button>
             </div>
@@ -603,12 +636,15 @@
     </div>
 
     <!-- PWA Installation Prompt (Custom) -->
-    <div id="install-banner" class="banner hidden">
+    <div id="install-banner" class="install-banner hidden">
         <p>Add Maximus to your home screen</p>
-        <button id="install-btn">Install</button>
+        <div class="install-banner-actions">
+            <button id="install-btn">Install</button>
+            <button id="install-close-btn" class="install-banner-close" aria-label="Dismiss">✕</button>
+        </div>
     </div>
 
-    <script src="app.js?v=81"> </script>
+    <script src="app.js?v=82"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');

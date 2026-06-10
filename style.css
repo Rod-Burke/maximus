@@ -105,33 +105,7 @@ footer {
     height: 18px;
 }
 
-/* Install Banner - positioned at top to avoid blocking input */
-.banner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: var(--accent-gold);
-    color: var(--bg-color);
-    padding: 0.5rem 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 300;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
 
-.banner button {
-    background: var(--bg-color);
-    color: var(--accent-gold);
-    border: none;
-    border-radius: 20px;
-    padding: 0.3rem 1rem;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-}
 
 header {
     padding: 1.5rem 1.5rem 0.5rem;
@@ -1018,29 +992,64 @@ button#send-btn svg {
 .hidden { display: none !important; }
 
 /* --- PWA BANNER --- */
-.banner {
+.install-banner {
     position: fixed;
     bottom: 2rem;
     left: 50%;
     transform: translateX(-50%);
-    background: white;
-    color: black;
-    padding: 1rem 1.5rem;
-    border-radius: 50px;
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 30px;
     display: flex;
     align-items: center;
-    gap: 1rem;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    z-index: 100;
+    gap: 1.25rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 999;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.install-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 #install-btn {
-    background: var(--bg-color);
-    color: white;
+    background: var(--accent-gold);
+    color: #0f172a;
     border: none;
-    padding: 0.5rem 1rem;
     border-radius: 20px;
+    padding: 0.4rem 1rem;
+    font-family: inherit;
     font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+#install-btn:hover {
+    transform: scale(1.05);
+}
+
+.install-banner-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.install-banner-close:hover {
+    color: white;
 }
 
 /* --- SHOW COMPLETED TOGGLE --- */
@@ -2515,5 +2524,183 @@ input:checked + .toggle-slider::before {
 .ct-card.ct-done .ct-action-prompt-btn {
     opacity: 1 !important;
     filter: none !important;
+}
+
+/* --- LOGIN OVERLAY --- */
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: radial-gradient(circle at 50% 0%, rgba(251, 191, 36, 0.15) 0%, transparent 60%),
+                radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
+                #0b0f19;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    backdrop-filter: blur(20px);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
+}
+
+.login-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border-radius: 24px;
+    padding: 2.25rem 2rem;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: login-card-show 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes login-card-show {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-logo-sym {
+    font-size: 2.5rem;
+    color: var(--accent-gold);
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+    margin-bottom: 0.5rem;
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.login-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #ffffff;
+    margin-bottom: 0.35rem;
+}
+
+.login-header p {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 300;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.form-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.form-group input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.25s ease;
+}
+
+.form-group input:focus {
+    border-color: var(--accent-gold);
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.15);
+}
+
+.login-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 10px;
+    color: #fca5a5;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.8rem;
+    margin-bottom: 1.25rem;
+    animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+}
+
+#login-submit {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent-gold) 0%, #d97706 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 0.9rem;
+    color: #0b0f19;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(217, 119, 6, 0.3);
+}
+
+#login-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+}
+
+#login-submit:active {
+    transform: translateY(1px);
+}
+
+#login-submit .btn-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(11, 15, 25, 0.2);
+    border-top-color: #0b0f19;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.hidden {
+    display: none !important;
 }
 
