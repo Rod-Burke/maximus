@@ -2843,7 +2843,7 @@ function getPromptTextForStatus(status, summary, taskId) {
         case 'needs_plan':
             return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId}) in implementation_plan.md. The subsequent execution will follow in task.md once approved.`;
         case 'done_in_maximus':
-            return `The task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
+            return `${cleanSummary}:\nThe task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'ready_in_antigravity':
             return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'in_progress':
