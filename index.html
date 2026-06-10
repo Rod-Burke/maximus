@@ -647,7 +647,16 @@
     <script src="app.js?v=82"> </script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                // Check for updates on page focus
+                window.addEventListener('focus', () => {
+                    reg.update().catch(() => {});
+                });
+                // Check for updates periodically (every 5 minutes)
+                setInterval(() => {
+                    reg.update().catch(() => {});
+                }, 300000);
+            });
         }
     </script>
 </body>
