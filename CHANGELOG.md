@@ -6,11 +6,14 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ## [v83] - 2026-06-11
 
-### Task: Add Task Summary to Action Button
+### Task: Add Task Summary to Action Button & Workflow Mods
 - **ID**: `c3ee9fcf-99d0-41d3-b084-7ce9cf10e09f`
 - **Changes**:
   - Prepended task summary and a newline to prompt text generated for the `done_in_maximus` status in `getPromptTextForStatus()`.
   - This allows the Antigravity conversation title to inherit the clean summary directly.
+- **Workflow / DevOps Changes**:
+  - Updated Agent Behavior Rules (`behavior_directive.md`) to establish a strict database state-sync workflow.
+  - Mandated automatic task transitions to `in_progress` (at execution start) and `needs_verification` (on completion, with checklist details).
 - **Cache**: Bumped service worker cache name and asset link queries to `v83`.
 
 ---
