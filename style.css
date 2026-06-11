@@ -1728,6 +1728,49 @@ input:checked + .toggle-slider::before {
     color: #4ade80;
 }
 
+/* Quick Filters */
+.ct-quick-filters {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 1rem 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.ct-quick-filter-btn {
+    flex: 1;
+    padding: 0.45rem 0.6rem;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.ct-quick-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.ct-quick-filter-btn.active {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.15);
+}
+
+.ct-quick-filter-btn:active {
+    transform: scale(0.97);
+}
+
 /* Coding task fields in the main task modal */
 .coding-task-fields {
     border-left: 3px solid rgba(168, 85, 247, 0.4);

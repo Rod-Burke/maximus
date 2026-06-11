@@ -2569,6 +2569,8 @@ const ctDom = {
     copySearchBtn: document.getElementById('ct-copy-search-btn'),
     projectInfoBtn: document.getElementById('ct-project-info-btn'),
     filterStatus: document.getElementById('ct-filter-status'),
+    filterNeedsInput: document.getElementById('ct-filter-needs-input'),
+    filterAntigravGo: document.getElementById('ct-filter-antigrav-go'),
     ctSearch: document.getElementById('ct-search'),
     // Add Modal
     addModal: document.getElementById('add-ct-modal'),
@@ -2641,6 +2643,23 @@ const STATUS_LABELS = {
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
 };
 
+const STATUS_GROUPS = {
+    needsInput: [
+        'ready_for_maximus',
+        'needs_clarification',
+        'needs_verification',
+        'in_progress'
+    ],
+    antigravGo: [
+        'needs_plan',
+        'done_in_maximus',
+        'ready_in_antigravity',
+        'needs_logging'
+    ]
+};
+
+let activeQuickFilter = null; // 'needsInput' or 'antigravGo' or null
+
 // Panel open/close
 ctDom.btn.addEventListener('click', () => { ctDom.panel.classList.remove('hidden'); loadCodingTasks(); });
 ctDom.closeBtn.addEventListener('click', () => ctDom.panel.classList.add('hidden'));
@@ -2651,7 +2670,34 @@ ctDom.filterProject.addEventListener('change', () => {
     loadCodingTasks();
     updateProjectInfoTooltip();
 });
-ctDom.filterStatus.addEventListener('change', loadCodingTasks);
+ctDom.filterStatus.addEventListener('change', () => {
+    activeQuickFilter = null;
+    ctDom.filterNeedsInput.classList.remove('active');
+    ctDom.filterAntigravGo.classList.remove('active');
+    loadCodingTasks();
+});
+
+function setQuickFilter(filterType) {
+    if (activeQuickFilter === filterType) {
+        activeQuickFilter = null;
+        ctDom.filterNeedsInput.classList.remove('active');
+        ctDom.filterAntigravGo.classList.remove('active');
+    } else {
+        activeQuickFilter = filterType;
+        if (filterType === 'needsInput') {
+            ctDom.filterNeedsInput.classList.add('active');
+            ctDom.filterAntigravGo.classList.remove('active');
+        } else {
+            ctDom.filterAntigravGo.classList.add('active');
+            ctDom.filterNeedsInput.classList.remove('active');
+        }
+        ctDom.filterStatus.value = '';
+    }
+    loadCodingTasks();
+}
+
+ctDom.filterNeedsInput.addEventListener('click', () => setQuickFilter('needsInput'));
+ctDom.filterAntigravGo.addEventListener('click', () => setQuickFilter('antigravGo'));
 
 // Copy Search Phrase
 if (ctDom.copySearchBtn) {
@@ -2775,7 +2821,7 @@ async function loadCodingTasks() {
         const project = ctDom.filterProject.value;
         const status = ctDom.filterStatus.value;
         if (project) body.project = project;
-        if (status) body.status = status;
+        if (!activeQuickFilter && status) body.status = status;
 
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
@@ -2785,7 +2831,20 @@ async function loadCodingTasks() {
         const data = await res.json();
         if (!data.thoughts) { ctDom.list.innerHTML = '<div class="history-empty">Error loading tasks.</div>'; return; }
 
-        renderCodingTasksList(data.thoughts);
+        let tasks = data.thoughts;
+        if (activeQuickFilter === 'needsInput') {
+            tasks = tasks.filter(t => {
+                const s = t.metadata?.coding_task?.status || 'draft';
+                return STATUS_GROUPS.needsInput.includes(s);
+            });
+        } else if (activeQuickFilter === 'antigravGo') {
+            tasks = tasks.filter(t => {
+                const s = t.metadata?.coding_task?.status || 'draft';
+                return STATUS_GROUPS.antigravGo.includes(s);
+            });
+        }
+
+        renderCodingTasksList(tasks);
     } catch (e) {
         console.error('Load coding tasks error:', e);
         ctDom.list.innerHTML = '<div class="history-empty">Error loading coding tasks.</div>';
