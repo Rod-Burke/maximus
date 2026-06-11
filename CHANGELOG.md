@@ -2,6 +2,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v84] - 2026-06-11
+
+### Task: Coding Tasks Deletion & Modal Flow Optimization
+- **ID**: `8364ed67-2241-412d-adeb-e6c6f1f5526d`
+- **Changes**:
+  - Tracked `editSource = 'coding_tasks'` when editing tasks from the coding tasks panel.
+  - Configured modal save & delete handlers to correctly refresh the coding tasks panel and remove the correct card element.
+  - Enhanced visual styling of `.ct-btn-delete` to make it larger and brighter red for better visibility on a dark background.
+- **Cache**: Bumped service worker cache name and asset link queries to `v84`.
+
 ---
 
 ## [v83] - 2026-06-11

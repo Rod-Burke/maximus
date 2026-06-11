@@ -1960,6 +1960,8 @@ dom.modalSave.addEventListener('click', async () => {
             if (source === 'history') {
                 await loadHistory();
                 dom.historyList.scrollTop = scrollTop;
+            } else if (source === 'coding_tasks') {
+                await loadCodingTasks();
             } else {
                 loadTasksDashboard();
             }
@@ -1985,14 +1987,18 @@ dom.modalDelete.addEventListener('click', async () => {
             body: JSON.stringify({ action: 'delete', id: modalThoughtId })
         });
         
-        const taskEl = document.querySelector(`.task-item[data-id="${modalThoughtId}"]`);
+        const taskEl = document.querySelector(`.task-item[data-id="${modalThoughtId}"]`) || document.querySelector(`.ct-card[data-id="${modalThoughtId}"]`);
         if (taskEl) {
-            const container = taskEl.closest('.task-section-container');
-            const header = container ? container.previousElementSibling : null;
-            taskEl.remove();
-            if (container && container.querySelectorAll('.task-item').length === 0) {
-                if (header && header.classList.contains('section-header')) header.remove();
-                container.remove();
+            if (taskEl.classList.contains('task-item')) {
+                const container = taskEl.closest('.task-section-container');
+                const header = container ? container.previousElementSibling : null;
+                taskEl.remove();
+                if (container && container.querySelectorAll('.task-item').length === 0) {
+                    if (header && header.classList.contains('section-header')) header.remove();
+                    container.remove();
+                }
+            } else {
+                taskEl.remove();
             }
         }
         const source = editSource;
@@ -2001,6 +2007,8 @@ dom.modalDelete.addEventListener('click', async () => {
         if (source === 'history') {
             await loadHistory();
             dom.historyList.scrollTop = scrollTop;
+        } else if (source === 'coding_tasks') {
+            await loadCodingTasks();
         }
     } catch (e) {
         alert('Delete failed.');
@@ -3025,6 +3033,7 @@ function renderCodingTaskCard(t) {
 
     // Edit button → open full Task Detail Modal
     el.querySelector('.ct-btn-edit').addEventListener('click', () => {
+        editSource = 'coding_tasks';
         openTaskModal(t.id, t.content, meta);
     });
 
