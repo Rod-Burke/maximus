@@ -2,6 +2,14 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v85] - 2026-06-11
+
+### Task: Cache Bump for Update Verification
+- **Changes**:
+  - Bumped service worker cache name to `maximus-v85` and assets query parameters to `v=85` to force browser clients to detect and load the updated coding task deletion fixes and styling.
+
+---
+
 ## [v84] - 2026-06-11
 
 ### Task: Coding Tasks Deletion & Modal Flow Optimization
