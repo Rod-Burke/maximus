@@ -4,6 +4,27 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
+## [v83] - 2026-06-11
+
+### Task: Add Task Summary to Action Button
+- **ID**: `c3ee9fcf-99d0-41d3-b084-7ce9cf10e09f`
+- **Changes**:
+  - Prepended task summary and a newline to prompt text generated for the `done_in_maximus` status in `getPromptTextForStatus()`.
+  - This allows the Antigravity conversation title to inherit the clean summary directly.
+- **Cache**: Bumped service worker cache name and asset link queries to `v83`.
+
+---
+
+## [v82] - 2026-06-10
+
+### Task: Responsive Install Banner & Authentication Finalization
+- **Changes**:
+  - Implemented responsive styling for the custom install banner.
+  - Finalized Maximus PWA authentication session and login card.
+- **Cache**: Bumped service worker cache name and asset link queries to `v82`.
+
+---
+
 ## [v81] - 2026-06-08
 
 ### Task 4: Create Distinct Google Tasks Reorder Icon
