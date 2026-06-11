@@ -2,6 +2,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v86] - 2026-06-11
+
+### Task: Delete Button Styling Improvements
+- **Changes**:
+  - Restyled `.ct-btn-delete` to have a light red/pink solid background (`#fee2e2`), a solid vibrant red border (`#ef4444`), and a high-contrast dark red trash can icon color (`#991b1b`).
+  - Added hover transitions with a slightly darker pink background (`#fecaca`) and border/text shifts.
+- **Cache**: Bumped service worker cache name and asset link queries to `v86`.
+
+---
+
 ## [v85] - 2026-06-11
 
 ### Task: Cache Bump for Update Verification
