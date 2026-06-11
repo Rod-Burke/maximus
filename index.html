@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=87">
+    <link rel="stylesheet" href="style.css?v=89">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -274,6 +274,7 @@
             </div>
             <!-- Quick Filters Bar -->
             <div class="ct-quick-filters">
+                <button id="ct-filter-draft" class="ct-quick-filter-btn" title="Filter: Drafts">📝 Draft</button>
                 <button id="ct-filter-needs-input" class="ct-quick-filter-btn" title="Filter: Needs Input (clarification, verification, ready for maximus, in progress)">⚠️ Needs Input</button>
                 <button id="ct-filter-antigrav-go" class="ct-quick-filter-btn" title="Filter: AntiGrav Go (needs plan, done in maximus, ready in antigravity, needs logging)">🚀 AntiGrav Go</button>
             </div>
@@ -649,7 +650,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=87"> </script>
+    <script src="app.js?v=89"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {

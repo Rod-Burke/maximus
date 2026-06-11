@@ -2569,6 +2569,7 @@ const ctDom = {
     copySearchBtn: document.getElementById('ct-copy-search-btn'),
     projectInfoBtn: document.getElementById('ct-project-info-btn'),
     filterStatus: document.getElementById('ct-filter-status'),
+    filterDraft: document.getElementById('ct-filter-draft'),
     filterNeedsInput: document.getElementById('ct-filter-needs-input'),
     filterAntigravGo: document.getElementById('ct-filter-antigrav-go'),
     ctSearch: document.getElementById('ct-search'),
@@ -2644,6 +2645,7 @@ const STATUS_LABELS = {
 };
 
 const STATUS_GROUPS = {
+    draft: ['draft'],
     needsInput: [
         'ready_for_maximus',
         'needs_clarification',
@@ -2658,7 +2660,7 @@ const STATUS_GROUPS = {
     ]
 };
 
-let activeQuickFilter = null; // 'needsInput' or 'antigravGo' or null
+let activeQuickFilter = null; // 'draft' or 'needsInput' or 'antigravGo' or null
 
 // Panel open/close
 ctDom.btn.addEventListener('click', () => { ctDom.panel.classList.remove('hidden'); loadCodingTasks(); });
@@ -2672,6 +2674,7 @@ ctDom.filterProject.addEventListener('change', () => {
 });
 ctDom.filterStatus.addEventListener('change', () => {
     activeQuickFilter = null;
+    ctDom.filterDraft.classList.remove('active');
     ctDom.filterNeedsInput.classList.remove('active');
     ctDom.filterAntigravGo.classList.remove('active');
     loadCodingTasks();
@@ -2680,22 +2683,20 @@ ctDom.filterStatus.addEventListener('change', () => {
 function setQuickFilter(filterType) {
     if (activeQuickFilter === filterType) {
         activeQuickFilter = null;
+        ctDom.filterDraft.classList.remove('active');
         ctDom.filterNeedsInput.classList.remove('active');
         ctDom.filterAntigravGo.classList.remove('active');
     } else {
         activeQuickFilter = filterType;
-        if (filterType === 'needsInput') {
-            ctDom.filterNeedsInput.classList.add('active');
-            ctDom.filterAntigravGo.classList.remove('active');
-        } else {
-            ctDom.filterAntigravGo.classList.add('active');
-            ctDom.filterNeedsInput.classList.remove('active');
-        }
+        ctDom.filterDraft.classList.toggle('active', filterType === 'draft');
+        ctDom.filterNeedsInput.classList.toggle('active', filterType === 'needsInput');
+        ctDom.filterAntigravGo.classList.toggle('active', filterType === 'antigravGo');
         ctDom.filterStatus.value = '';
     }
     loadCodingTasks();
 }
 
+ctDom.filterDraft.addEventListener('click', () => setQuickFilter('draft'));
 ctDom.filterNeedsInput.addEventListener('click', () => setQuickFilter('needsInput'));
 ctDom.filterAntigravGo.addEventListener('click', () => setQuickFilter('antigravGo'));
 
@@ -2832,7 +2833,12 @@ async function loadCodingTasks() {
         if (!data.thoughts) { ctDom.list.innerHTML = '<div class="history-empty">Error loading tasks.</div>'; return; }
 
         let tasks = data.thoughts;
-        if (activeQuickFilter === 'needsInput') {
+        if (activeQuickFilter === 'draft') {
+            tasks = tasks.filter(t => {
+                const s = t.metadata?.coding_task?.status || 'draft';
+                return STATUS_GROUPS.draft.includes(s);
+            });
+        } else if (activeQuickFilter === 'needsInput') {
             tasks = tasks.filter(t => {
                 const s = t.metadata?.coding_task?.status || 'draft';
                 return STATUS_GROUPS.needsInput.includes(s);
@@ -2912,7 +2918,7 @@ function getPromptTextForStatus(status, summary, taskId) {
         case 'done_in_maximus':
             return `${cleanSummary}:\nThe task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'ready_in_antigravity':
-            return `Please execute the approved plan for task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
+            return `Please review the verification feedback from the user to fix what is wrong or not complete for the task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'in_progress':
             return `Please continue execution of task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'needs_verification':
