@@ -2639,7 +2639,7 @@ const PROJECT_LABELS = {
 
 const STATUS_LABELS = {
     draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
-    ready_for_maximus: 'Ready for Maximus', done_in_maximus: 'Done in Maximus',
+    done_in_maximus: 'Done in Maximus',
     ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress',
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
 };
@@ -2647,7 +2647,6 @@ const STATUS_LABELS = {
 const STATUS_GROUPS = {
     draft: ['draft'],
     needsInput: [
-        'ready_for_maximus',
         'needs_clarification',
         'needs_verification',
         'in_progress'

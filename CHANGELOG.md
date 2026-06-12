@@ -4,6 +4,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v91] - 2026-06-12
+
+### Task: Remove "Ready for Maximus" Status
+- **Changes**:
+  - Removed `ready_for_maximus` status from all UI dropdown options (filtering, creation, editing) in `index.html`.
+  - Removed `ready_for_maximus` from labels and group configurations in `app.js` and badge styling in `style.css`.
+  - Updated the Supabase Edge Function `evaluate_coding_task` system prompt in `index.ts` to assign structured but unfinished tasks to `needs_clarification` instead of `ready_for_maximus`.
+  - Excluded `ready_for_maximus` from valid CLI argument choices in `tasks.py`.
+- **Cache**: Bumped service worker cache name and asset link queries to `v91`.
+
+---
+
 ## [v90] - 2026-06-12
 
 ### Task: Action Button Visibility Restriction
