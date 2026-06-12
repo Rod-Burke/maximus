@@ -2956,7 +2956,7 @@ function renderCodingTaskCard(t) {
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
             </div>
-            <button class="ct-action-prompt-btn ${['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
+            <button class="ct-action-prompt-btn ${STATUS_GROUPS.antigravGo.includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
         </div>
         <div class="ct-expanded">
             <div class="ct-description-rendered improve-rendered improve-editable-rich" contenteditable="true">${simpleMarkdownToHtml(t.content)}</div>

@@ -4,6 +4,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v90] - 2026-06-12
+
+### Task: Action Button Visibility Restriction
+- **Changes**:
+  - Restricted the visibility of the "Action" button on coding task cards to only show for statuses belonging to the `antigravGo` group (where the agent needs to do work, e.g. `needs_plan`, `done_in_maximus`, `ready_in_antigravity`, `needs_logging`).
+  - Hides the "Action" button for tasks that are under the user's court (e.g. `needs_verification`, `needs_clarification`, `in_progress`, etc.) to prevent confusing and unnecessary prompt copies.
+- **Cache**: Bumped service worker cache name and asset link queries to `v90`.
+
+---
+
 ## [v88] - 2026-06-12
 
 ### Task: Update Action Button Text per Task Status
@@ -16,14 +26,14 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
-## [v87] - 2026-06-11
+## [v89] - 2026-06-11
 
 ### Task: Filtering Coding Tasks in PWA UI
 - **ID**: `05276aff-0fff-4023-926d-7eb1efcaa38e`
 - **Changes**:
   - Added quick filter buttons for "Needs Input" and "AntiGrav Go" in the Coding Tasks panel.
   - Filter membership is determined strictly by task status values.
-- **Cache**: Bumped service worker cache name and asset link queries to `v87`.
+- **Cache**: Bumped service worker cache name and asset link queries to `v89`.
 
 ---
 
