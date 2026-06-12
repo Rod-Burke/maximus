@@ -1,8 +1,31 @@
 # Maximus PWA - Changelog & Walkthroughs
 
+> **Agent Instruction**: To conserve context window space, read only the first 200 lines of this file to review recent version history. Read further down if a task explicitly references older updates. If this file exceeds 500 lines, move older releases to [CHANGELOG_ARCHIVE.md](./CHANGELOG_ARCHIVE.md).
+
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
-## [v86] - 2026-06-11
+## [v88] - 2026-06-12
+
+### Task: Update Action Button Text per Task Status
+- **ID**: `90e0cdcc-b96c-471f-862d-e5e2dac964f0`
+- **Changes**:
+  - Updated the action prompt template in `getPromptTextForStatus` for the `ready_in_antigravity` status.
+  - The copied prompt now directs the developer to review the verification feedback and address rework items, reflecting the status's role in the feedback loop.
+  - Added an agent directive header block to prevent memory blowup and manage file archiving once size limits are reached.
+- **Cache**: Bumped service worker cache name and asset link queries to `v88`.
+
+---
+
+## [v87] - 2026-06-11
+
+### Task: Filtering Coding Tasks in PWA UI
+- **ID**: `05276aff-0fff-4023-926d-7eb1efcaa38e`
+- **Changes**:
+  - Added quick filter buttons for "Needs Input" and "AntiGrav Go" in the Coding Tasks panel.
+  - Filter membership is determined strictly by task status values.
+- **Cache**: Bumped service worker cache name and asset link queries to `v87`.
+
+---
 
 ### Task: Delete Button Styling Improvements
 - **Changes**:
