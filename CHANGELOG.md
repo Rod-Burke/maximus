@@ -4,6 +4,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v93] - 2026-06-13
+
+### Task: Planning Decision Delegation & Verification Efficiency
+- **Changes**:
+  - Shifted task complexity planning decision to Antigravity (eliminating the `needs_plan` status from the evaluator's output options).
+  - Renamed the status key `needs_plan` to `needs_plan_approval` globally across Edge Functions, PWA components (`app.js`, `index.html`, `style.css`), PowerShell scripts (`list_ready_tasks.ps1`), and CLI utilities (`tasks.py`).
+  - Added support for chat-based approval (such as "Go for it"), allowing Antigravity to autonomously transition tasks to `in_progress` in the database.
+  - Implemented the **Verification Efficiency Rule**: Explicit division of the Verification Plan into "Agent Verification (Automated & Fast)" and "User Verification (Manual & Visual)" to completely avoid slow/expensive interactive browser subagent loops. Interactive visual checks are delegated to the user via checkable lists in the database.
+  - Corrected the version bump in `index.html` loading tag for `app.js` to reference `v93`.
+- **Cache**: Bumped service worker cache name and asset queries to `v93`.
+
+---
+
 ## [v92] - 2026-06-13
 
 ### Task: Status Name Renaming
