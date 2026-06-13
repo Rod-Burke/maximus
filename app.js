@@ -2923,7 +2923,7 @@ function getPromptTextForStatus(status, summary, taskId) {
         case 'needs_verification':
             return `Please verify the completed work for task: "${cleanSummary}" (ID: ${taskId}) using the checklist in walkthrough.md.`;
         case 'needs_logging':
-            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) in walkthrough.md and mark it done.`;
+            return `Please log the completed work for task: "${cleanSummary}" (ID: ${taskId}) in walkthrough.md, repository CHANGELOG.md, and OpenBrain, then mark it done.`;
         default:
             return '';
     }
