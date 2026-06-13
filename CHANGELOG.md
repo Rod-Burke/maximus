@@ -4,6 +4,20 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v94] - 2026-06-13
+
+### Task: Smooth PWA Updates (Update Banner Notification)
+- **ID**: `f0e84ae9-7a09-456e-ad00-eafa7793ebd2`
+- **Changes**:
+  - Implemented background Service Worker controllerchange event listener in `index.html` to automatically detect new Service Worker activation.
+  - Added a stylish fixed overlay update notification banner (`#update-toast`) in `index.html` with a reload action button.
+  - Added modern glassmorphic styles and slide-up micro-animations for the toast notification in `style.css`.
+  - Configured reload button to trigger a page refresh to update all client-side assets in memory.
+  - Bumped Service Worker cache version and script/style reference query version queries to `v94` in `sw.js` and `index.html`.
+- **Cache**: Bumped service worker cache name and asset queries to `v94`.
+
+---
+
 ## [v93] - 2026-06-13
 
 ### Task: Planning Decision Delegation & Verification Efficiency
