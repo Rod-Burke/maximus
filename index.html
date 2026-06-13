@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=93">
+    <link rel="stylesheet" href="style.css?v=94">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -638,6 +638,12 @@
         </footer>
     </div>
 
+    <!-- PWA Update Notification Toast -->
+    <div id="update-toast" class="update-toast hidden">
+        <span class="update-toast-text">Maximus has been updated (v94).</span>
+        <button id="update-toast-btn">Reload</button>
+    </div>
+
     <!-- PWA Installation Prompt (Custom) -->
     <div id="install-banner" class="install-banner hidden">
         <p>Add Maximus to your home screen</p>
@@ -647,10 +653,15 @@
         </div>
     </div>
 
-    <script src="app.js?v=93"> </script>
+    <script src="app.js?v=94"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
+                // Check if an update is already waiting
+                if (reg.waiting) {
+                    document.getElementById('update-toast')?.classList.remove('hidden');
+                }
+
                 // Check for updates on page focus
                 window.addEventListener('focus', () => {
                     reg.update().catch(() => {});
@@ -659,6 +670,19 @@
                 setInterval(() => {
                     reg.update().catch(() => {});
                 }, 300000);
+            });
+
+            // Show update toast on controller change (when new service worker activates)
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    document.getElementById('update-toast')?.classList.remove('hidden');
+                }
+            });
+
+            document.getElementById('update-toast-btn')?.addEventListener('click', () => {
+                window.location.reload();
             });
         }
     </script>

@@ -1052,6 +1052,60 @@ button#send-btn svg {
     color: white;
 }
 
+/* --- UPDATE TOAST --- */
+.update-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95); /* Deeper slate */
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(59, 130, 246, 0.4); /* Nice blue glow accent */
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 10000;
+    font-size: 0.85rem;
+    font-weight: 500;
+    animation: slideUpSW 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.update-toast-text {
+    white-space: nowrap;
+}
+
+#update-toast-btn {
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 0.4rem 1rem;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+#update-toast-btn:hover {
+    transform: scale(1.05);
+    background-color: #2563eb;
+}
+
+@keyframes slideUpSW {
+    from {
+        transform: translate(-50%, 100px);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
 /* --- SHOW COMPLETED TOGGLE --- */
 #show-completed-btn.active {
     color: var(--accent-gold);
