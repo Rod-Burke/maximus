@@ -2639,8 +2639,8 @@ const PROJECT_LABELS = {
 
 const STATUS_LABELS = {
     draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
-    done_in_maximus: 'Done in Maximus',
-    ready_in_antigravity: 'Ready in Antigravity', in_progress: 'In Progress',
+    ready_for_antigravity: 'Ready for Antigravity',
+    rework_in_antigravity: 'Rework in Antigravity', in_progress: 'In Progress',
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
 };
 
@@ -2653,8 +2653,8 @@ const STATUS_GROUPS = {
     ],
     antigravGo: [
         'needs_plan',
-        'done_in_maximus',
-        'ready_in_antigravity',
+        'ready_for_antigravity',
+        'rework_in_antigravity',
         'needs_logging'
     ]
 };
@@ -2901,8 +2901,8 @@ function renderCodingTasksList(tasks) {
 // Mapping of task statuses to their corresponding markdown files
 const STATUS_MD_FILES = {
     needs_plan: 'implementation_plan.md',
-    done_in_maximus: 'task.md',
-    ready_in_antigravity: 'task.md',
+    ready_for_antigravity: 'task.md',
+    rework_in_antigravity: 'task.md',
     in_progress: 'task.md',
     needs_verification: 'walkthrough.md',
     needs_logging: 'walkthrough.md'
@@ -2914,9 +2914,9 @@ function getPromptTextForStatus(status, summary, taskId) {
     switch (status) {
         case 'needs_plan':
             return `Please create an implementation plan for task: "${cleanSummary}" (ID: ${taskId}) in implementation_plan.md. The subsequent execution will follow in task.md once approved.`;
-        case 'done_in_maximus':
+        case 'ready_for_antigravity':
             return `${cleanSummary}:\nThe task: "${cleanSummary}" (ID: ${taskId}) is ready. Please proceed with execution as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
-        case 'ready_in_antigravity':
+        case 'rework_in_antigravity':
             return `Please review the verification feedback from the user to fix what is wrong or not complete for the task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
         case 'in_progress':
             return `Please continue execution of task: "${cleanSummary}" (ID: ${taskId}) as per task.md. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
@@ -2933,7 +2933,7 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'done_in_maximus', 'needs_plan', 'needs_logging'];
+    const doneStatuses = ['done', 'ready_for_antigravity', 'needs_plan', 'needs_logging'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
@@ -3232,7 +3232,7 @@ function renderCodingTaskCard(t) {
 
     function updatePromptBtnVisibility(currentStatus) {
         if (!promptBtn) return;
-        if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(currentStatus)) {
+        if (['needs_plan', 'ready_for_antigravity', 'rework_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(currentStatus)) {
             promptBtn.classList.remove('hidden');
         } else {
             promptBtn.classList.add('hidden');
@@ -3264,13 +3264,13 @@ function renderCodingTaskCard(t) {
             return;
         }
 
-        ct.status = 'ready_in_antigravity';
+        ct.status = 'rework_in_antigravity';
         ct.rework_notes = reworkNotes;
         
         const badge = el.querySelector('.ct-badge[class*="status-"]');
-        badge.className = 'ct-badge status-ready_in_antigravity';
-        badge.textContent = STATUS_LABELS['ready_in_antigravity'];
-        el.querySelector('.ct-status-select').value = 'ready_in_antigravity';
+        badge.className = 'ct-badge status-rework_in_antigravity';
+        badge.textContent = STATUS_LABELS['rework_in_antigravity'];
+        el.querySelector('.ct-status-select').value = 'rework_in_antigravity';
         el.classList.remove('ct-done');
         
         sendbackSection.style.display = 'none';
@@ -3327,14 +3327,14 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
             }
 
             // Toggle done styling
-            if (['done', 'done_in_maximus', 'needs_plan', 'needs_logging'].includes(newStatus)) {
+            if (['done', 'ready_for_antigravity', 'needs_plan', 'needs_logging'].includes(newStatus)) {
                 cardEl.classList.add('ct-done');
             } else {
                 cardEl.classList.remove('ct-done');
             }
             const promptBtn = cardEl.querySelector('.ct-action-prompt-btn');
             if (promptBtn) {
-                if (['needs_plan', 'done_in_maximus', 'ready_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(newStatus)) {
+                if (['needs_plan', 'ready_for_antigravity', 'rework_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(newStatus)) {
                     promptBtn.classList.remove('hidden');
                 } else {
                     promptBtn.classList.add('hidden');
@@ -3669,7 +3669,7 @@ ctDom.improveSubmitBtn.addEventListener('click', async () => {
     ctDom.improveSubmitBtn.disabled = true;
 
     try {
-        // Update the content and set status to done_in_maximus
+        // Update the content and set status to ready_for_antigravity
         await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
@@ -3679,7 +3679,7 @@ ctDom.improveSubmitBtn.addEventListener('click', async () => {
                 content: improvedText,
                 metadata: {
                     coding_task: {
-                        status: 'done_in_maximus',
+                        status: 'ready_for_antigravity',
                         last_improved_at: new Date().toISOString(),
                         readiness_score: parseInt(ctDom.readinessLabel.textContent.match(/\d+/)?.[0] || '5'),
                         readiness_notes: ctDom.readinessNotes.textContent

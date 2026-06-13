@@ -4,6 +4,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v92] - 2026-06-13
+
+### Task: Status Name Renaming
+- **Changes**:
+  - Renamed `done_in_maximus` status to `ready_for_antigravity` across PWA HTML select options, JavaScript app configurations, CSS status badge colors, Supabase Edge Function evaluator prompts, helper scripts (`list_ready_tasks.ps1`), CLI arguments (`tasks.py`), and documentation.
+  - Renamed `ready_in_antigravity` status to `rework_in_antigravity` across PWA HTML options, JavaScript event/visibility triggers, CSS status badge colors, Supabase Edge Function sync maps, helper scripts, CLI arguments, and documentation.
+- **Cache**: Bumped service worker cache name and asset link queries to `v92`.
+
+---
+
 ## [v91] - 2026-06-12
 
 ### Task: Remove "Ready for Maximus" Status
