@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=92">
+    <link rel="stylesheet" href="style.css?v=93">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -262,7 +262,7 @@
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
                     <option value="needs_clarification">Needs Clarification</option>
-                    <option value="needs_plan">Needs Plan</option>
+                    <option value="needs_plan_approval">Needs Plan Approval</option>
                     <option value="ready_for_antigravity">Ready for Antigravity</option>
                     <option value="rework_in_antigravity">Rework in Antigravity</option>
                     <option value="in_progress">In Progress</option>
@@ -274,8 +274,8 @@
             <!-- Quick Filters Bar -->
             <div class="ct-quick-filters">
                 <button id="ct-filter-draft" class="ct-quick-filter-btn" title="Filter: Drafts">📝 Draft</button>
-                <button id="ct-filter-needs-input" class="ct-quick-filter-btn" title="Filter: Needs Input (clarification, verification, ready for maximus, in progress)">⚠️ Needs Input</button>
-                <button id="ct-filter-antigrav-go" class="ct-quick-filter-btn" title="Filter: AntiGrav Go (needs plan, done in maximus, ready in antigravity, needs logging)">🚀 AntiGrav Go</button>
+                <button id="ct-filter-needs-input" class="ct-quick-filter-btn" title="Filter: Needs Input (clarification, plan approval, verification)">⚠️ Needs Input</button>
+                <button id="ct-filter-antigrav-go" class="ct-quick-filter-btn" title="Filter: AntiGrav Go (ready for antigravity, rework, needs logging)">🚀 AntiGrav Go</button>
             </div>
             <input type="text" id="ct-search" class="ct-search-input" placeholder="🔍 Search coding tasks...">
             <div id="coding-tasks-list" class="history-list ct-list">
@@ -337,7 +337,7 @@
                             <select id="add-ct-status" class="modal-select">
                                 <option value="draft">Draft</option>
                                 <option value="needs_clarification">Needs Clarification</option>
-                                <option value="needs_plan">Needs Plan</option>
+                                <option value="needs_plan_approval">Needs Plan Approval</option>
                             </select>
                         </div>
                     </div>
@@ -496,7 +496,7 @@
                                 <select id="modal-ct-status" class="modal-select">
                                     <option value="draft">Draft</option>
                                     <option value="needs_clarification">Needs Clarification</option>
-                                    <option value="needs_plan">Needs Plan</option>
+                                    <option value="needs_plan_approval">Needs Plan Approval</option>
                                     <option value="ready_for_antigravity">Ready for Antigravity</option>
                                     <option value="rework_in_antigravity">Rework in Antigravity</option>
                                     <option value="in_progress">In Progress</option>

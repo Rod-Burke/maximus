@@ -2638,7 +2638,7 @@ const PROJECT_LABELS = {
 };
 
 const STATUS_LABELS = {
-    draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan: 'Needs Plan',
+    draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan_approval: 'Needs Plan Approval',
     ready_for_antigravity: 'Ready for Antigravity',
     rework_in_antigravity: 'Rework in Antigravity', in_progress: 'In Progress',
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
@@ -2648,11 +2648,10 @@ const STATUS_GROUPS = {
     draft: ['draft'],
     needsInput: [
         'needs_clarification',
-        'needs_verification',
-        'in_progress'
+        'needs_plan_approval',
+        'needs_verification'
     ],
     antigravGo: [
-        'needs_plan',
         'ready_for_antigravity',
         'rework_in_antigravity',
         'needs_logging'
@@ -2900,7 +2899,7 @@ function renderCodingTasksList(tasks) {
 
 // Mapping of task statuses to their corresponding markdown files
 const STATUS_MD_FILES = {
-    needs_plan: 'implementation_plan.md',
+    needs_plan_approval: 'implementation_plan.md',
     ready_for_antigravity: 'task.md',
     rework_in_antigravity: 'task.md',
     in_progress: 'task.md',
@@ -2912,7 +2911,7 @@ function getPromptTextForStatus(status, summary, taskId) {
     const cleanSummary = summary.trim();
     
     switch (status) {
-        case 'needs_plan':
+        case 'needs_plan_approval':
             return `${cleanSummary}:\nPlease create an implementation plan for task: "${cleanSummary}" (ID: ${taskId}) in implementation_plan.md. The subsequent execution will follow in task.md once approved.`;
         case 'ready_for_antigravity':
             return `${cleanSummary}:\nThe task: "${cleanSummary}" (ID: ${taskId}) is ready. Please read the workflow instructions in behavior_directive.md, create the execution checklist in task.md, and proceed with implementation. The follow-up walkthrough and verification will be documented in walkthrough.md.`;
@@ -2933,7 +2932,7 @@ function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
     const el = document.createElement('div');
-    const doneStatuses = ['done', 'ready_for_antigravity', 'needs_plan', 'needs_logging'];
+    const doneStatuses = ['done', 'ready_for_antigravity', 'needs_plan_approval', 'needs_logging'];
     el.className = 'ct-card' + (doneStatuses.includes(ct.status) ? ' ct-done' : '');
     el.dataset.id = t.id;
 
