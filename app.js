@@ -3232,7 +3232,7 @@ function renderCodingTaskCard(t) {
 
     function updatePromptBtnVisibility(currentStatus) {
         if (!promptBtn) return;
-        if (['needs_plan', 'ready_for_antigravity', 'rework_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(currentStatus)) {
+        if (STATUS_GROUPS.antigravGo.includes(currentStatus)) {
             promptBtn.classList.remove('hidden');
         } else {
             promptBtn.classList.add('hidden');
