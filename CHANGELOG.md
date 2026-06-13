@@ -14,6 +14,12 @@ This file contains the persistent record of all completed tasks, architectural u
   - Added modern glassmorphic styles and slide-up micro-animations for the toast notification in `style.css`.
   - Configured reload button to trigger a page refresh to update all client-side assets in memory.
   - Bumped Service Worker cache version and script/style reference query version queries to `v94` in `sw.js` and `index.html`.
+
+### Task: Manual Input Listener Deactivation (Focus Event Handler)
+- **ID**: `ebdd3cd6-0c1f-4f71-b5d2-5083fd61c642` / `2ed40ae0-c5d7-496d-9855-2b9bc3e21e73`
+- **Changes**:
+  - Verified and closed the microphone auto-turn-off feature when the manual typing box gains focus.
+  - Keeps voice orb status properly reset and clears any pending submission timeouts during manual entries.
 - **Cache**: Bumped service worker cache name and asset queries to `v94`.
 
 ---
