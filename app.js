@@ -225,6 +225,7 @@ let waveformTimer = null;
 let editingThoughtId = null;
 let cancelEditBtn = null; // Created dynamically
 let editSource = null;       // Tracks 'history' or 'tasks' origin for active edits
+let isNavigationTransitioning = false; // Prevents history.back() when hiding panels during level transitions
 let historyScrollTop = 0;    // Temporarily stores vertical scroll offset of History list
 let tasksScrollTop = 0;      // Temporarily stores vertical scroll offset of Tasks list
 
@@ -943,13 +944,17 @@ function renderHistoryList(thoughts) {
             el.querySelector('.edit-btn').addEventListener('click', () => {
                 editSource = 'history';
                 historyScrollTop = dom.historyList.scrollTop;
+                isNavigationTransitioning = true;
                 dom.historyPanel.classList.add('hidden');
+                isNavigationTransitioning = false;
                 enterEditMode(t.id, t.content);
             });
             el.querySelector('.details-btn').addEventListener('click', () => {
                 editSource = 'history';
                 historyScrollTop = dom.historyList.scrollTop;
+                isNavigationTransitioning = true;
                 dom.historyPanel.classList.add('hidden');
+                isNavigationTransitioning = false;
                 openTaskModal(t.id, t.content, t.metadata || t.payload || {});
             });
             el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
@@ -1056,8 +1061,45 @@ dom.syncTasksBtn.addEventListener('click', async () => {
     }
 });
 
+// --- COMPLETED TASKS FILTER CYCLE ---
+function getCompletedFilterState() {
+    return localStorage.getItem('maximus_completed_filter') || 'not_completed';
+}
+
+function setCompletedFilterState(state) {
+    localStorage.setItem('maximus_completed_filter', state);
+    updateCompletedFilterUI(state);
+}
+
+function updateCompletedFilterUI(state) {
+    const btn = dom.showCompletedBtn;
+    if (!btn) return;
+    btn.classList.remove('active', 'only-completed');
+    if (state === 'both') {
+        btn.classList.add('active');
+        btn.title = "Show Only Completed (currently showing both)";
+    } else if (state === 'only_completed') {
+        btn.classList.add('active', 'only-completed');
+        btn.title = "Hide Completed (currently showing only completed)";
+    } else { // 'not_completed'
+        btn.title = "Show Completed (currently hiding completed)";
+    }
+}
+
+// Initialize on load
+updateCompletedFilterUI(getCompletedFilterState());
+
 dom.showCompletedBtn.addEventListener('click', () => {
-    dom.showCompletedBtn.classList.toggle('active');
+    const currentState = getCompletedFilterState();
+    let nextState;
+    if (currentState === 'not_completed') {
+        nextState = 'both';
+    } else if (currentState === 'both') {
+        nextState = 'only_completed';
+    } else {
+        nextState = 'not_completed';
+    }
+    setCompletedFilterState(nextState);
     loadTasksDashboard();
 });
 
@@ -1110,15 +1152,22 @@ async function loadTasksDashboard() {
         const data = await res.json();
         if (!data.thoughts) return;
         
-        // Filter tasks and events
-        const showCompleted = dom.showCompletedBtn.classList.contains('active');
+        // Filter tasks and events based on the 3-state toggle
+        const filterState = getCompletedFilterState();
+        const showCompleted = filterState === 'both' || filterState === 'only_completed';
         const activeItems = data.thoughts.filter(t => {
             const meta = t.metadata || t.payload?.metadata || {};
             const type = meta.type || '';
             const status = meta.status || 'pending';
             if (type !== 'task' && type !== 'event') return false;
-            if (status === 'completed' && !showCompleted) return false;
-            return true;
+            
+            if (filterState === 'not_completed') {
+                return status !== 'completed';
+            } else if (filterState === 'only_completed') {
+                return status === 'completed';
+            } else { // 'both'
+                return true;
+            }
         });
 
         // Sort: Bumped > Events with Dates > Tasks with Dates > Unscheduled
@@ -1295,6 +1344,8 @@ function renderTaskSection(title, items) {
 
         if (isCompleted) {
             el.style.opacity = '0.5';
+            const contentEl = el.querySelector('.task-content');
+            if (contentEl) contentEl.style.textDecoration = 'line-through';
         }
 
         // Drag and Drop Handlers
@@ -3941,7 +3992,7 @@ function initNavigationIntercept() {
             originalAdd.apply(this, tokens);
             if (tokens.includes('hidden')) {
                 // If we are closing a level 1 or 2 component and the active history state level matches, pop it
-                if (window.history.state && window.history.state.level === level) {
+                if (!isNavigationTransitioning && window.history.state && window.history.state.level === level) {
                     window.history.back();
                 }
             }

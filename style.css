@@ -1111,6 +1111,17 @@ button#send-btn svg {
     color: var(--accent-gold);
     background: rgba(251, 191, 36, 0.15);
 }
+#show-completed-btn.active.only-completed {
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.15);
+}
+
+.task-item.completed {
+    opacity: 0.5;
+}
+.task-item.completed .task-content {
+    text-decoration: line-through;
+}
 
 /* --- QUICK CAPTURE OVERLAY --- */
 .quick-capture-trigger svg {
