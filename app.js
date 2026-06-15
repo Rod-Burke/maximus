@@ -3892,3 +3892,83 @@ if (appScript) {
         }
     }
 }
+
+// --- NAVIGATION INTERCEPT (BACK BUTTON) ---
+function initNavigationIntercept() {
+    if (window.history && window.history.pushState) {
+        // Push initial state so we have a state to pop
+        window.history.pushState({ page: 'main' }, '');
+        
+        window.addEventListener('popstate', (event) => {
+            let handled = false;
+            
+            // 1. Text Edit Mode
+            if (editingThoughtId !== null) {
+                exitEditMode(false);
+                handled = true;
+            }
+            // 2. Task Detail Modal
+            else if (!dom.modal.classList.contains('hidden')) {
+                closeTaskModal();
+                handled = true;
+            }
+            // 3. Add Coding Task Modal
+            else if (!ctDom.addModal.classList.contains('hidden')) {
+                closeAddCtModal();
+                handled = true;
+            }
+            // 4. Improve Dialog
+            else if (!ctDom.improveDialog.classList.contains('hidden')) {
+                ctDom.improveDialog.classList.add('hidden');
+                ctImproveTaskId = null;
+                handled = true;
+            }
+            // 5. Project Info Modal
+            else if (!ctDom.projectInfoModal.classList.contains('hidden')) {
+                ctDom.projectInfoModal.classList.add('hidden');
+                handled = true;
+            }
+            // 6. Quick Capture Overlay
+            else if (!dom.quickCaptureOverlay.classList.contains('hidden')) {
+                closeQuickCapture();
+                handled = true;
+            }
+            // 7. Live Voice Panel
+            else if (liveVoiceActive) {
+                endLiveVoice();
+                handled = true;
+            }
+            // 8. Reclassify Picker
+            else if (!dom.reclassifyPicker.classList.contains('hidden')) {
+                dom.reclassifyPicker.classList.add('hidden');
+                handled = true;
+            }
+            // 9. Coding Tasks Panel
+            else if (!ctDom.panel.classList.contains('hidden')) {
+                ctDom.panel.classList.add('hidden');
+                handled = true;
+            }
+            // 10. Tasks Panel
+            else if (!dom.tasksPanel.classList.contains('hidden')) {
+                dom.tasksPanel.classList.add('hidden');
+                handled = true;
+            }
+            // 11. History Panel
+            else if (!dom.historyPanel.classList.contains('hidden')) {
+                dom.historyPanel.classList.add('hidden');
+                isDeclutterMode = false;
+                dom.declutterBtn.classList.remove('active');
+                dom.bulkActionsBar.classList.add('hidden');
+                dom.historySearch.disabled = false;
+                handled = true;
+            }
+            
+            // Always push the state back to ensure the next back press is also intercepted
+            window.history.pushState({ page: 'main' }, '');
+        });
+    }
+}
+
+// Call navigation intercept initializer
+initNavigationIntercept();
+
