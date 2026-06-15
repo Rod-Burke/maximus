@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=94">
+    <link rel="stylesheet" href="style.css?v=95">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -258,6 +258,21 @@
                 </select>
                 <button id="ct-copy-search-btn" class="ct-copy-btn" title="Copy ready search query to clipboard">Copy</button>
                 <button id="ct-project-info-btn" class="ct-copy-btn" title="Show information about the selected project">Info</button>
+                <select id="ct-filter-workstream" class="ct-filter-select">
+                    <option value="">All Workstreams</option>
+                    <option value="maximus_ui_ux">Maximus UI & UX</option>
+                    <option value="google_tasks_sync">Google Tasks Sync</option>
+                    <option value="task_deletion_logging">Task Deletion & Logs</option>
+                    <option value="ai_categorization_processing">AI Categorization</option>
+                    <option value="chatops_participants">CO Participants</option>
+                    <option value="chatops_intentions">CO Intentions</option>
+                    <option value="chatops_today_enrichment">CO Today Panel</option>
+                    <option value="chatops_external_integrations">CO Ext Integrations</option>
+                    <option value="stream_scheduling_automation">Stream Scheduling</option>
+                    <option value="openbrain_migration">OpenBrain Ingestion</option>
+                    <option value="api_mail_integration">API & Mail</option>
+                    <option value="system_backups">System Backups</option>
+                </select>
                 <select id="ct-filter-status" class="ct-filter-select">
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
@@ -269,6 +284,12 @@
                     <option value="needs_verification">Needs Verification</option>
                     <option value="needs_logging">Needs Logging</option>
                     <option value="done">Done</option>
+                </select>
+                <select id="ct-sort-by" class="ct-filter-select" style="flex: 1 1 100%; margin-top: 0.25rem;">
+                    <option value="seq">Sort: Sequence Order</option>
+                    <option value="priority">Sort: Priority</option>
+                    <option value="status">Sort: Status</option>
+                    <option value="date">Sort: Date Created</option>
                 </select>
             </div>
             <!-- Quick Filters Bar -->
@@ -338,6 +359,26 @@
                                 <option value="draft">Draft</option>
                                 <option value="needs_clarification">Needs Clarification</option>
                                 <option value="needs_plan_approval">Needs Plan Approval</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Workstream</label>
+                            <select id="add-ct-workstream" class="modal-select">
+                                <option value="">None</option>
+                                <option value="maximus_ui_ux">Maximus UI & UX</option>
+                                <option value="google_tasks_sync">Google Tasks Sync</option>
+                                <option value="task_deletion_logging">Task Deletion & Logs</option>
+                                <option value="ai_categorization_processing">AI Categorization</option>
+                                <option value="chatops_participants">CO Participants</option>
+                                <option value="chatops_intentions">CO Intentions</option>
+                                <option value="chatops_today_enrichment">CO Today Panel</option>
+                                <option value="chatops_external_integrations">CO Ext Integrations</option>
+                                <option value="stream_scheduling_automation">Stream Scheduling</option>
+                                <option value="openbrain_migration">OpenBrain Ingestion</option>
+                                <option value="api_mail_integration">API & Mail</option>
+                                <option value="system_backups">System Backups</option>
                             </select>
                         </div>
                     </div>
@@ -509,6 +550,26 @@
                                 <button id="modal-ct-improve-btn" class="modal-btn ct-btn-improve" style="width:100%;">✨ Improve</button>
                             </div>
                         </div>
+                        <div class="modal-row">
+                            <div class="modal-field" style="width: 100%;">
+                                <label class="modal-label">Workstream</label>
+                                <select id="modal-ct-workstream" class="modal-select">
+                                    <option value="">None</option>
+                                    <option value="maximus_ui_ux">Maximus UI & UX</option>
+                                    <option value="google_tasks_sync">Google Tasks Sync</option>
+                                    <option value="task_deletion_logging">Task Deletion & Logs</option>
+                                    <option value="ai_categorization_processing">AI Categorization</option>
+                                    <option value="chatops_participants">CO Participants</option>
+                                    <option value="chatops_intentions">CO Intentions</option>
+                                    <option value="chatops_today_enrichment">CO Today Panel</option>
+                                    <option value="chatops_external_integrations">CO Ext Integrations</option>
+                                    <option value="stream_scheduling_automation">Stream Scheduling</option>
+                                    <option value="openbrain_migration">OpenBrain Ingestion</option>
+                                    <option value="api_mail_integration">API & Mail</option>
+                                    <option value="system_backups">System Backups</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Event-specific fields (hidden unless type = event) -->
@@ -640,7 +701,7 @@
 
     <!-- PWA Update Notification Toast -->
     <div id="update-toast" class="update-toast hidden">
-        <span class="update-toast-text">Maximus has been updated (v94).</span>
+        <span class="update-toast-text">Maximus has been updated (v95).</span>
         <button id="update-toast-btn">Reload</button>
     </div>
 
@@ -653,7 +714,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=94"> </script>
+    <script src="app.js?v=95"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {

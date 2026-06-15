@@ -1723,6 +1723,7 @@ input:checked + .toggle-slider::before {
 /* Filter Bar */
 .ct-filter-bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--glass-border);
@@ -1943,6 +1944,11 @@ input:checked + .toggle-slider::before {
     color: #818cf8;
 }
 
+.ct-badge.workstream-badge {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
 /* Expanded Card Detail */
 .ct-expanded {
     display: none;
@@ -1964,6 +1970,15 @@ input:checked + .toggle-slider::before {
 
 .ct-card.ct-done:hover {
     opacity: 0.7;
+}
+
+/* Prevent dimming for Antigrav Go tasks when filter is active */
+.ct-view-antigrav-go .ct-card.ct-done {
+    opacity: 1;
+}
+
+.ct-view-antigrav-go .ct-card.ct-done:hover {
+    opacity: 1;
 }
 
 .ct-btn-evaluate {

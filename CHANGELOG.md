@@ -4,6 +4,20 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v95] - 2026-06-14
+
+### Task: Upgrade Maximus task dashboard with AJAX button
+- **ID**: `2f3f8038-0c1a-470b-9c24-5cdef27e79fa`
+- **Changes**:
+  - Replaced the full-page reload on task completion with asynchronous background updates (AJAX) to the Supabase Edge Function (`manage-thoughts`).
+  - Added local optimistic DOM updates to instantly show checked state, strike-through text, and dim opacity on the completed task.
+  - Implemented a 3-second grace period with a dynamic countdown "Undo" button (e.g. "Undo 3s") next to the checkbox, allowing users to abort completion.
+  - Handled automatic date calculation for recurring tasks, rolling their due date forward in the background.
+  - Implemented asynchronous reopening (uncompleting) of tasks with immediate UI updates and error notification.
+  - Smoothed user experience by fading out completed cards and dynamically removing empty sections without losing scroll position.
+
+---
+
 ## [v94] - 2026-06-13
 
 ### Task: Smooth PWA Updates (Update Banner Notification)

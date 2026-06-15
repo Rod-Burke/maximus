@@ -169,6 +169,7 @@ const dom = {
     modalCtProject: document.getElementById('modal-ct-project'),
     modalCtComplexity: document.getElementById('modal-ct-complexity'),
     modalCtStatus: document.getElementById('modal-ct-status'),
+    modalCtWorkstream: document.getElementById('modal-ct-workstream'),
     modalCtImproveBtn: document.getElementById('modal-ct-improve-btn'),
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
@@ -1766,10 +1767,12 @@ function openTaskModal(id, content, meta) {
         dom.modalCtProject.value = meta.coding_task.project || 'uncategorized';
         dom.modalCtComplexity.value = meta.coding_task.complexity || 'moderate';
         dom.modalCtStatus.value = meta.coding_task.status || 'draft';
+        dom.modalCtWorkstream.value = meta.coding_task.workstream || '';
     } else {
         dom.modalCtProject.value = 'uncategorized';
         dom.modalCtComplexity.value = 'moderate';
         dom.modalCtStatus.value = 'draft';
+        dom.modalCtWorkstream.value = '';
     }
     
     // Toggle Complete button label based on current status
@@ -1942,6 +1945,7 @@ dom.modalSave.addEventListener('click', async () => {
                         status: dom.modalCtStatus.value,
                         priority: dom.modalPriority.value === 'high' ? 'high' : dom.modalPriority.value === 'low' ? 'low' : 'medium',
                         workspace: ['chatops','quote_manager','liturgy_explorer','homily_pipeline','stream_management','backups_devops'].includes(dom.modalCtProject.value) ? 'airmaria' : 'openbrain',
+                        workstream: dom.modalCtWorkstream.value || null,
                     }
                 } : {})
             }
@@ -2568,7 +2572,9 @@ const ctDom = {
     filterProject: document.getElementById('ct-filter-project'),
     copySearchBtn: document.getElementById('ct-copy-search-btn'),
     projectInfoBtn: document.getElementById('ct-project-info-btn'),
+    filterWorkstream: document.getElementById('ct-filter-workstream'),
     filterStatus: document.getElementById('ct-filter-status'),
+    sortBy: document.getElementById('ct-sort-by'),
     filterDraft: document.getElementById('ct-filter-draft'),
     filterNeedsInput: document.getElementById('ct-filter-needs-input'),
     filterAntigravGo: document.getElementById('ct-filter-antigrav-go'),
@@ -2580,6 +2586,7 @@ const ctDom = {
     addPriority: document.getElementById('add-ct-priority'),
     addComplexity: document.getElementById('add-ct-complexity'),
     addStatus: document.getElementById('add-ct-status'),
+    addWorkstream: document.getElementById('add-ct-workstream'),
     addSubmit: document.getElementById('add-ct-submit'),
     addCancel: document.getElementById('add-ct-cancel'),
     closeAddModal: document.getElementById('close-add-ct'),
@@ -2644,6 +2651,21 @@ const STATUS_LABELS = {
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
 };
 
+const WORKSTREAM_LABELS = {
+    maximus_ui_ux: 'UI & UX',
+    google_tasks_sync: 'Google Sync',
+    task_deletion_logging: 'Deletion & Logs',
+    ai_categorization_processing: 'AI Categorization',
+    chatops_participants: 'CO Participants',
+    chatops_intentions: 'CO Intentions',
+    chatops_today_enrichment: 'CO Today Panel',
+    chatops_external_integrations: 'CO Ext Integrations',
+    stream_scheduling_automation: 'Stream Scheduling',
+    openbrain_migration: 'OpenBrain Ingestion',
+    api_mail_integration: 'API & Mail',
+    system_backups: 'Backups'
+};
+
 const STATUS_GROUPS = {
     draft: ['draft'],
     needsInput: [
@@ -2670,11 +2692,17 @@ ctDom.filterProject.addEventListener('change', () => {
     loadCodingTasks();
     updateProjectInfoTooltip();
 });
+ctDom.filterWorkstream.addEventListener('change', () => {
+    loadCodingTasks();
+});
 ctDom.filterStatus.addEventListener('change', () => {
     activeQuickFilter = null;
     ctDom.filterDraft.classList.remove('active');
     ctDom.filterNeedsInput.classList.remove('active');
     ctDom.filterAntigravGo.classList.remove('active');
+    loadCodingTasks();
+});
+ctDom.sortBy.addEventListener('change', () => {
     loadCodingTasks();
 });
 
@@ -2831,6 +2859,13 @@ async function loadCodingTasks() {
         if (!data.thoughts) { ctDom.list.innerHTML = '<div class="history-empty">Error loading tasks.</div>'; return; }
 
         let tasks = data.thoughts;
+        
+        // Client-side workstream filter
+        const workstreamFilter = ctDom.filterWorkstream.value;
+        if (workstreamFilter) {
+            tasks = tasks.filter(t => t.metadata?.coding_task?.workstream === workstreamFilter);
+        }
+
         if (activeQuickFilter === 'draft') {
             tasks = tasks.filter(t => {
                 const s = t.metadata?.coding_task?.status || 'draft';
@@ -2858,6 +2893,10 @@ async function loadCodingTasks() {
 function renderCodingTasksList(tasks) {
     ctDom.list.innerHTML = '';
 
+    // Toggle class based on active quick filter so CSS can keep antigravGo tasks fully bright
+    const isAntigravGo = activeQuickFilter === 'antigravGo';
+    ctDom.list.classList.toggle('ct-view-antigrav-go', isAntigravGo);
+
     if (!tasks.length) {
         ctDom.list.innerHTML = '<div class="history-empty">No coding tasks found. Add one with the + button.</div>';
         return;
@@ -2879,17 +2918,48 @@ function renderCodingTasksList(tasks) {
     }
     ctDom.list.appendChild(countsBar);
 
-    // Sort: priority high > medium > low, then by sort_order, then by created_at
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    tasks.sort((a, b) => {
-        const pa = priorityOrder[a.metadata?.coding_task?.priority || 'medium'] ?? 1;
-        const pb = priorityOrder[b.metadata?.coding_task?.priority || 'medium'] ?? 1;
-        if (pa !== pb) return pa - pb;
-        const sa = a.metadata?.coding_task?.sort_order ?? 50;
-        const sb = b.metadata?.coding_task?.sort_order ?? 50;
-        if (sa !== sb) return sa - sb;
-        return new Date(b.created_at) - new Date(a.created_at);
-    });
+    // Sort by selection
+    const sortBy = ctDom.sortBy.value || 'seq';
+    if (sortBy === 'priority') {
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        tasks.sort((a, b) => {
+            const pa = priorityOrder[a.metadata?.coding_task?.priority || 'medium'] ?? 1;
+            const pb = priorityOrder[b.metadata?.coding_task?.priority || 'medium'] ?? 1;
+            if (pa !== pb) return pa - pb;
+            const sa = a.metadata?.coding_task?.sort_order ?? 50;
+            const sb = b.metadata?.coding_task?.sort_order ?? 50;
+            if (sa !== sb) return sa - sb;
+            return new Date(a.created_at) - new Date(b.created_at);
+        });
+    } else if (sortBy === 'status') {
+        const statusOrder = {
+            in_progress: 0,
+            rework_in_antigravity: 1,
+            ready_for_antigravity: 2,
+            needs_plan_approval: 3,
+            needs_clarification: 4,
+            needs_verification: 5,
+            needs_logging: 6,
+            draft: 7,
+            done: 8
+        };
+        tasks.sort((a, b) => {
+            const sa = statusOrder[a.metadata?.coding_task?.status || 'draft'] ?? 9;
+            const sb = statusOrder[b.metadata?.coding_task?.status || 'draft'] ?? 9;
+            if (sa !== sb) return sa - sb;
+            return new Date(a.created_at) - new Date(b.created_at);
+        });
+    } else if (sortBy === 'date') {
+        tasks.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else {
+        // Default: Sequence Order ('seq')
+        tasks.sort((a, b) => {
+            const sa = a.metadata?.coding_task?.sort_order ?? 50;
+            const sb = b.metadata?.coding_task?.sort_order ?? 50;
+            if (sa !== sb) return sa - sb;
+            return new Date(a.created_at) - new Date(b.created_at);
+        });
+    }
 
     tasks.forEach(t => {
         const card = renderCodingTaskCard(t);
@@ -2940,6 +3010,7 @@ function renderCodingTaskCard(t) {
     const status = ct.status || 'draft';
     const project = ct.project || 'uncategorized';
     const complexity = ct.complexity || 'moderate';
+    const workstream = ct.workstream || '';
     const summary = meta.summary || t.content.substring(0, 80);
 
     el.innerHTML = `
@@ -2950,6 +3021,7 @@ function renderCodingTaskCard(t) {
                 <div class="ct-meta-row">
                     <span class="ct-badge status-${status}">${STATUS_LABELS[status] || status}</span>
                     <span class="ct-badge project">${PROJECT_LABELS[project] || project}</span>
+                    ${workstream ? `<span class="ct-badge workstream-badge">${WORKSTREAM_LABELS[workstream] || workstream}</span>` : ''}
                     <span class="ct-badge priority-badge priority-${priority}">${priority === 'high' ? '🔴 High' : priority === 'low' ? '🟢 Low' : '🟡 Medium'}</span>
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
@@ -2964,6 +3036,21 @@ function renderCodingTaskCard(t) {
                     ${Object.entries(STATUS_LABELS).map(([v, l]) =>
                         `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`
                     ).join('')}
+                </select>
+                <select class="ct-inline-select ct-workstream-select" title="Workstream">
+                    <option value="">No Workstream</option>
+                    <option value="maximus_ui_ux" ${workstream === 'maximus_ui_ux' ? 'selected' : ''}>UI & UX</option>
+                    <option value="google_tasks_sync" ${workstream === 'google_tasks_sync' ? 'selected' : ''}>Google Sync</option>
+                    <option value="task_deletion_logging" ${workstream === 'task_deletion_logging' ? 'selected' : ''}>Deletion/Logs</option>
+                    <option value="ai_categorization_processing" ${workstream === 'ai_categorization_processing' ? 'selected' : ''}>AI Categorization</option>
+                    <option value="chatops_participants" ${workstream === 'chatops_participants' ? 'selected' : ''}>CO Participants</option>
+                    <option value="chatops_intentions" ${workstream === 'chatops_intentions' ? 'selected' : ''}>CO Intentions</option>
+                    <option value="chatops_today_enrichment" ${workstream === 'chatops_today_enrichment' ? 'selected' : ''}>CO Today</option>
+                    <option value="chatops_external_integrations" ${workstream === 'chatops_external_integrations' ? 'selected' : ''}>CO Ext Integrations</option>
+                    <option value="stream_scheduling_automation" ${workstream === 'stream_scheduling_automation' ? 'selected' : ''}>Stream Scheduling</option>
+                    <option value="openbrain_migration" ${workstream === 'openbrain_migration' ? 'selected' : ''}>OpenBrain Ingestion</option>
+                    <option value="api_mail_integration" ${workstream === 'api_mail_integration' ? 'selected' : ''}>API & Mail</option>
+                    <option value="system_backups" ${workstream === 'system_backups' ? 'selected' : ''}>Backups</option>
                 </select>
                 <select class="ct-inline-select ct-priority-select" title="Priority">
                     <option value="high" ${priority === 'high' ? 'selected' : ''}>🔴 High</option>
@@ -3017,6 +3104,14 @@ function renderCodingTaskCard(t) {
         }
         updatePromptBtnVisibility(newStatus);
         await updateCodingTaskMeta(t.id, meta);
+    });
+
+    // Workstream change
+    el.querySelector('.ct-workstream-select').addEventListener('change', async function() {
+        const newWorkstream = this.value || null;
+        ct.workstream = newWorkstream;
+        await updateCodingTaskMeta(t.id, meta);
+        loadCodingTasks();
     });
 
     // Priority change
@@ -3740,7 +3835,8 @@ ctDom.addSubmit.addEventListener('click', async () => {
                 project: ctDom.addProject.value,
                 priority: ctDom.addPriority.value,
                 complexity: ctDom.addComplexity.value,
-                status: ctDom.addStatus.value
+                status: ctDom.addStatus.value,
+                workstream: ctDom.addWorkstream.value || null
             })
         });
 
