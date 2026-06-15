@@ -3895,80 +3895,149 @@ if (appScript) {
 
 // --- NAVIGATION INTERCEPT (BACK BUTTON) ---
 function initNavigationIntercept() {
-    if (window.history && window.history.pushState) {
-        // Push initial state so we have a state to pop
-        window.history.pushState({ page: 'main' }, '');
-        
-        window.addEventListener('popstate', (event) => {
-            let handled = false;
-            
-            // 1. Text Edit Mode
-            if (editingThoughtId !== null) {
-                exitEditMode(false);
-                handled = true;
-            }
-            // 2. Task Detail Modal
-            else if (!dom.modal.classList.contains('hidden')) {
-                closeTaskModal();
-                handled = true;
-            }
-            // 3. Add Coding Task Modal
-            else if (!ctDom.addModal.classList.contains('hidden')) {
-                closeAddCtModal();
-                handled = true;
-            }
-            // 4. Improve Dialog
-            else if (!ctDom.improveDialog.classList.contains('hidden')) {
-                ctDom.improveDialog.classList.add('hidden');
-                ctImproveTaskId = null;
-                handled = true;
-            }
-            // 5. Project Info Modal
-            else if (!ctDom.projectInfoModal.classList.contains('hidden')) {
-                ctDom.projectInfoModal.classList.add('hidden');
-                handled = true;
-            }
-            // 6. Quick Capture Overlay
-            else if (!dom.quickCaptureOverlay.classList.contains('hidden')) {
-                closeQuickCapture();
-                handled = true;
-            }
-            // 7. Live Voice Panel
-            else if (liveVoiceActive) {
-                endLiveVoice();
-                handled = true;
-            }
-            // 8. Reclassify Picker
-            else if (!dom.reclassifyPicker.classList.contains('hidden')) {
-                dom.reclassifyPicker.classList.add('hidden');
-                handled = true;
-            }
-            // 9. Coding Tasks Panel
-            else if (!ctDom.panel.classList.contains('hidden')) {
-                ctDom.panel.classList.add('hidden');
-                handled = true;
-            }
-            // 10. Tasks Panel
-            else if (!dom.tasksPanel.classList.contains('hidden')) {
-                dom.tasksPanel.classList.add('hidden');
-                handled = true;
-            }
-            // 11. History Panel
-            else if (!dom.historyPanel.classList.contains('hidden')) {
-                dom.historyPanel.classList.add('hidden');
-                isDeclutterMode = false;
-                dom.declutterBtn.classList.remove('active');
-                dom.bulkActionsBar.classList.add('hidden');
-                dom.historySearch.disabled = false;
-                handled = true;
-            }
-            
-            // Always push the state back to ensure the next back press is also intercepted
-            window.history.pushState({ page: 'main' }, '');
-        });
+    if (!window.history || !window.history.pushState) return;
+
+    // Define elements and their levels
+    const trackedElements = [
+        { el: dom.historyPanel, level: 1 },
+        { el: dom.tasksPanel, level: 1 },
+        { el: ctDom.panel, level: 1 },
+        { el: dom.modal, level: 2 },
+        { el: ctDom.addModal, level: 2 },
+        { el: ctDom.improveDialog, level: 2 },
+        { el: ctDom.projectInfoModal, level: 2 },
+        { el: dom.quickCaptureOverlay, level: 2 },
+        { el: dom.liveVoicePanel, level: 2 },
+        { el: dom.reclassifyPicker, level: 2 }
+    ];
+
+    // Helper to compute active UI level
+    function getCurrentUILevel() {
+        if ((dom.inputTray && dom.inputTray.classList.contains('edit-mode')) ||
+            (dom.modal && !dom.modal.classList.contains('hidden')) ||
+            (ctDom.addModal && !ctDom.addModal.classList.contains('hidden')) ||
+            (ctDom.improveDialog && !ctDom.improveDialog.classList.contains('hidden')) ||
+            (ctDom.projectInfoModal && !ctDom.projectInfoModal.classList.contains('hidden')) ||
+            (dom.quickCaptureOverlay && !dom.quickCaptureOverlay.classList.contains('hidden')) ||
+            (dom.liveVoicePanel && !dom.liveVoicePanel.classList.contains('hidden')) ||
+            (dom.reclassifyPicker && !dom.reclassifyPicker.classList.contains('hidden'))) {
+            return 2;
+        }
+        if ((ctDom.panel && !ctDom.panel.classList.contains('hidden')) ||
+            (dom.tasksPanel && !dom.tasksPanel.classList.contains('hidden')) ||
+            (dom.historyPanel && !dom.historyPanel.classList.contains('hidden'))) {
+            return 1;
+        }
+        return 0;
     }
+
+    // Hook classList for each tracked element
+    trackedElements.forEach(({ el, level }) => {
+        if (!el) return;
+        const originalAdd = el.classList.add;
+        const originalRemove = el.classList.remove;
+
+        el.classList.add = function(...tokens) {
+            originalAdd.apply(this, tokens);
+            if (tokens.includes('hidden')) {
+                // If we are closing a level 1 or 2 component and the active history state level matches, pop it
+                if (window.history.state && window.history.state.level === level) {
+                    window.history.back();
+                }
+            }
+        };
+
+        el.classList.remove = function(...tokens) {
+            if (tokens.includes('hidden')) {
+                const currentLevel = getCurrentUILevel();
+                if (level > currentLevel) {
+                    window.history.pushState({ level: level }, '');
+                }
+            }
+            originalRemove.apply(this, tokens);
+        };
+    });
+
+    // Hook classList for inputTray (text edit mode)
+    if (dom.inputTray) {
+        const originalInputAdd = dom.inputTray.classList.add;
+        const originalInputRemove = dom.inputTray.classList.remove;
+
+        dom.inputTray.classList.add = function(...tokens) {
+            if (tokens.includes('edit-mode')) {
+                const currentLevel = getCurrentUILevel();
+                if (2 > currentLevel) {
+                    window.history.pushState({ level: 2 }, '');
+                }
+            }
+            originalInputAdd.apply(this, tokens);
+        };
+
+        dom.inputTray.classList.remove = function(...tokens) {
+            originalInputRemove.apply(this, tokens);
+            if (tokens.includes('edit-mode')) {
+                if (window.history.state && window.history.state.level === 2) {
+                    window.history.back();
+                }
+            }
+        };
+    }
+
+    // Listener for back button presses
+    window.addEventListener('popstate', (event) => {
+        const state = event.state;
+        const targetLevel = (state && typeof state.level === 'number') ? state.level : 0;
+        const currentLevel = getCurrentUILevel();
+
+        if (targetLevel < currentLevel) {
+            if (currentLevel === 2) {
+                if (dom.inputTray && dom.inputTray.classList.contains('edit-mode')) {
+                    exitEditMode(false);
+                }
+                if (dom.modal && !dom.modal.classList.contains('hidden')) {
+                    closeTaskModal();
+                }
+                if (ctDom.addModal && !ctDom.addModal.classList.contains('hidden')) {
+                    closeAddCtModal();
+                }
+                if (ctDom.improveDialog && !ctDom.improveDialog.classList.contains('hidden')) {
+                    ctDom.improveDialog.classList.add('hidden');
+                    ctImproveTaskId = null;
+                }
+                if (ctDom.projectInfoModal && !ctDom.projectInfoModal.classList.contains('hidden')) {
+                    ctDom.projectInfoModal.classList.add('hidden');
+                }
+                if (dom.quickCaptureOverlay && !dom.quickCaptureOverlay.classList.contains('hidden')) {
+                    closeQuickCapture();
+                }
+                if (dom.liveVoicePanel && !dom.liveVoicePanel.classList.contains('hidden')) {
+                    endLiveVoice();
+                }
+                if (dom.reclassifyPicker && !dom.reclassifyPicker.classList.contains('hidden')) {
+                    dom.reclassifyPicker.classList.add('hidden');
+                }
+            }
+
+            if (targetLevel === 0) {
+                if (ctDom.panel && !ctDom.panel.classList.contains('hidden')) {
+                    ctDom.panel.classList.add('hidden');
+                }
+                if (dom.tasksPanel && !dom.tasksPanel.classList.contains('hidden')) {
+                    dom.tasksPanel.classList.add('hidden');
+                }
+                if (dom.historyPanel && !dom.historyPanel.classList.contains('hidden')) {
+                    dom.historyPanel.classList.add('hidden');
+                    isDeclutterMode = false;
+                    dom.declutterBtn?.classList.remove('active');
+                    dom.bulkActionsBar?.classList.add('hidden');
+                    if (dom.historySearch) dom.historySearch.disabled = false;
+                }
+            }
+        }
+    });
 }
 
 // Call navigation intercept initializer
 initNavigationIntercept();
+
 
