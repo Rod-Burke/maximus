@@ -4,6 +4,30 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v100] - 2026-06-15
+
+### Task: Completed Button, Default hide completed Tasks (3-State Completed Filter Toggle)
+- **ID**: `45eb3a7d-ac77-448e-95b1-e7c7f4e9ceab`
+- **Changes**:
+  - Replaced the binary "Show Completed" toggle with a 3-state cycle filter (State 1: Hide Completed [Default], State 2: Show Both, State 3: Show Only Completed).
+  - Implemented `localStorage` persistence under the key `maximus_completed_filter` so that the user's selection remains consistent across sessions.
+  - Added custom blue accent styles for the filter button's `only-completed` state in `style.css`, matching the premium visual design language.
+  - Standardized completed task card styles (dimmed opacity, checkmark, and line-through content text decoration) across initial rendering and live interaction transitions.
+  - Bumped the Service Worker cache name and asset query versions to `v100`.
+
+---
+
+## [v99] - 2026-06-15
+
+### Task: Ensure Antigrav Go tasks on Coding Tasks page are not grayed out
+- **ID**: `3647c017-5daa-44bf-9b4f-ba87afca98e7`
+- **Changes**:
+  - Toggled `ct-view-antigrav-go` class on the coding tasks list container (`ctDom.list`) in `renderCodingTasksList` based on the active quick filter state.
+  - Added CSS overrides in `style.css` for `.ct-view-antigrav-go .ct-card.ct-done` to keep tasks fully bright (opacity: 1) in the Antigrav Go view.
+  - Bumped the Service Worker cache name and asset query versions to `v99`.
+
+---
+
 ## [v98] - 2026-06-15
 
 ### Task: Set Previous button to return to main screen (Back Interception Rework)
