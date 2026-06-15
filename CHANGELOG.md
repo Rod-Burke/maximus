@@ -4,6 +4,27 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v98] - 2026-06-15
+
+### Task: Set Previous button to return to main screen (Back Interception Rework)
+- **ID**: `61f8ad0d-6982-4a44-bbd4-8aad9e92f2e0`
+- **Changes**:
+  - Implemented a robust level-based visual routing architecture (Level 0: Main Screen, Level 1: Main Panels, Level 2: Modals & Editing states).
+  - Hooked classList operations (`classList.add('hidden')` / `classList.remove('hidden')`) on all main panels and modals to automatically sync the browser history stack.
+  - Implemented an `isNavigationTransitioning` guard flag to prevent `history.back()` from firing when panels are temporarily hidden visually during higher-level transitions (e.g. going from the Message History panel directly to edit/details mode).
+  - Configured Service Worker cache and page query assets to bump to `v98` to force clients to update.
+
+---
+
+## [v97] - 2026-06-15
+
+### Task: Set Previous button to return to main screen (Browser Back Interception)
+- **ID**: `61f8ad0d-6982-4a44-bbd4-8aad9e92f2e0`
+- **Changes**:
+  - Created level-based popstate and history manager to intercept system Back button presses, returning from level 2 modals to level 1 panels, and level 1 panels to the main screen, preventing premature PWA closure.
+
+---
+
 ## [v95] - 2026-06-14
 
 ### Task: Upgrade Maximus task dashboard with AJAX button
