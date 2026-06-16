@@ -6,6 +6,20 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v110] - 2026-06-16
+
+### Task: Make the verification Comment box larger & persistent
+- **ID**: `550c571d-c51b-4e4a-8340-fe17b5319833`
+- **Changes**:
+  - Resized the verification/sendback comment text area to rows="5" (naturally holds 5-6 lines).
+  - Configured `.ct-sendback-input` in `style.css` to limit height bounds (min-height: 120px, max-height: 250px, overflow-y: auto) to prevent layout obstruction.
+  - Implemented vanilla JS auto-expanding height logic matching user typing.
+  - Added in-memory caching (`ctInProgressComments`) and debounced database updates (500ms) to ensure in-progress comments are never lost when changing filters, opening the "+" Add Modal, or closing the PWA.
+  - Automatically flushed saves on blur and cleaned up stored comments when tasks are successfully verified, sent back, or changed status.
+  - Bumped Service Worker cache version and asset query version parameters to `v110`.
+
+---
+
 ## [v109] - 2026-06-16
 
 ### Task: Enhance Improve: self-clarify via OpenBrain and include details

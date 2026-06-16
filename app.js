@@ -145,6 +145,7 @@ const dom = {
     modalSave: document.getElementById('modal-save-btn'),
     modalDelete: document.getElementById('modal-delete-btn'),
     modalComplete: document.getElementById('modal-complete-btn'),
+    modalRef: document.getElementById('modal-ref-btn'),
     modalClose: document.getElementById('close-modal'),
     // Declutter Mode
     declutterBtn: document.getElementById('declutter-btn'),
@@ -1928,6 +1929,24 @@ function closeTaskModal() {
 }
 
 dom.modalClose.addEventListener('click', closeTaskModal);
+if (dom.modalRef) {
+    dom.modalRef.addEventListener('click', () => {
+        if (!modalThoughtId) return;
+        const summaryText = dom.modalSummary.value ? dom.modalSummary.value.trim() : '';
+        const textToCopy = `${summaryText} (ID: ${modalThoughtId})`;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalHTML = dom.modalRef.innerHTML;
+            dom.modalRef.innerHTML = '✅ Copied!';
+            dom.modalRef.classList.add('copied');
+            setTimeout(() => {
+                dom.modalRef.innerHTML = originalHTML;
+                dom.modalRef.classList.remove('copied');
+            }, 1500);
+        }).catch(err => {
+            console.error('Failed to copy task reference: ', err);
+        });
+    });
+}
 dom.modal.addEventListener('click', (e) => {
     if (e.target === dom.modal) closeTaskModal();
 });
@@ -2638,6 +2657,8 @@ dom.liveVoiceMute.addEventListener('click', toggleLiveVoiceMute);
 
 // ===== CODING TASKS MODULE =====
 
+const ctInProgressComments = {};
+
 const ctDom = {
     panel: document.getElementById('coding-tasks-panel'),
     btn: document.getElementById('coding-tasks-btn'),
@@ -3103,6 +3124,7 @@ function renderCodingTaskCard(t) {
                 </div>
             </div>
             <button class="ct-action-prompt-btn ${STATUS_GROUPS.antigravGo.includes(status) ? '' : 'hidden'}" title="Copy action prompt for Antigravity">📋 Action</button>
+            <button class="ct-ref-btn ${STATUS_GROUPS.antigravGo.includes(status) ? '' : 'margin-left-auto'}" title="Copy task reference">🔗 Ref</button>
         </div>
         <div class="ct-expanded">
             <div class="ct-description-rendered improve-rendered improve-editable-rich" contenteditable="true">${simpleMarkdownToHtml(t.content)}</div>
@@ -3150,7 +3172,7 @@ function renderCodingTaskCard(t) {
                     <button class="ct-action-btn ct-btn-mark-done" style="display:none">✅ All Verified → Send for Logging</button>
                 </div>
                 <div class="ct-sendback-section" style="display:${status === 'needs_verification' ? 'block' : 'none'}">
-                    <textarea class="ct-sendback-input" rows="2" placeholder="Describe what needs rework..."></textarea>
+                    <textarea class="ct-sendback-input" rows="5" placeholder="Describe what needs rework...">${escapeHtml(ctInProgressComments[t.id] !== undefined ? ctInProgressComments[t.id] : (ct.in_progress_comment || ''))}</textarea>
                     <button class="ct-action-btn ct-btn-sendback">↩ Send Back for Rework</button>
                 </div>
             </div>
@@ -3178,6 +3200,13 @@ function renderCodingTaskCard(t) {
         } else {
             el.classList.remove('ct-done');
         }
+
+        // Clear in-progress comment if status changes away from needs_verification
+        if (newStatus !== 'needs_verification') {
+            delete ctInProgressComments[t.id];
+            ct.in_progress_comment = '';
+        }
+
         updatePromptBtnVisibility(newStatus);
         await updateCodingTaskMeta(t.id, meta);
     });
@@ -3284,6 +3313,38 @@ function renderCodingTaskCard(t) {
     const sendbackInput = el.querySelector('.ct-sendback-input');
     const sendbackBtn = el.querySelector('.ct-btn-sendback');
 
+    let sendbackDebounceTimer;
+    sendbackInput.addEventListener('input', () => {
+        // Auto-expand height
+        sendbackInput.style.height = 'auto';
+        sendbackInput.style.height = sendbackInput.scrollHeight + 'px';
+
+        const val = sendbackInput.value;
+        ctInProgressComments[t.id] = val;
+        ct.in_progress_comment = val;
+
+        clearTimeout(sendbackDebounceTimer);
+        sendbackDebounceTimer = setTimeout(async () => {
+            await updateCodingTaskMeta(t.id, meta);
+        }, 500);
+    });
+
+    sendbackInput.addEventListener('blur', async () => {
+        clearTimeout(sendbackDebounceTimer);
+        const val = sendbackInput.value;
+        if (ct.in_progress_comment !== val) {
+            ct.in_progress_comment = val;
+            ctInProgressComments[t.id] = val;
+            await updateCodingTaskMeta(t.id, meta);
+        }
+    });
+
+    // Initial height adjustment on render
+    setTimeout(() => {
+        sendbackInput.style.height = 'auto';
+        sendbackInput.style.height = sendbackInput.scrollHeight + 'px';
+    }, 0);
+
     function updateVerificationUI() {
         const items = ct.verification_items || [];
         if (items.length === 0) return;
@@ -3377,6 +3438,11 @@ function renderCodingTaskCard(t) {
         markDoneBtn.style.display = 'none';
         el.classList.add('ct-done');
         updatePromptBtnVisibility('needs_logging');
+        
+        // Clear in-progress comment since the task is verified
+        delete ctInProgressComments[t.id];
+        ct.in_progress_comment = '';
+        
         await updateCodingTaskMeta(t.id, meta);
     });
 
@@ -3400,12 +3466,34 @@ function renderCodingTaskCard(t) {
         });
     }
 
+    const refBtn = el.querySelector('.ct-ref-btn');
+    if (refBtn) {
+        refBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const textToCopy = `${summary} (ID: ${t.id})`;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalHTML = refBtn.innerHTML;
+                refBtn.innerHTML = '✅ Copied!';
+                refBtn.classList.add('copied');
+                setTimeout(() => {
+                    refBtn.innerHTML = originalHTML;
+                    refBtn.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy task reference: ', err);
+            });
+        });
+    }
+
     function updatePromptBtnVisibility(currentStatus) {
         if (!promptBtn) return;
-        if (STATUS_GROUPS.antigravGo.includes(currentStatus)) {
+        const isActionVisible = STATUS_GROUPS.antigravGo.includes(currentStatus);
+        if (isActionVisible) {
             promptBtn.classList.remove('hidden');
+            if (refBtn) refBtn.classList.remove('margin-left-auto');
         } else {
             promptBtn.classList.add('hidden');
+            if (refBtn) refBtn.classList.add('margin-left-auto');
         }
     }
 
@@ -3436,6 +3524,10 @@ function renderCodingTaskCard(t) {
 
         ct.status = 'rework_in_antigravity';
         ct.rework_notes = reworkNotes;
+        
+        // Clear in-progress comment since it is now submitted as the official rework notes
+        delete ctInProgressComments[t.id];
+        ct.in_progress_comment = '';
         
         const badge = el.querySelector('.ct-badge[class*="status-"]');
         badge.className = 'ct-badge status-rework_in_antigravity';
@@ -3503,11 +3595,15 @@ async function evaluateCodingTask(id, content, cardEl, meta) {
                 cardEl.classList.remove('ct-done');
             }
             const promptBtn = cardEl.querySelector('.ct-action-prompt-btn');
+            const refBtn = cardEl.querySelector('.ct-ref-btn');
             if (promptBtn) {
-                if (['needs_plan', 'ready_for_antigravity', 'rework_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(newStatus)) {
+                const isActionVisible = ['needs_plan', 'ready_for_antigravity', 'rework_in_antigravity', 'in_progress', 'needs_verification', 'needs_logging'].includes(newStatus);
+                if (isActionVisible) {
                     promptBtn.classList.remove('hidden');
+                    if (refBtn) refBtn.classList.remove('margin-left-auto');
                 } else {
                     promptBtn.classList.add('hidden');
+                    if (refBtn) refBtn.classList.add('margin-left-auto');
                 }
             }
 

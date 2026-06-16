@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=109">
+    <link rel="stylesheet" href="style.css?v=110">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -650,6 +650,7 @@
                 <div class="modal-footer">
                     <button id="modal-delete-btn" class="modal-btn modal-btn-danger">Delete</button>
                     <button id="modal-complete-btn" class="modal-btn modal-btn-success">✓ Complete</button>
+                    <button id="modal-ref-btn" class="modal-btn modal-btn-ref">🔗 Ref</button>
                     <button id="modal-save-btn" class="modal-btn modal-btn-primary">Save Changes</button>
                 </div>
             </div>
@@ -705,7 +706,7 @@
 
     <!-- PWA Update Notification Toast -->
     <div id="update-toast" class="update-toast hidden">
-        <span class="update-toast-text">Maximus has been updated (v109).</span>
+        <span class="update-toast-text">Maximus has been updated (v110).</span>
         <button id="update-toast-btn">Reload</button>
     </div>
 
@@ -718,7 +719,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=109"> </script>
+    <script src="app.js?v=110"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {

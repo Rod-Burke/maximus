@@ -2596,6 +2596,10 @@ input:checked + .toggle-slider::before {
     padding: 0.5rem;
     resize: none;
     outline: none;
+    box-sizing: border-box;
+    min-height: 120px; /* Naturally fits ~5-6 lines */
+    max-height: 250px; /* Sized to prevent obstruction by virtual keyboard/UI headers */
+    overflow-y: auto;
 }
 .ct-sendback-input:focus {
     border-color: rgba(239, 68, 68, 0.4);
@@ -2654,6 +2658,74 @@ input:checked + .toggle-slider::before {
 .ct-card.ct-done .ct-action-prompt-btn {
     opacity: 1 !important;
     filter: none !important;
+}
+
+/* Reference button styling */
+.ct-ref-btn {
+    align-self: center;
+    background: linear-gradient(135deg, #0e7490 0%, #06b6d4 100%);
+    border: none;
+    color: #121225;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    flex-shrink: 0;
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 0.4rem;
+}
+
+.ct-ref-btn:hover {
+    background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+    color: #0c0c18;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.6);
+    transform: translateY(-1px);
+}
+
+.ct-ref-btn:active {
+    transform: translateY(0);
+}
+
+.ct-ref-btn.copied {
+    background: #22c55e !important;
+    border: none !important;
+    color: #0c2d15 !important;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6) !important;
+}
+
+.ct-ref-btn.margin-left-auto {
+    margin-left: auto !important;
+}
+
+.ct-card.ct-done .ct-ref-btn {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.modal-btn-ref {
+    background: rgba(6, 182, 212, 0.15);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    color: #06b6d4;
+}
+
+.modal-btn-ref:hover {
+    background: rgba(6, 182, 212, 0.25);
+}
+
+.modal-btn-ref:active {
+    background: rgba(6, 182, 212, 0.35);
+}
+
+.modal-btn-ref.copied {
+    background: #22c55e !important;
+    border: 1px solid #22c55e !important;
+    color: #0c2d15 !important;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6) !important;
 }
 
 /* --- LOGIN OVERLAY --- */
