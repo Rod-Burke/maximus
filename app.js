@@ -896,6 +896,10 @@ function renderHistoryList(thoughts) {
         const el = document.createElement('div');
         el.className = 'history-item';
         
+        const meta = t.metadata || t.payload?.metadata || {};
+        const displayText = meta.summary || t.content;
+        const hasMore = meta.summary && meta.summary !== t.content;
+        
         if (isDeclutterMode) {
             el.classList.add('selectable');
             const isSelected = selectedJunkIds.has(t.id);
@@ -904,7 +908,7 @@ function renderHistoryList(thoughts) {
             el.innerHTML = `
                 <div class="${checkClass}"></div>
                 <div style="flex:1;">
-                    <div class="thought-content">${t.content}</div>
+                    <div class="thought-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
                     <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
                 </div>
             `;
@@ -921,7 +925,7 @@ function renderHistoryList(thoughts) {
                 updateBulkCount();
             });
         } else {
-            el.innerHTML = `<div class="thought-content">${t.content}</div>
+            el.innerHTML = `<div class="thought-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
                 <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
                 <div class="item-actions">
                     <button class="edit-btn" title="Edit Text">
