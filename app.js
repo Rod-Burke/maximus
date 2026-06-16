@@ -3618,6 +3618,7 @@ function renderInteractiveSuggestions(suggestions) {
 
             // Render each option as a checkbox
             s.options.forEach((opt, optIdx) => {
+                if (opt.toLowerCase().trim() === 'check existing code') return;
                 const label = document.createElement('label');
                 label.className = 'suggestion-option';
                 const cb = document.createElement('input');
@@ -3628,6 +3629,17 @@ function renderInteractiveSuggestions(suggestions) {
                 label.appendChild(document.createTextNode(' ' + opt));
                 optionsDiv.appendChild(label);
             });
+
+            // "check existing code" option
+            const checkCodeLabel = document.createElement('label');
+            checkCodeLabel.className = 'suggestion-option suggestion-check-code';
+            const checkCodeCb = document.createElement('input');
+            checkCodeCb.type = 'checkbox';
+            checkCodeCb.className = 'suggestion-cb suggestion-cb-check-code';
+            checkCodeCb.dataset.option = 'check existing code';
+            checkCodeLabel.appendChild(checkCodeCb);
+            checkCodeLabel.appendChild(document.createTextNode(' check existing code'));
+            optionsDiv.appendChild(checkCodeLabel);
 
             // "Other" option with text field
             const otherLabel = document.createElement('label');
@@ -4127,5 +4139,27 @@ function initNavigationIntercept() {
 
 // Call navigation intercept initializer
 initNavigationIntercept();
+
+// --- VIEWPORT / KEYBOARD HANDLING ---
+function initViewportHandler() {
+    if (!window.visualViewport) return;
+
+    const appContainer = document.querySelector('.app-container');
+    if (!appContainer) return;
+
+    const adjustLayoutForKeyboard = () => {
+        const height = window.visualViewport.height;
+        appContainer.style.height = `${height}px`;
+        // Scroll to top of window to prevent layout viewport offset
+        window.scrollTo(0, 0);
+    };
+
+    window.visualViewport.addEventListener('resize', adjustLayoutForKeyboard);
+    window.visualViewport.addEventListener('scroll', adjustLayoutForKeyboard);
+
+    // Initial run
+    adjustLayoutForKeyboard();
+}
+initViewportHandler();
 
 
