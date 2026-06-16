@@ -1,5 +1,7 @@
 # Maximus PWA - Changelog & Walkthroughs
 
+
+
 > **Agent Instruction**: To conserve context window space, read only the first 200 lines of this file to review recent version history. Read further down if a task explicitly references older updates. If this file exceeds 500 lines, move older releases to [CHANGELOG_ARCHIVE.md](./CHANGELOG_ARCHIVE.md).
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
