@@ -6,6 +6,17 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v106] - 2026-06-16
+
+### Task: Set Default project to Maximus for create
+- **ID**: `ec75c01a-fdf9-41f4-ba6b-0c81ba95b067`
+- **Changes**:
+  - Rearranged the dropdown options in the Add Coding Task modal (`#add-ct-project`) to place `Maximus Core` (`maximus_core`) as the first and selected option.
+  - Updated the click listener for the "Add Coding Task" button in `app.js` to reset the project value back to `maximus_core` when opening the modal and no project filter is active.
+  - Bumped Service Worker cache name to `maximus-v106` and updated asset version strings in `index.html` to trigger visual client reload.
+
+---
+
 ## [v105] - 2026-06-16
 
 ### Task: Summarize long string thoughts and update Message History UI
@@ -40,6 +51,18 @@ This file contains the persistent record of all completed tasks, architectural u
   - Corrected the two-way sync loop to prevent completed tasks from reverting to incomplete (pending) due to unmatched status alignment.
   - Reverted the experimental deletion tombstone tracking mechanism from Supabase Edge Functions (`sync-google`, `manage-thoughts`, and `voice-gateway`) to keep the architecture clean and maintainable.
   - Bumped the Service Worker cache version and asset query queries to `v103` to trigger visual client reload.
+
+---
+
+## [v102] - 2026-06-16
+
+### Task: Improve Modal, Ensure general comments input is always enabled, never grayed out
+- **ID**: `f49f4a1f-af95-4108-95de-4a422e626fd8`
+- **Changes**:
+  - Added a persistent `General Comments` textarea in `index.html` within the Improve Task modal (`improve-ct-dialog`).
+  - Updated `app.js` to select the textarea and clear its value on opening the dialog.
+  - Hooked up `improveAgainBtn` and `improveSubmitBtn` click listeners to collect the general comments, append them under a `## General Comments` header in the task content, and reset the field.
+  - Bumped the Service Worker cache version and asset query references to `v102` to trigger an update toast on user devices.
 
 ---
 
