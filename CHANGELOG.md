@@ -4,6 +4,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v103] - 2026-06-16
+
+### Task: Fix Maximus task Completion to prevent reverting to incomplete later
+- **ID**: `4be4d1dd-fe91-45f9-aa1a-fe02765e8977`
+- **Changes**:
+  - Integrated the task completion `status` field into the `pushTask` Google Tasks API synchronization payload.
+  - Corrected the two-way sync loop to prevent completed tasks from reverting to incomplete (pending) due to unmatched status alignment.
+  - Reverted the experimental deletion tombstone tracking mechanism from Supabase Edge Functions (`sync-google`, `manage-thoughts`, and `voice-gateway`) to keep the architecture clean and maintainable.
+  - Bumped the Service Worker cache version and asset query queries to `v103` to trigger visual client reload.
+
+---
+
 ## [v100] - 2026-06-15
 
 ### Task: Completed Button, Default hide completed Tasks (3-State Completed Filter Toggle)
