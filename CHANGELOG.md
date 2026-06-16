@@ -4,6 +4,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v104] - 2026-06-16
+
+### Task: Remove complete buttons from events in Tasks and Events page
+- **ID**: `c2a943d2-7098-4a8c-8fc0-000cb6087523`
+- **Changes**:
+  - Excluded completion radio checkboxes (`.task-checkbox`) from rendering for event items on the Tasks & Events list view.
+  - Wrapped the checkbox click handler in a safety check to prevent JavaScript runtime errors when checkboxes are absent.
+  - Hidden the "Complete" / "Reopen" button (`dom.modalComplete`) from the Task Detail Modal when the item is an event, including dynamic updates when switching types.
+  - Updated the backend `manage-thoughts` Edge Function to delete the `status` field from metadata for `event` type thoughts on update.
+  - Bumped the Service Worker cache version and asset query strings to `v104` to trigger client-side update.
+
+---
+
 ## [v103] - 2026-06-16
 
 ### Task: Fix Maximus task Completion to prevent reverting to incomplete later
