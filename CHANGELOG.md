@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v109] - 2026-06-16
+
+### Task: Enhance Improve: self-clarify via OpenBrain and include details
+- **ID**: `83d4e870-2aaf-4a3a-8211-8038d61d77a5`
+- **Changes**:
+  - Enhanced the backend Deno Edge Function `manage-thoughts/index.ts` `improve_coding_task` handler to query OpenBrain to resolve clarification questions.
+  - Successfully answered clarifications are appended under `## Resolved Clarifications (via OpenBrain)` in the task's improved text, and omitted from user suggestions.
+  - Remaining unresolved multiple-choice suggestions include the option `"check existing code"`.
+  - Updated the PWA frontend `renderInteractiveSuggestions` in `app.js` to render the `"check existing code"` option checkbox for multiple-choice suggestions.
+  - Bumped the Service Worker cache version and index.html version references to `v109` to force client-side reload.
+
+---
+
 ## [v108] - 2026-06-16
 
 ### Task: Adjust typing box expansion to avoid keyboard overlap
