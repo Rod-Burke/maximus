@@ -2648,6 +2648,7 @@ const ctDom = {
     improveResult: document.getElementById('improve-result-rendered'),
     // improveResult is now the contenteditable div (was separate textarea+rendered)
     improveSuggestionsList: document.getElementById('improve-suggestions-list'),
+    improveGeneralCommentsInput: document.getElementById('improve-general-comments-input'),
     readinessBarFill: document.getElementById('readiness-bar-fill'),
     readinessLabel: document.getElementById('readiness-label'),
     readinessNotes: document.getElementById('readiness-notes'),
@@ -3719,6 +3720,7 @@ async function openImproveDialog(taskId, content, meta) {
     ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(content);
     ctDom.improveResult.innerHTML = '';
     ctDom.improveSuggestionsList.innerHTML = '';
+    if (ctDom.improveGeneralCommentsInput) ctDom.improveGeneralCommentsInput.value = '';
     ctDom.readinessBarFill.style.width = '0%';
     ctDom.readinessLabel.textContent = '📊 Readiness: —/10';
     ctDom.readinessNotes.textContent = '';
@@ -3774,6 +3776,12 @@ ctDom.improveAgainBtn.addEventListener('click', async () => {
     if (answers) {
         combinedContent += '\n\n## User Clarifications\n' + answers;
     }
+    const generalComment = ctDom.improveGeneralCommentsInput ? ctDom.improveGeneralCommentsInput.value.trim() : '';
+    if (generalComment) {
+        combinedContent += '\n\n## General Comments\n' + generalComment;
+    }
+    if (ctDom.improveGeneralCommentsInput) ctDom.improveGeneralCommentsInput.value = '';
+    
     ctDom.improveOriginal.innerHTML = simpleMarkdownToHtml(combinedContent);
     ctDom.improveResult.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Improving again...</div>';
     ctDom.improveResult.contentEditable = 'false';
@@ -3809,6 +3817,11 @@ ctDom.improveSubmitBtn.addEventListener('click', async () => {
     if (answers) {
         improvedText += '\n\n## User Clarifications\n' + answers;
     }
+    const generalComment = ctDom.improveGeneralCommentsInput ? ctDom.improveGeneralCommentsInput.value.trim() : '';
+    if (generalComment) {
+        improvedText += '\n\n## General Comments\n' + generalComment;
+    }
+    if (ctDom.improveGeneralCommentsInput) ctDom.improveGeneralCommentsInput.value = '';
 
     ctDom.improveSubmitBtn.textContent = 'Saving...';
     ctDom.improveSubmitBtn.disabled = true;
@@ -3853,9 +3866,9 @@ ctDom.closeImprove.addEventListener('click', () => {
 // --- ADD CODING TASK MODAL ---
 
 ctDom.addBtn.addEventListener('click', () => {
-    // Pre-fill project from current filter if one is selected
+    // Pre-fill project from current filter if one is selected, otherwise default to 'maximus_core'
     const currentProject = ctDom.filterProject.value;
-    if (currentProject) ctDom.addProject.value = currentProject;
+    ctDom.addProject.value = currentProject || 'maximus_core';
     ctDom.addContent.value = '';
     ctDom.addModal.classList.remove('hidden');
     ctDom.addContent.focus();

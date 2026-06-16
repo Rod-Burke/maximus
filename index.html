@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=100">
+    <link rel="stylesheet" href="style.css?v=101">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -322,13 +322,13 @@
                         <div class="modal-field">
                             <label class="modal-label">Project</label>
                             <select id="add-ct-project" class="modal-select">
+                                <option value="maximus_core" selected>Maximus Core</option>
                                 <option value="chatops">Chat Ops</option>
                                 <option value="quote_manager">Quote Manager</option>
                                 <option value="liturgy_explorer">Liturgy Explorer</option>
                                 <option value="homily_pipeline">Homily Pipeline</option>
                                 <option value="stream_management">Stream Management</option>
                                 <option value="backups_devops">Backups & DevOps</option>
-                                <option value="maximus_core">Maximus Core</option>
                                 <option value="open_brain">Open Brain</option>
                                 <option value="infrastructure">Infrastructure</option>
                             </select>
@@ -435,6 +435,10 @@
                     <div class="improve-suggestions" id="improve-suggestions">
                         <label class="improve-label">💡 Suggested Clarifications</label>
                         <ul id="improve-suggestions-list"></ul>
+                    </div>
+                    <div class="improve-general-comments" style="margin-bottom: 0.75rem;">
+                        <label class="improve-label">💬 General Comments / Additional Instructions</label>
+                        <textarea id="improve-general-comments-input" class="suggestion-text-answer" rows="3" style="width: 100%; box-sizing: border-box; resize: vertical;" placeholder="Type any additional instructions or general comments here..."></textarea>
                     </div>
                     <div class="improve-readiness" id="improve-readiness">
                         <div class="readiness-bar-track">
@@ -701,7 +705,7 @@
 
     <!-- PWA Update Notification Toast -->
     <div id="update-toast" class="update-toast hidden">
-        <span class="update-toast-text">Maximus has been updated (v100).</span>
+        <span class="update-toast-text">Maximus has been updated (v102).</span>
         <button id="update-toast-btn">Reload</button>
     </div>
 
@@ -714,7 +718,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=100"> </script>
+    <script src="app.js?v=102"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
