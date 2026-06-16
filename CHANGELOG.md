@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v111] - 2026-06-16
+
+### Task: Add Ref button to copy task reference, summary, and ID
+- **ID**: `2c1aad32-2288-4a27-8fbf-f8aa3304662c`
+- **Changes**:
+  - Rendered a "Ref" button for each Coding Task entry on the Coding Tasks page, styled with a teal gradient background.
+  - Placed a matching "Ref" button inside the details modal footer (`#modal-ref-btn`), styled with a teal border.
+  - Implemented event handlers to copy the format `"{Summary} (ID: {ID})"` to the clipboard, with visual "✅ Copied!" feedback on click.
+  - Added new directives in `behavior_directive.md` to establish version bumping and deployment procedures for future PWA updates.
+  - Bumped the Service Worker cache version and asset query references to `v111` to force client-side reload.
+
+---
+
 ## [v110] - 2026-06-16
 
 ### Task: Make the verification Comment box larger & persistent
