@@ -4,6 +4,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v105] - 2026-06-16
+
+### Task: Summarize long string thoughts and update Message History UI
+- **ID**: `2e9bc48d-7090-4a25-8a0e-8e0b2f7c798f`
+- **Changes**:
+  - Modified the backend `manage-thoughts` Edge Function to automatically generate short summaries (<= 8 words) for incoming and edited thoughts when content is longer than 12 words, or use content verbatim if <= 12 words.
+  - Wrote a batch migration script to retroactively summarize 211 existing thoughts in the database in batches of 30.
+  - Updated the frontend `renderHistoryList` and `renderTaskSection` in `app.js` to render the short summaries and append a gold `+` sign suffix for entries that have longer content.
+  - Bumped the Service Worker cache version and asset query strings to `v105` to trigger client-side update.
+
+---
+
 ## [v104] - 2026-06-16
 
 ### Task: Remove complete buttons from events in Tasks and Events page
