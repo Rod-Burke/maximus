@@ -6,6 +6,17 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v108] - 2026-06-16
+
+### Task: Adjust typing box expansion to avoid keyboard overlap
+- **ID**: `d0623dae-c2e8-42f0-9ac4-4247dcbd179a`
+- **Changes**:
+  - Modified `<meta name="viewport">` in `index.html` to specify `interactive-widget=resizes-content` so Android Chrome resizes the layout viewport automatically when the keyboard is toggled.
+  - Implemented `initViewportHandler()` in `app.js` to dynamically set `.app-container` height to `window.visualViewport.height` on resize or scroll, preventing keyboard overlap on all platforms.
+  - Bumped Service Worker cache version and asset query version strings to `v108` to trigger visual update.
+
+---
+
 ## [v106] - 2026-06-16
 
 ### Task: Set Default project to Maximus for create
