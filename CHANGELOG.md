@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v112] - 2026-06-17
+
+### Task: Expand tasks in message history page when I click on the task
+- **ID**: `7da0d3ed-0927-4b95-aecd-f94832d01780`
+- **Changes**:
+  - Implemented client-side details expansion for tasks and coding tasks in the Message History panel.
+  - Rendered inline detailed metadata including full markdown description, status, priority, due date, recurrence, and coding task specifics (project, complexity, CT status, workstream).
+  - Configured click handlers to toggle expansion, and stopped click propagation on action buttons (edit, details, delete) to prevent interference.
+  - Styled hover states, expanded boundaries, and inline badges with harmonious colors conforming to the premium PWA visual language.
+  - Bumped the Service Worker cache version and asset query references to `v112` to force client-side reload.
+
+---
+
 ## [v111] - 2026-06-16
 
 ### Task: Add Ref button to copy task reference, summary, and ID

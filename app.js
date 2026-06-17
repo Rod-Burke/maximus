@@ -901,6 +901,11 @@ function renderHistoryList(thoughts) {
         const displayText = meta.summary || t.content;
         const hasMore = meta.summary && meta.summary !== t.content;
         
+        const isTask = (type === 'task' || type === 'coding_task');
+        if (!isDeclutterMode && isTask) {
+            el.classList.add('task-item-clickable');
+        }
+
         if (isDeclutterMode) {
             el.classList.add('selectable');
             const isSelected = selectedJunkIds.has(t.id);
@@ -926,8 +931,87 @@ function renderHistoryList(thoughts) {
                 updateBulkCount();
             });
         } else {
+            let detailsHtml = '';
+            if (isTask) {
+                const status = meta.status || (meta.coding_task?.status) || 'pending';
+                const priority = meta.priority || 'normal';
+                const dueDate = meta.due_date || '';
+                const recurrence = meta.recurrence || '';
+                const notes = meta.notes || '';
+                
+                let codingTaskHtml = '';
+                if (type === 'coding_task') {
+                    const ct = meta.coding_task || {};
+                    const ctProject = ct.project || 'uncategorized';
+                    const ctComplexity = ct.complexity || 'moderate';
+                    const ctStatus = ct.status || 'draft';
+                    const ctWorkstream = ct.workstream || '';
+                    
+                    codingTaskHtml = `
+                        <div class="details-grid coding-task-details" style="margin-top: 0.5rem;">
+                            <div class="details-meta-item">
+                                <span class="details-label">Project</span>
+                                <span class="details-value">${ctProject}</span>
+                            </div>
+                            <div class="details-meta-item">
+                                <span class="details-label">Complexity</span>
+                                <span class="details-value">${ctComplexity}</span>
+                            </div>
+                            <div class="details-meta-item">
+                                <span class="details-label">CT Status</span>
+                                <span class="details-value"><span class="badge status-${ctStatus}">${ctStatus}</span></span>
+                            </div>
+                            ${ctWorkstream ? `
+                            <div class="details-meta-item">
+                                <span class="details-label">Workstream</span>
+                                <span class="details-value">${ctWorkstream}</span>
+                            </div>` : ''}
+                        </div>
+                    `;
+                }
+                
+                detailsHtml = `
+                    <div class="task-details-expanded hidden">
+                        <div class="details-section">
+                            <span class="details-label">Full Description</span>
+                            <div class="details-value description-text">${simpleMarkdownToHtml(t.content)}</div>
+                        </div>
+                        
+                        <div class="details-grid">
+                            <div class="details-meta-item">
+                                <span class="details-label">Status</span>
+                                <span class="details-value"><span class="badge status-${status}">${status}</span></span>
+                            </div>
+                            <div class="details-meta-item">
+                                <span class="details-label">Priority</span>
+                                <span class="details-value"><span class="badge priority-${priority}">${priority}</span></span>
+                            </div>
+                            ${dueDate ? `
+                            <div class="details-meta-item">
+                                <span class="details-label">Due Date</span>
+                                <span class="details-value">${dueDate}</span>
+                            </div>` : ''}
+                            ${recurrence ? `
+                            <div class="details-meta-item">
+                                <span class="details-label">Recurrence</span>
+                                <span class="details-value">${recurrence}</span>
+                            </div>` : ''}
+                        </div>
+                        
+                        ${codingTaskHtml}
+                        
+                        ${notes ? `
+                        <div class="details-section notes-section">
+                            <span class="details-label">Notes</span>
+                            <div class="details-value notes-text">${simpleMarkdownToHtml(notes)}</div>
+                        </div>` : ''}
+                    </div>
+                `;
+            }
+
             el.innerHTML = `<div class="thought-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
                 <div class="thought-meta"><span>${ds}</span><span class="thought-type">${type}${matchStr}</span></div>
+                ${detailsHtml}
                 <div class="item-actions">
                     <button class="edit-btn" title="Edit Text">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -946,7 +1030,28 @@ function renderHistoryList(thoughts) {
                         </svg>
                     </button>
                 </div>`;
-            el.querySelector('.edit-btn').addEventListener('click', () => {
+
+            if (isTask) {
+                el.addEventListener('click', (e) => {
+                    if (isDeclutterMode) return;
+                    if (e.target.closest('.item-actions')) return;
+                    
+                    const detailsEl = el.querySelector('.task-details-expanded');
+                    if (detailsEl) {
+                        const isExpanded = !detailsEl.classList.contains('hidden');
+                        if (isExpanded) {
+                            detailsEl.classList.add('hidden');
+                            el.classList.remove('expanded');
+                        } else {
+                            detailsEl.classList.remove('hidden');
+                            el.classList.add('expanded');
+                        }
+                    }
+                });
+            }
+
+            el.querySelector('.edit-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
                 editSource = 'history';
                 historyScrollTop = dom.historyList.scrollTop;
                 isNavigationTransitioning = true;
@@ -954,7 +1059,8 @@ function renderHistoryList(thoughts) {
                 isNavigationTransitioning = false;
                 enterEditMode(t.id, t.content);
             });
-            el.querySelector('.details-btn').addEventListener('click', () => {
+            el.querySelector('.details-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
                 editSource = 'history';
                 historyScrollTop = dom.historyList.scrollTop;
                 isNavigationTransitioning = true;
@@ -962,7 +1068,10 @@ function renderHistoryList(thoughts) {
                 isNavigationTransitioning = false;
                 openTaskModal(t.id, t.content, t.metadata || t.payload || {});
             });
-            el.querySelector('.delete-btn').addEventListener('click', () => deleteThought(t.id, el));
+            el.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteThought(t.id, el);
+            });
         }
         
         dom.historyList.appendChild(el);
