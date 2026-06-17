@@ -2907,12 +2907,12 @@ input:checked + .toggle-slider::before {
 }
 
 /* --- TASK EXPANSION IN MESSAGE HISTORY --- */
-.history-item.task-item-clickable {
+.history-item.history-item-clickable {
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.history-item.task-item-clickable:hover {
+.history-item.history-item-clickable:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.2);
 }

@@ -6,6 +6,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v115] - 2026-06-17
+
+### Task: Expand tasks in message history page when I click on the task (Rework)
+- **ID**: `7da0d3ed-0927-4b95-aecd-f94832d01780`
+- **Changes**:
+  - Expanded the inline click-to-toggle details feature in the Message History panel to support all thought types (thoughts, observations, ideas, references, events, tasks, coding tasks).
+  - Renamed `.task-item-clickable` to `.history-item-clickable` in both JavaScript and CSS.
+  - Implemented dynamic metadata parsing and rendering, displaying event details (location, timing) and standard metadata fields (status, priority, due date, recurrence) when present.
+  - Bumped cache and asset version query strings to `v115` to trigger client-side update.
+
+---
+
 ## [v112] - 2026-06-17
 
 ### Task: Expand tasks in message history page when I click on the task
