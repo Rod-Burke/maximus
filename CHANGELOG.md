@@ -6,6 +6,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v116] - 2026-06-17
+
+### Task: Thought summarizing is not functioning
+- **ID**: `57f14716-4729-4d46-b30b-27661ab21e63`
+- **Changes**:
+  - Restandardized all summary prompt limits for coding tasks, tasks, events, and references to 8 words or fewer.
+  - Implemented auto-summarization logic inside the `capture_thought` and `update_thought` MCP edge tools in `open-brain-mcp/index.ts`.
+  - Executed a backfill to generate new 8-word summaries for all thoughts that were missing summaries or had overlong duplicate content in the database.
+  - Bumped PWA version to `v116`.
+
+---
+
 ## [v115] - 2026-06-17
 
 ### Task: Expand tasks in message history page when I click on the task (Rework)
