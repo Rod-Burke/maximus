@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=112">
+    <link rel="stylesheet" href="style.css?v=113">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -612,6 +612,7 @@
                                 <option value="weekly">Weekly</option>
                                 <option value="every_other_week">Every Other Week</option>
                                 <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
                                 <option value="custom">Custom...</option>
                             </select>
                         </div>
@@ -637,12 +638,20 @@
                                     <select id="custom-interval-unit" class="modal-select" style="flex:1;">
                                         <option value="weeks">Week(s)</option>
                                         <option value="days">Day(s)</option>
+                                        <option value="months">Month(s)</option>
+                                        <option value="years">Year(s)</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="modal-field">
                                 <label class="modal-label">Ends</label>
                                 <input type="date" id="custom-end-date" class="modal-input" placeholder="Never">
+                            </div>
+                        </div>
+                        <div class="modal-row" style="margin-top: 0.5rem;">
+                            <div class="modal-field" style="width: 100%;">
+                                <label class="modal-label">Or English recurrence description</label>
+                                <input type="text" id="custom-english" class="modal-input" placeholder="e.g. the first Friday of the month, every Easter" style="width: 100%; box-sizing: border-box;">
                             </div>
                         </div>
                     </div>
@@ -719,7 +728,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=112"> </script>
+    <script src="app.js?v=113"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {

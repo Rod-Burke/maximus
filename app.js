@@ -157,6 +157,7 @@ const dom = {
     customInterval: document.getElementById('custom-interval'),
     customIntervalUnit: document.getElementById('custom-interval-unit'),
     customEndDate: document.getElementById('custom-end-date'),
+    customEnglish: document.getElementById('custom-english'),
     // Event fields
     eventFields: document.getElementById('event-fields'),
     modalAllDay: document.getElementById('modal-all-day'),
@@ -936,7 +937,7 @@ function renderHistoryList(thoughts) {
                 const status = meta.status || (meta.coding_task?.status) || 'pending';
                 const priority = meta.priority || 'normal';
                 const dueDate = meta.due_date || '';
-                const recurrence = meta.recurrence || '';
+                const recurrence = formatRecurrence(meta.recurrence || '');
                 const notes = meta.notes || '';
                 
                 let codingTaskHtml = '';
@@ -1437,7 +1438,7 @@ function renderTaskSection(title, items) {
         el.dataset.meta = JSON.stringify(meta);
         
         const dueMeta = meta.due_date ? `Due: ${meta.due_date}` : '';
-        const recMeta = meta.recurrence ? `↺ ${meta.recurrence}` : '';
+        const recMeta = meta.recurrence ? `↺ ${formatRecurrence(meta.recurrence)}` : '';
         const metaStr = [dueMeta, recMeta].filter(Boolean).join(' | ');
 
         const isCompleted = meta.status === 'completed';
@@ -1498,7 +1499,7 @@ function renderTaskSection(title, items) {
                 // Update UI metadata string immediately
                 const metaTextEl = el.querySelector('.task-meta');
                 const newDueMeta = taskMeta.due_date ? `Due: ${taskMeta.due_date}` : '';
-                const newRecMeta = taskMeta.recurrence ? `↺ ${taskMeta.recurrence}` : '';
+                const newRecMeta = taskMeta.recurrence ? `↺ ${formatRecurrence(taskMeta.recurrence)}` : '';
                 const newMetaStr = [newDueMeta, newRecMeta].filter(Boolean).join(' | ');
                 
                 if (metaTextEl) {
@@ -1747,6 +1748,154 @@ function renderTaskSection(title, items) {
     dom.tasksList.appendChild(container);
 }
 
+// --- RECURRENCE HELPERS ---
+function getEasterDate(year) {
+    const f = Math.floor;
+    const a = year % 19;
+    const b = f(year / 100);
+    const c = year % 100;
+    const d = f(b / 4);
+    const e = b % 4;
+    const g = f((8 * b + 13) / 25);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = f(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = f((a + 11 * h + 22 * l) / 451);
+    const month = f((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+}
+
+function getNthWeekdayOfMonth(year, month, nth, targetWeekday) {
+    if (nth === -1) {
+        const lastDay = new Date(year, month + 1, 0);
+        while (lastDay.getDay() !== targetWeekday) {
+            lastDay.setDate(lastDay.getDate() - 1);
+        }
+        return lastDay;
+    } else {
+        const firstDay = new Date(year, month, 1);
+        let count = 0;
+        const current = new Date(firstDay);
+        while (current.getMonth() === month) {
+            if (current.getDay() === targetWeekday) {
+                count++;
+                if (count === nth) {
+                    return current;
+                }
+            }
+            current.setDate(current.getDate() + 1);
+        }
+    }
+    return null;
+}
+
+function getNextEnglishRecurrenceDate(text, base, today) {
+    const textClean = text.toLowerCase().trim();
+    
+    const weekdayMap = {
+        sunday: 0, sun: 0,
+        monday: 1, mon: 1,
+        tuesday: 2, tue: 2,
+        wednesday: 3, wed: 3,
+        thursday: 4, thu: 4,
+        friday: 5, fri: 5,
+        saturday: 6, sat: 6
+    };
+    
+    const nthMap = {
+        first: 1,
+        second: 2,
+        third: 3,
+        fourth: 4,
+        fifth: 5,
+        last: -1
+    };
+
+    const nthWeekdayRegex = /the\s+(first|second|third|fourth|fifth|last)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+of\s+the\s+month/;
+    const nthWeekdayMatch = textClean.match(nthWeekdayRegex);
+    if (nthWeekdayMatch) {
+        const nthStr = nthWeekdayMatch[1];
+        const weekdayStr = nthWeekdayMatch[2];
+        const nth = nthMap[nthStr];
+        const targetWeekday = weekdayMap[weekdayStr];
+        
+        let year = base.getFullYear();
+        let month = base.getMonth();
+        
+        for (let mOffset = 0; mOffset < 24; mOffset++) {
+            const candidateYear = year + Math.floor((month + mOffset) / 12);
+            const candidateMonth = (month + mOffset) % 12;
+            const candidateDate = getNthWeekdayOfMonth(candidateYear, candidateMonth, nth, targetWeekday);
+            if (candidateDate && candidateDate > base && candidateDate > today) {
+                return candidateDate;
+            }
+        }
+    }
+    
+    if (textClean === 'every easter' || textClean === 'easter') {
+        let year = base.getFullYear();
+        for (let yOffset = 0; yOffset < 5; yOffset++) {
+            const candidateYear = year + yOffset;
+            const easter = getEasterDate(candidateYear);
+            if (easter > base && easter > today) {
+                return easter;
+            }
+        }
+    }
+    
+    const easterOffsetRegex = /(.+)\s+days?\s+(before|after)\s+easter/;
+    const easterOffsetMatch = textClean.match(easterOffsetRegex);
+    if (easterOffsetMatch) {
+        const amountStr = easterOffsetMatch[1].trim();
+        const dir = easterOffsetMatch[2];
+        const numMap = {
+            one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10
+        };
+        let amount = parseInt(amountStr);
+        if (isNaN(amount)) {
+            amount = numMap[amountStr] || 0;
+        }
+        const offset = dir === 'before' ? -amount : amount;
+        
+        let year = base.getFullYear();
+        for (let yOffset = 0; yOffset < 5; yOffset++) {
+            const candidateYear = year + yOffset;
+            const easter = getEasterDate(candidateYear);
+            const candidateDate = new Date(easter);
+            candidateDate.setDate(candidateDate.getDate() + offset);
+            if (candidateDate > base && candidateDate > today) {
+                return candidateDate;
+            }
+        }
+    }
+    
+    return null;
+}
+
+function formatRecurrence(rec) {
+    if (!rec) return '';
+    if (rec.startsWith('english:')) {
+        return rec.replace('english:', '');
+    }
+    if (rec.startsWith('custom:')) {
+        const parts = rec.replace('custom:', '').split(':');
+        const interval = parseInt(parts[0]) || 1;
+        const unit = parts[1] || 'weeks';
+        const days = parts[2] ? parts[2].split(',') : [];
+        const intervalStr = interval === 1 ? '' : ` ${interval}`;
+        const unitStr = interval === 1 ? (unit === 'weeks' ? 'week' : unit === 'days' ? 'day' : unit === 'months' ? 'month' : 'year') : unit;
+        if (unit === 'days' || unit === 'months' || unit === 'years') {
+            return `Every${intervalStr} ${unitStr}`;
+        } else {
+            const daysStr = days.length ? ` on ${days.join(', ')}` : '';
+            return `Every${intervalStr} ${unitStr}${daysStr}`;
+        }
+    }
+    return rec;
+}
+
 // --- RECURRENCE DATE CALCULATOR ---
 function getNextRecurrenceDate(recurrence, currentDueDate) {
     const today = new Date();
@@ -1754,6 +1903,14 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
     let next = new Date(base);
     
     const rec = (recurrence || '').toLowerCase();
+    
+    if (rec.startsWith('english:')) {
+        const englishText = recurrence.substring(8).trim();
+        const nextEng = getNextEnglishRecurrenceDate(englishText, base, today);
+        if (nextEng) {
+            return getLocalDateStr(nextEng);
+        }
+    }
     
     if (rec === 'daily') {
         next = new Date(today);
@@ -1765,7 +1922,7 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
         next.setDate(next.getDate() + 14);
         while (next <= today) next.setDate(next.getDate() + 14);
     } else if (rec.startsWith('custom:')) {
-        // custom:2:weeks:mon,wed or custom:3:days
+        // custom:2:weeks:mon,wed or custom:3:days or custom:1:months
         const parts = rec.replace('custom:', '').split(':');
         const interval = parseInt(parts[0]) || 1;
         const unit = parts[1] || 'weeks';
@@ -1774,6 +1931,12 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
         if (unit === 'days') {
             next = new Date(today);
             next.setDate(next.getDate() + interval);
+        } else if (unit === 'months') {
+            next.setMonth(next.getMonth() + interval);
+            while (next <= today) next.setMonth(next.getMonth() + interval);
+        } else if (unit === 'years') {
+            next.setFullYear(next.getFullYear() + interval);
+            while (next <= today) next.setFullYear(next.getFullYear() + interval);
         } else {
             // weeks - find next matching day
             if (days.length) {
@@ -1915,18 +2078,21 @@ function openTaskModal(id, content, meta) {
     
     // Parse recurrence into the UI
     const rec = meta.recurrence || '';
-    if (rec.startsWith('custom:')) {
+    if (rec.startsWith('custom:') || rec.startsWith('english:')) {
         dom.modalRecurrence.value = 'custom';
         dom.customPanel.classList.remove('hidden');
         parseCustomRecurrenceToUI(rec);
-    } else if (rec === 'every_other_day' || rec === 'every_other_week') {
+    } else if (rec === 'every_other_day' || rec === 'every_other_week' || rec === 'yearly') {
         dom.modalRecurrence.value = rec;
         dom.customPanel.classList.add('hidden');
     } else {
         dom.modalRecurrence.value = rec;
         dom.customPanel.classList.add('hidden');
     }
-    if (!rec.startsWith('custom:')) resetDayButtons();
+    if (!rec.startsWith('custom:') && !rec.startsWith('english:')) {
+        resetDayButtons();
+        if (dom.customEnglish) dom.customEnglish.value = '';
+    }
     
     // Set modal title based on type
     updateModalTitle(meta.type || 'task');
@@ -1996,16 +2162,24 @@ function toggleCodingTaskFields(show) {
 }
 
 function parseCustomRecurrenceToUI(rec) {
-    // Format: "custom:1:weeks:mon,wed,fri" or "custom:2:days"
-    const parts = rec.replace('custom:', '').split(':');
-    dom.customInterval.value = parts[0] || '1';
-    dom.customIntervalUnit.value = parts[1] || 'weeks';
-    resetDayButtons();
-    if (parts[2]) {
-        parts[2].split(',').forEach(d => {
-            const btn = document.querySelector(`.day-btn[data-day="${d}"]`);
-            if (btn) btn.classList.add('active');
-        });
+    if (rec.startsWith('english:')) {
+        if (dom.customEnglish) dom.customEnglish.value = rec.replace('english:', '');
+        dom.customInterval.value = '1';
+        dom.customIntervalUnit.value = 'weeks';
+        resetDayButtons();
+    } else {
+        if (dom.customEnglish) dom.customEnglish.value = '';
+        // Format: "custom:1:weeks:mon,wed,fri" or "custom:2:days"
+        const parts = rec.replace('custom:', '').split(':');
+        dom.customInterval.value = parts[0] || '1';
+        dom.customIntervalUnit.value = parts[1] || 'weeks';
+        resetDayButtons();
+        if (parts[2]) {
+            parts[2].split(',').forEach(d => {
+                const btn = document.querySelector(`.day-btn[data-day="${d}"]`);
+                if (btn) btn.classList.add('active');
+            });
+        }
     }
 }
 
@@ -2014,6 +2188,9 @@ function resetDayButtons() {
 }
 
 function getCustomRecurrenceValue() {
+    if (dom.customEnglish && dom.customEnglish.value.trim()) {
+        return 'english:' + dom.customEnglish.value.trim();
+    }
     const interval = dom.customInterval.value || '1';
     const unit = dom.customIntervalUnit.value || 'weeks';
     const days = [...document.querySelectorAll('.day-btn.active')].map(b => b.dataset.day);
@@ -2076,8 +2253,31 @@ dom.modalRecurrence.addEventListener('change', () => {
 
 // Day button toggles
 document.querySelectorAll('.day-btn').forEach(btn => {
-    btn.addEventListener('click', () => btn.classList.toggle('active'));
+    btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        if (dom.customEnglish) dom.customEnglish.value = '';
+    });
 });
+
+if (dom.customInterval) {
+    dom.customInterval.addEventListener('input', () => {
+        if (dom.customEnglish) dom.customEnglish.value = '';
+    });
+}
+if (dom.customIntervalUnit) {
+    dom.customIntervalUnit.addEventListener('change', () => {
+        if (dom.customEnglish) dom.customEnglish.value = '';
+    });
+}
+if (dom.customEnglish) {
+    dom.customEnglish.addEventListener('input', () => {
+        if (dom.customEnglish.value.trim()) {
+            resetDayButtons();
+            dom.customInterval.value = '1';
+            dom.customIntervalUnit.value = 'weeks';
+        }
+    });
+}
 
 // Show/hide event fields when type changes
 dom.modalType.addEventListener('change', () => {
@@ -2121,6 +2321,14 @@ dom.modalSave.addEventListener('click', async () => {
         let recurrenceValue = dom.modalRecurrence.value || null;
         if (recurrenceValue === 'custom') {
             recurrenceValue = getCustomRecurrenceValue();
+        }
+
+        if (recurrenceValue && recurrenceValue.startsWith('english:')) {
+            const englishText = recurrenceValue.substring(8).trim();
+            const parsed = getNextEnglishRecurrenceDate(englishText, new Date(), new Date());
+            if (!parsed) {
+                alert('Warning: Could not parse English recurrence "' + englishText + '". It will be saved, but may not recur automatically until fixed.');
+            }
         }
 
         const updatePayload = {
