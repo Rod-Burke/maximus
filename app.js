@@ -2325,9 +2325,25 @@ dom.modalSave.addEventListener('click', async () => {
 
         if (recurrenceValue && recurrenceValue.startsWith('english:')) {
             const englishText = recurrenceValue.substring(8).trim();
-            const parsed = getNextEnglishRecurrenceDate(englishText, new Date(), new Date());
-            if (!parsed) {
-                alert('Warning: Could not parse English recurrence "' + englishText + '". It will be saved, but may not recur automatically until fixed.');
+            try {
+                const parseRes = await fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'parse_english_recurrence', text: englishText })
+                });
+                if (parseRes.ok) {
+                    const parseData = await parseRes.json();
+                    if (parseData.success && parseData.recurrence) {
+                        recurrenceValue = parseData.recurrence;
+                    } else {
+                        alert('Warning: Could not parse English recurrence "' + englishText + '". It will be saved, but may not recur automatically until fixed.');
+                    }
+                } else {
+                    alert('Warning: Recurrence parser service unavailable. Saving as-is.');
+                }
+            } catch (err) {
+                console.error('Failed to parse English recurrence via API:', err);
+                alert('Warning: Failed to connect to recurrence parser. Saving as-is.');
             }
         }
 
