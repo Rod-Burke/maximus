@@ -1630,14 +1630,14 @@ function renderTaskSection(title, items) {
                         }
                     }, 1000);
 
-                    const saveTimeout = setTimeout(() => {
+                    const saveTimeout = setTimeout(async () => {
                         undoBtn.remove();
                         if (bumpBtn) bumpBtn.style.display = '';
 
                         let updatePromise;
                         if (meta.recurrence) {
                             // Recurring task: roll due_date forward
-                            const nextDate = getNextRecurrenceDate(meta.recurrence, meta.due_date);
+                            const nextDate = await getNextRecurrenceDateAsync(meta.recurrence, meta.due_date);
                             const endDate = meta.recurrence_end;
                             if (endDate && nextDate > endDate) {
                                 meta.status = 'completed';
@@ -1933,6 +1933,32 @@ function formatRecurrence(rec) {
         }
     }
     return rec;
+}
+
+async function getNextRecurrenceDateAsync(recurrence, currentDueDate) {
+    if (!recurrence) return null;
+    if (recurrence.startsWith('english:')) {
+        try {
+            const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                body: JSON.stringify({
+                    action: 'get_next_recurrence_date',
+                    recurrence: recurrence,
+                    current_due_date: currentDueDate
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.next_date) {
+                    return data.next_date;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to get next recurrence date via LLM API:', err);
+        }
+    }
+    return getNextRecurrenceDate(recurrence, currentDueDate);
 }
 
 // --- RECURRENCE DATE CALCULATOR ---
