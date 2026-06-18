@@ -2,7 +2,7 @@ const CONFIG = {
     ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/voice-gateway',
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
     SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
-    KEY: 'eddaa00be5289a5cd4130b01055cdef8123fa72994a9ad9784256806c2339ace'
+    KEY: '4f4bfce4ae96af52c35c0f6c4491a9b5e20caea9c52489a07ccd6083f1d2455d'
 };
 
 const dom = {

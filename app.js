@@ -395,7 +395,7 @@ async function askMaximus(text, options = {}) {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        const answer = data.text || "Couldn't reach your brain.";
+        const answer = data.text || (data.error ? `Error: ${data.error}` : "Couldn't reach your brain.");
         lastInputText = text;
         
         // --- DUPLICATE DETECTION ---
@@ -522,7 +522,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
                 })
             });
             const data = await res.json();
-            const answer = data.text || "Couldn't process that.";
+            const answer = data.text || (data.error ? `Error: ${data.error}` : "Couldn't process that.");
             
             if (data.thoughtId) {
                 lastThoughtId = data.thoughtId;
@@ -2608,17 +2608,23 @@ dom.quickCaptureSubmit.addEventListener('click', async () => {
         });
         const data = await res.json();
         
-        dom.quickCaptureStatus.textContent = data.text || 'Captured!';
-        dom.quickCaptureInput.value = '';
-        dom.quickCaptureSubmit.textContent = 'Capture';
-        dom.quickCaptureSubmit.disabled = false;
-        
-        // Auto-close after a brief delay so user sees the confirmation
-        setTimeout(() => {
-            closeQuickCapture();
-            // Refresh tasks if the tasks panel is open
-            if (!dom.tasksPanel.classList.contains('hidden')) loadTasksDashboard();
-        }, 1200);
+        if (data.error) {
+            dom.quickCaptureStatus.textContent = 'Error: ' + data.error;
+            dom.quickCaptureSubmit.textContent = 'Retry';
+            dom.quickCaptureSubmit.disabled = false;
+        } else {
+            dom.quickCaptureStatus.textContent = data.text || 'Captured!';
+            dom.quickCaptureInput.value = '';
+            dom.quickCaptureSubmit.textContent = 'Capture';
+            dom.quickCaptureSubmit.disabled = false;
+            
+            // Auto-close after a brief delay so user sees the confirmation
+            setTimeout(() => {
+                closeQuickCapture();
+                // Refresh tasks if the tasks panel is open
+                if (!dom.tasksPanel.classList.contains('hidden')) loadTasksDashboard();
+            }, 1200);
+        }
     } catch (e) {
         dom.quickCaptureStatus.textContent = 'Error capturing.';
         dom.quickCaptureSubmit.textContent = 'Retry';
