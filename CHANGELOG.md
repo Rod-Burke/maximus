@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v117] - 2026-06-17
+
+### Task: Add yearly recurrence to recurring events and tasks (Rework)
+- **ID**: `1d1833f6-91f7-4425-8621-1bcf67c5153f`
+- **Changes**:
+  - Implemented backend action `get_next_recurrence_date` using Deno and Gemini to calculate complex/relative recurrences (e.g. `english:the first Friday of the month`, `english:every Easter`).
+  - Integrated async recurrence rolling in the PWA client-side completion handler (`app.js`).
+  - Implemented completed recurring task rollover support in Google Tasks pull sync (`sync-google` Edge Function).
+  - Standardized prompt formats in the metadata extraction prompt in `_shared/ai.ts`.
+  - Bumped PWA service worker cache name and asset version query strings to `v117`.
+
+---
+
 ## [v116] - 2026-06-17
 
 ### Task: Thought summarizing is not functioning
