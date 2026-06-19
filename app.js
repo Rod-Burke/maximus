@@ -4509,16 +4509,22 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 });
 
 // --- DYNAMIC VERSION ---
-const appScript = document.querySelector('script[src^="app.js"]');
+const appScript = document.querySelector('script[src*="app.js"]');
+let versionStr = 'v118';
 if (appScript) {
-    const urlParams = new URLSearchParams(appScript.src.split('?')[1] || '');
-    const v = urlParams.get('v');
-    if (v) {
-        const versionEl = document.querySelector('.app-version');
-        if (versionEl) {
-            versionEl.textContent = `v${v}`;
+    const srcAttr = appScript.getAttribute('src') || appScript.src || '';
+    const parts = srcAttr.split('?');
+    if (parts.length > 1) {
+        const urlParams = new URLSearchParams(parts[1]);
+        const v = urlParams.get('v');
+        if (v) {
+            versionStr = `v${v}`;
         }
     }
+}
+const versionEl = document.querySelector('.app-version');
+if (versionEl) {
+    versionEl.textContent = versionStr;
 }
 
 // --- NAVIGATION INTERCEPT (BACK BUTTON) ---
