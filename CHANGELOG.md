@@ -6,6 +6,17 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v119] - 2026-06-19
+
+### Task: Add yearly recurrence to recurring events and tasks (Rework - Hotfix)
+- **ID**: `1d1833f6-91f7-4425-8621-1bcf67c5153f`
+- **Changes**:
+  - Fixed syntax error in `app.js` caused by duplicate declaration of `todayStr_pre` in `loadTasksDashboard` which had caused the script parsing to fail and make the PWA unresponsive.
+  - Ported `getEasterDate`, `getNthWeekdayOfMonth`, and `getNextEnglishRecurrenceDate` helper functions locally to `app.js` to prevent ReferenceError crashes when parsing English recurrence patterns offline or on initial loading fallback paths.
+  - Bumped PWA service worker cache name and asset version query strings to `v119`.
+
+---
+
 ## [v118] - 2026-06-19
 
 ### Task: Add yearly recurrence to recurring events and tasks (Rework - Event Recurrence Projection & Auto-Roll)

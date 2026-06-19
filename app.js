@@ -1372,7 +1372,6 @@ async function loadTasksDashboard() {
         const recurring = [];
         const actionable = [];
 
-        const todayStr_pre = getLocalDateStr();
         activeItems.forEach(t => {
             const meta = t.metadata || {};
             const rec = (meta.recurrence || '').toLowerCase();
@@ -2073,6 +2072,131 @@ function getNextRecurrenceDate(recurrence, currentDueDate) {
     }
     
     return getLocalDateStr(next); // YYYY-MM-DD in local timezone
+}
+
+function getEasterDate(year) {
+  const f = Math.floor;
+  const a = year % 19;
+  const b = f(year / 100);
+  const c = year % 100;
+  const d = f(b / 4);
+  const e = b % 4;
+  const g = f((8 * b + 13) / 25);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = f(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = f((a + 11 * h + 22 * l) / 451);
+  const month = f((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function getNthWeekdayOfMonth(year, month, nth, targetWeekday) {
+  if (nth === -1) {
+    const lastDay = new Date(year, month + 1, 0);
+    while (lastDay.getDay() !== targetWeekday) {
+      lastDay.setDate(lastDay.getDate() - 1);
+    }
+    return lastDay;
+  } else {
+    const firstDay = new Date(year, month, 1);
+    let count = 0;
+    const current = new Date(firstDay);
+    while (current.getMonth() === month) {
+      if (current.getDay() === targetWeekday) {
+        count++;
+        if (count === nth) {
+          return current;
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+  }
+  return null;
+}
+
+function getNextEnglishRecurrenceDate(text, base, today) {
+  const textClean = text.toLowerCase().trim();
+  
+  const weekdayMap = {
+    sunday: 0, sun: 0,
+    monday: 1, mon: 1,
+    tuesday: 2, tue: 2,
+    wednesday: 3, wed: 3,
+    thursday: 4, thu: 4,
+    friday: 5, fri: 5,
+    saturday: 6, sat: 6
+  };
+  
+  const nthMap = {
+    first: 1,
+    second: 2,
+    third: 3,
+    fourth: 4,
+    fifth: 5,
+    last: -1
+  };
+
+  const nthWeekdayRegex = /the\s+(first|second|third|fourth|fifth|last)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+of\s+the\s+month/;
+  const nthWeekdayMatch = textClean.match(nthWeekdayRegex);
+  if (nthWeekdayMatch) {
+    const nthStr = nthWeekdayMatch[1];
+    const weekdayStr = nthWeekdayMatch[2];
+    const nth = nthMap[nthStr];
+    const targetWeekday = weekdayMap[weekdayStr];
+    
+    const year = base.getFullYear();
+    const month = base.getMonth();
+    
+    for (let mOffset = 0; mOffset < 24; mOffset++) {
+      const candidateYear = year + Math.floor((month + mOffset) / 12);
+      const candidateMonth = (month + mOffset) % 12;
+      const candidateDate = getNthWeekdayOfMonth(candidateYear, candidateMonth, nth, targetWeekday);
+      if (candidateDate && candidateDate > base && candidateDate > today) {
+        return candidateDate;
+      }
+    }
+  }
+  
+  if (textClean === 'every easter' || textClean === 'easter') {
+    const year = base.getFullYear();
+    for (let yOffset = 0; yOffset < 5; yOffset++) {
+      const candidateYear = year + yOffset;
+      const easter = getEasterDate(candidateYear);
+      if (easter > base && easter > today) {
+        return easter;
+      }
+    }
+  }
+  
+  const easterOffsetRegex = /(.+)\s+days?\s+(before|after)\s+easter/;
+  const easterOffsetMatch = textClean.match(easterOffsetRegex);
+  if (easterOffsetMatch) {
+    const amountStr = easterOffsetMatch[1].trim();
+    const dir = easterOffsetMatch[2];
+    const numMap = {
+      one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10
+    };
+    let amount = parseInt(amountStr);
+    if (isNaN(amount)) {
+      amount = numMap[amountStr] || 0;
+    }
+    const offset = dir === 'before' ? -amount : amount;
+    
+    const year = base.getFullYear();
+    for (let yOffset = 0; yOffset < 5; yOffset++) {
+      const candidateYear = year + yOffset;
+      const easter = getEasterDate(candidateYear);
+      const candidateDate = new Date(easter);
+      candidateDate.setDate(candidateDate.getDate() + offset);
+      if (candidateDate > base && candidateDate > today) {
+        return candidateDate;
+      }
+    }
+  }
+  
+  return null;
 }
 
 function getDragAfterElement(container, y) {
@@ -4510,7 +4634,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v118';
+let versionStr = 'v119';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');
