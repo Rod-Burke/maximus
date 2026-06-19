@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v118] - 2026-06-19
+
+### Task: Add yearly recurrence to recurring events and tasks (Rework - Event Recurrence Projection & Auto-Roll)
+- **ID**: `1d1833f6-91f7-4425-8621-1bcf67c5153f`
+- **Changes**:
+  - Implemented automatic background roll-forward for past recurring events in the PWA `loadTasksDashboard` to dynamically calculate, update locally, and persist next recurrence dates.
+  - Implemented automatic background roll-forward for past recurring events in the `voice-gateway` agenda handler.
+  - Allowed recurring events to fall through to recurrence checking logic in the voice gateway's `isScheduledForDate` function.
+  - Enhanced the general search memory context generator in `voice-gateway` to expose Type, Status, Due Date, and Recurrence to Gemini for accurate natural-language recurrence replies.
+  - Bumped PWA service worker cache name and asset version query strings to `v118`.
+
+---
+
 ## [v117] - 2026-06-17
 
 ### Task: Add yearly recurrence to recurring events and tasks (Rework)

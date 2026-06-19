@@ -1305,6 +1305,34 @@ async function loadTasksDashboard() {
         });
         const data = await res.json();
         if (!data.thoughts) return;
+
+        // Auto-roll forward past recurring events in background
+        const todayStr_pre = getLocalDateStr();
+        const rollPromises = data.thoughts.map(async (t) => {
+            const meta = t.metadata || {};
+            if (meta.type === 'event' && meta.recurrence && meta.due_date && meta.due_date < todayStr_pre) {
+                try {
+                    const nextDate = await getNextRecurrenceDateAsync(meta.recurrence, meta.due_date);
+                    if (nextDate && nextDate !== meta.due_date) {
+                        meta.due_date = nextDate;
+                        t.metadata = meta; // update in memory
+                        // Fire-and-forget update to the database
+                        fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({
+                                action: 'update',
+                                id: t.id,
+                                metadata: meta
+                            })
+                        }).catch(err => console.error("Auto-roll database update failed:", err));
+                    }
+                } catch (e) {
+                    console.error("Failed to calculate next recurrence date for auto-roll:", e);
+                }
+            }
+        });
+        await Promise.all(rollPromises);
         
         // Filter tasks and events based on the 3-state toggle
         const filterState = getCompletedFilterState();
