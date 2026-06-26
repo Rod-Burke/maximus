@@ -1,9 +1,10 @@
-const CACHE_NAME = 'maximus-v123';
+const CACHE_NAME = 'maximus-v124';
 const ASSETS = ['index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'migration.html', 'migration.js'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+  const requests = ASSETS.map(url => new Request(url, { cache: 'reload' }));
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(requests)));
 });
 
 self.addEventListener('activate', (e) => {

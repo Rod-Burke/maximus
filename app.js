@@ -1202,7 +1202,7 @@ dom.syncTasksBtn.addEventListener('click', async () => {
         const res = await fetch(CONFIG.SYNC_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-            body: JSON.stringify({ action: 'pull' })
+            body: JSON.stringify({ action: 'pull', localToday: getLocalDateStr() })
         });
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
@@ -1434,11 +1434,8 @@ async function loadTasksDashboard() {
             return oa - ob;
         });
 
-        // Sort unscheduled: previously-bumped items float to top, otherwise sort by order
+        // Sort unscheduled strictly by order field
         unscheduled.sort((a, b) => {
-            if (a._wasBumped && !b._wasBumped) return -1;
-            if (!a._wasBumped && b._wasBumped) return 1;
-            
             const oa = a.metadata?.order !== undefined ? a.metadata.order : 999999;
             const ob = b.metadata?.order !== undefined ? b.metadata.order : 999999;
             return oa - ob;
@@ -4645,7 +4642,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v123';
+let versionStr = 'v124';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');
