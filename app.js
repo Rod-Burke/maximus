@@ -1357,8 +1357,9 @@ async function loadTasksDashboard() {
             const m_a = a.metadata || {};
             const m_b = b.metadata || {};
             
-            // Explicit order field from drag and drop
-            if (m_a.order !== undefined && m_b.order !== undefined) return m_a.order - m_b.order;
+            const oa = m_a.order !== undefined ? m_a.order : 999999;
+            const ob = m_b.order !== undefined ? m_b.order : 999999;
+            if (oa !== ob) return oa - ob;
 
             // Bumped to top
             if (m_a.bumped_at && !m_b.bumped_at) return -1;
@@ -1426,11 +1427,21 @@ async function loadTasksDashboard() {
             }
         });
 
-        // Sort unscheduled: previously-bumped items float to top
+        // Sort todayTasks by order field
+        todayTasks.sort((a, b) => {
+            const oa = a.metadata?.order !== undefined ? a.metadata.order : 999999;
+            const ob = b.metadata?.order !== undefined ? b.metadata.order : 999999;
+            return oa - ob;
+        });
+
+        // Sort unscheduled: previously-bumped items float to top, otherwise sort by order
         unscheduled.sort((a, b) => {
             if (a._wasBumped && !b._wasBumped) return -1;
             if (!a._wasBumped && b._wasBumped) return 1;
-            return 0; // preserve original order otherwise
+            
+            const oa = a.metadata?.order !== undefined ? a.metadata.order : 999999;
+            const ob = b.metadata?.order !== undefined ? b.metadata.order : 999999;
+            return oa - ob;
         });
 
         dom.tasksList.innerHTML = '';
@@ -4634,7 +4645,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v122';
+let versionStr = 'v123';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');
