@@ -171,7 +171,6 @@ const dom = {
     modalCtProject: document.getElementById('modal-ct-project'),
     modalCtComplexity: document.getElementById('modal-ct-complexity'),
     modalCtStatus: document.getElementById('modal-ct-status'),
-    modalCtWorkstream: document.getElementById('modal-ct-workstream'),
     modalCtImproveBtn: document.getElementById('modal-ct-improve-btn'),
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
@@ -1005,16 +1004,16 @@ function renderHistoryList(thoughts) {
             let codingTaskHtml = '';
             if (type === 'coding_task') {
                 const ct = meta.coding_task || {};
-                const ctProject = ct.project || 'uncategorized';
+                const resolvedProjectKey = ct.workstream || ct.project || 'uncategorized';
+                const ctProjectName = PROJECT_LABELS[resolvedProjectKey] || resolvedProjectKey;
                 const ctComplexity = ct.complexity || 'moderate';
                 const ctStatus = ct.status || 'draft';
-                const ctWorkstream = ct.workstream || '';
                 
                 codingTaskHtml = `
                     <div class="details-grid coding-task-details" style="margin-top: 0.5rem;">
                         <div class="details-meta-item">
                             <span class="details-label">Project</span>
-                            <span class="details-value">${ctProject}</span>
+                            <span class="details-value">${ctProjectName}</span>
                         </div>
                         <div class="details-meta-item">
                             <span class="details-label">Complexity</span>
@@ -1024,11 +1023,6 @@ function renderHistoryList(thoughts) {
                             <span class="details-label">CT Status</span>
                             <span class="details-value"><span class="badge status-${ctStatus}">${ctStatus}</span></span>
                         </div>
-                        ${ctWorkstream ? `
-                        <div class="details-meta-item">
-                            <span class="details-label">Workstream</span>
-                            <span class="details-value">${ctWorkstream}</span>
-                        </div>` : ''}
                     </div>
                 `;
             }
@@ -2326,15 +2320,14 @@ function openTaskModal(id, content, meta) {
     const isCodingTask = (meta.type === 'coding_task');
     toggleCodingTaskFields(isCodingTask);
     if (isCodingTask && meta.coding_task) {
-        dom.modalCtProject.value = meta.coding_task.project || 'uncategorized';
+        const projectKey = meta.coding_task.workstream || meta.coding_task.project || 'uncategorized';
+        dom.modalCtProject.value = projectKey;
         dom.modalCtComplexity.value = meta.coding_task.complexity || 'moderate';
         dom.modalCtStatus.value = meta.coding_task.status || 'draft';
-        dom.modalCtWorkstream.value = meta.coding_task.workstream || '';
     } else {
         dom.modalCtProject.value = 'uncategorized';
         dom.modalCtComplexity.value = 'moderate';
         dom.modalCtStatus.value = 'draft';
-        dom.modalCtWorkstream.value = '';
     }
     
     // Toggle Complete button label based on current status
@@ -2596,8 +2589,8 @@ dom.modalSave.addEventListener('click', async () => {
                         complexity: dom.modalCtComplexity.value,
                         status: dom.modalCtStatus.value,
                         priority: dom.modalPriority.value === 'high' ? 'high' : dom.modalPriority.value === 'low' ? 'low' : 'medium',
-                        workspace: ['chatops','quote_manager','liturgy_explorer','homily_pipeline','stream_management','backups_devops'].includes(dom.modalCtProject.value) ? 'airmaria' : 'openbrain',
-                        workstream: dom.modalCtWorkstream.value || null,
+                        workspace: getWorkspaceForProjectKey(dom.modalCtProject.value),
+                        workstream: null,
                     }
                 } : {})
             }
@@ -3232,7 +3225,6 @@ const ctDom = {
     filterProject: document.getElementById('ct-filter-project'),
     copySearchBtn: document.getElementById('ct-copy-search-btn'),
     projectInfoBtn: document.getElementById('ct-project-info-btn'),
-    filterWorkstream: document.getElementById('ct-filter-workstream'),
     filterStatus: document.getElementById('ct-filter-status'),
     sortBy: document.getElementById('ct-sort-by'),
     filterDraft: document.getElementById('ct-filter-draft'),
@@ -3246,10 +3238,21 @@ const ctDom = {
     addPriority: document.getElementById('add-ct-priority'),
     addComplexity: document.getElementById('add-ct-complexity'),
     addStatus: document.getElementById('add-ct-status'),
-    addWorkstream: document.getElementById('add-ct-workstream'),
     addSubmit: document.getElementById('add-ct-submit'),
     addCancel: document.getElementById('add-ct-cancel'),
     closeAddModal: document.getElementById('close-add-ct'),
+    // Add Project Modal
+    addProjectModal: document.getElementById('add-project-modal'),
+    addProjectParent: document.getElementById('add-project-parent'),
+    addProjectName: document.getElementById('add-project-name'),
+    addProjectKey: document.getElementById('add-project-key'),
+    addProjectWorkspace: document.getElementById('add-project-workspace'),
+    addProjectWorkspaceRow: document.getElementById('add-project-workspace-row'),
+    addProjectDesc: document.getElementById('add-project-desc'),
+    addProjectError: document.getElementById('add-project-error'),
+    addProjectCancel: document.getElementById('add-project-cancel'),
+    addProjectSubmit: document.getElementById('add-project-submit'),
+    closeAddProject: document.getElementById('close-add-project'),
     // Improve Dialog
     improveDialog: document.getElementById('improve-ct-dialog'),
     closeImprove: document.getElementById('close-improve-ct'),
@@ -3298,33 +3301,290 @@ function setImproveRenderedText(text) {
 
 let ctImproveTaskId = null; // Track which task is being improved
 
-const PROJECT_LABELS = {
-    chatops: 'Chat Ops', quote_manager: 'Quote Mgr', liturgy_explorer: 'Liturgy',
-    homily_pipeline: 'Homily', stream_management: 'Streams', backups_devops: 'DevOps',
-    maximus_core: 'Maximus', open_brain: 'Open Brain', infrastructure: 'Infra',
-    uncategorized: 'Other'
-};
+// --- DYNAMIC PROJECT ARCHITECTURE ---
+let projectsConfigThoughtId = null;
+
+const DEFAULT_PROJECT_TREE = [
+    {
+        key: 'maximus_core',
+        name: 'Maximus Core',
+        desc: 'Central PWA dashboard, voice capturing, and task tracking.',
+        workspace: 'openbrain',
+        subprojects: [
+            { key: 'maximus_ui_ux', name: 'UI & UX Design', desc: 'UI improvements, styling, animations, and layouts.' },
+            { key: 'google_tasks_sync', name: 'Google Tasks Sync', desc: 'Two-way tasks sync with Google Tasks.' },
+            { key: 'task_deletion_logging', name: 'Task Deletion & Logging', desc: 'Logging creation, updates, and deletions.' }
+        ]
+    },
+    {
+        key: 'chatops',
+        name: 'Chat Ops',
+        desc: 'UI panel and administrative tools for chat moderation, message history, participant intentions, and prayer orchestration.',
+        workspace: 'airmaria',
+        subprojects: [
+            { key: 'chatops_participants', name: 'Participants Management', desc: 'Tracking chat participants.' },
+            { key: 'chatops_intentions', name: 'Intentions Tracker', desc: 'Orchestrating prayer intentions.' },
+            { key: 'chatops_today_enrichment', name: 'Today Enrichment', desc: 'Enriching chat streams with today\'s data.' },
+            { key: 'chatops_external_integrations', name: 'External Integrations', desc: 'Integrations with external chat platforms.' }
+        ]
+    },
+    {
+        key: 'liturgy_explorer',
+        name: 'Liturgy Explorer',
+        desc: 'Liturgical readings calendar, weekday fetcher, and missal database.',
+        workspace: 'airmaria'
+    },
+    {
+        key: 'homily_pipeline',
+        name: 'Homily Pipeline',
+        desc: 'AI homily processing: audio upload, transcription, and YouTube publishing.',
+        workspace: 'airmaria'
+    },
+    {
+        key: 'stream_management',
+        name: 'Stream Management',
+        desc: 'Live stream scheduling and stream cancellation automation.',
+        workspace: 'airmaria',
+        subprojects: [
+            { key: 'stream_scheduling_automation', name: 'Scheduling Automation', desc: 'Automating custom event creation and templates.' }
+        ]
+    },
+    {
+        key: 'backups_devops',
+        name: 'Backups & DevOps',
+        desc: 'Database backups, exports, health monitoring, and server configs.',
+        workspace: 'airmaria',
+        subprojects: [
+            { key: 'system_backups', name: 'System Backups', desc: 'Automating database and files backup.' }
+        ]
+    },
+    {
+        key: 'open_brain',
+        name: 'Open Brain',
+        desc: 'Supabase vector database, semantic search, and reference storage.',
+        workspace: 'openbrain',
+        subprojects: [
+            { key: 'openbrain_migration', name: 'OpenBrain Ingestion', desc: 'Ingestion pipelines and migrations.' }
+        ]
+    },
+    {
+        key: 'infrastructure',
+        name: 'Infrastructure',
+        desc: 'Server configs, edge functions, migrations, and performance.',
+        workspace: 'openbrain'
+    },
+    {
+        key: 'uncategorized',
+        name: 'Other (Uncategorized)',
+        desc: 'General tasks not tied to a specific sub-project.',
+        workspace: 'openbrain'
+    }
+];
+
+const DEFAULT_GENERAL_CATEGORIES = [
+    {
+        key: 'personal',
+        name: 'Personal',
+        subcategories: [
+            { key: 'medication', name: 'Medication' },
+            { key: 'pet_care', name: 'Pet Care' },
+            { key: 'finances', name: 'Finances' }
+        ]
+    },
+    {
+        key: 'house_chapter',
+        name: 'House Chapter'
+    },
+    {
+        key: 'groundskeeping',
+        name: 'Groundskeeping'
+    }
+];
+
+let projectTree = [...DEFAULT_PROJECT_TREE];
+let generalCategories = [...DEFAULT_GENERAL_CATEGORIES];
+
+let PROJECT_LABELS = {};
+let PROJECT_DESCRIPTIONS = {};
+let previousFilterProjectVal = '';
+
+function rebuildProjectLookups() {
+    PROJECT_LABELS = {};
+    PROJECT_DESCRIPTIONS = {};
+    projectTree.forEach(proj => {
+        PROJECT_LABELS[proj.key] = proj.name;
+        PROJECT_DESCRIPTIONS[proj.key] = proj.desc || '';
+        if (proj.subprojects) {
+            proj.subprojects.forEach(sub => {
+                PROJECT_LABELS[sub.key] = sub.name;
+                PROJECT_DESCRIPTIONS[sub.key] = sub.desc || '';
+            });
+        }
+    });
+}
+
+function getWorkspaceForProjectKey(key) {
+    for (const proj of projectTree) {
+        if (proj.key === key) {
+            return proj.workspace || 'openbrain';
+        }
+        if (proj.subprojects) {
+            for (const sub of proj.subprojects) {
+                if (sub.key === key) {
+                    return proj.workspace || 'openbrain';
+                }
+            }
+        }
+    }
+    return 'openbrain';
+}
+
+async function loadProjectsConfig() {
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({ action: 'list', type: 'projects_config', limit: 1 })
+        });
+        const data = await res.json();
+        if (data.success && data.thoughts && data.thoughts.length > 0) {
+            const configThought = data.thoughts[0];
+            projectsConfigThoughtId = configThought.id;
+            if (configThought.metadata && configThought.metadata.projects) {
+                projectTree = configThought.metadata.projects;
+            }
+            if (configThought.metadata && configThought.metadata.categories) {
+                generalCategories = configThought.metadata.categories;
+            }
+        } else {
+            await saveProjectsConfigToDb(DEFAULT_PROJECT_TREE, DEFAULT_GENERAL_CATEGORIES);
+        }
+    } catch (e) {
+        console.error("Failed to load projects configuration from DB:", e);
+    }
+    rebuildProjectLookups();
+    populateProjectDropdowns();
+}
+
+async function saveProjectsConfigToDb(tree, categories) {
+    try {
+        const content = "Maximus Project Management System Unified Hierarchy Configuration";
+        const metadata = {
+            type: 'projects_config',
+            projects: tree,
+            categories: categories
+        };
+        
+        let body;
+        if (projectsConfigThoughtId) {
+            body = {
+                action: 'update',
+                id: projectsConfigThoughtId,
+                content,
+                metadata
+            };
+        } else {
+            body = {
+                action: 'add',
+                content,
+                metadata
+            };
+        }
+        
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (data.thought) {
+                projectsConfigThoughtId = data.thought.id;
+            } else if (data.updated) {
+                projectsConfigThoughtId = data.updated.id;
+            }
+        }
+    } catch (e) {
+        console.error("Error saving projects config:", e);
+    }
+}
+
+function populateProjectDropdowns(selectedKey) {
+    if (ctDom.filterProject) {
+        const currentVal = selectedKey || ctDom.filterProject.value || '';
+        let html = '<option value="">All Projects</option>';
+        projectTree.forEach(proj => {
+            if (proj.subprojects && proj.subprojects.length > 0) {
+                html += `<optgroup label="${proj.name}">`;
+                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                proj.subprojects.forEach(sub => {
+                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                });
+                html += `</optgroup>`;
+            } else {
+                html += `<option value="${proj.key}">${proj.name}</option>`;
+            }
+        });
+        html += `<option value="_add_new_project_">+ Add New Project...</option>`;
+        ctDom.filterProject.innerHTML = html;
+        ctDom.filterProject.value = currentVal;
+        previousFilterProjectVal = currentVal;
+    }
+    
+    if (ctDom.addProject) {
+        const currentVal = ctDom.addProject.value || 'maximus_core';
+        let html = '';
+        projectTree.forEach(proj => {
+            if (proj.subprojects && proj.subprojects.length > 0) {
+                html += `<optgroup label="${proj.name}">`;
+                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                proj.subprojects.forEach(sub => {
+                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                });
+                html += `</optgroup>`;
+            } else {
+                html += `<option value="${proj.key}">${proj.name}</option>`;
+            }
+        });
+        ctDom.addProject.innerHTML = html;
+        const hasOption = Array.from(ctDom.addProject.options).some(opt => opt.value === currentVal);
+        ctDom.addProject.value = hasOption ? currentVal : 'maximus_core';
+    }
+    
+    if (dom.modalCtProject) {
+        const currentVal = dom.modalCtProject.value || 'uncategorized';
+        let html = '';
+        projectTree.forEach(proj => {
+            if (proj.subprojects && proj.subprojects.length > 0) {
+                html += `<optgroup label="${proj.name}">`;
+                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                proj.subprojects.forEach(sub => {
+                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                });
+                html += `</optgroup>`;
+            } else {
+                html += `<option value="${proj.key}">${proj.name}</option>`;
+            }
+        });
+        dom.modalCtProject.innerHTML = html;
+        const hasOption = Array.from(dom.modalCtProject.options).some(opt => opt.value === currentVal);
+        dom.modalCtProject.value = hasOption ? currentVal : 'uncategorized';
+    }
+    
+    if (ctDom.addProjectParent) {
+        let html = '<option value="">None (Main Project)</option>';
+        projectTree.forEach(proj => {
+            html += `<option value="${proj.key}">${proj.name}</option>`;
+        });
+        ctDom.addProjectParent.innerHTML = html;
+    }
+}
 
 const STATUS_LABELS = {
     draft: 'Draft', needs_clarification: 'Needs Clarification', needs_plan_approval: 'Needs Plan Approval',
     ready_for_antigravity: 'Ready for Antigravity',
     rework_in_antigravity: 'Rework in Antigravity', in_progress: 'In Progress',
     needs_verification: 'Needs Verification', needs_logging: 'Needs Logging', done: 'Done'
-};
-
-const WORKSTREAM_LABELS = {
-    maximus_ui_ux: 'UI & UX',
-    google_tasks_sync: 'Google Sync',
-    task_deletion_logging: 'Deletion & Logs',
-    ai_categorization_processing: 'AI Categorization',
-    chatops_participants: 'CO Participants',
-    chatops_intentions: 'CO Intentions',
-    chatops_today_enrichment: 'CO Today Panel',
-    chatops_external_integrations: 'CO Ext Integrations',
-    stream_scheduling_automation: 'Stream Scheduling',
-    openbrain_migration: 'OpenBrain Ingestion',
-    api_mail_integration: 'API & Mail',
-    system_backups: 'Backups'
 };
 
 const STATUS_GROUPS = {
@@ -3350,11 +3610,14 @@ document.getElementById('refresh-coding-tasks').addEventListener('click', loadCo
 
 // Filters
 ctDom.filterProject.addEventListener('change', () => {
+    if (ctDom.filterProject.value === '_add_new_project_') {
+        ctDom.filterProject.value = previousFilterProjectVal;
+        openAddProjectModal();
+        return;
+    }
+    previousFilterProjectVal = ctDom.filterProject.value;
     loadCodingTasks();
     updateProjectInfoTooltip();
-});
-ctDom.filterWorkstream.addEventListener('change', () => {
-    loadCodingTasks();
 });
 ctDom.filterStatus.addEventListener('change', () => {
     activeQuickFilter = null;
@@ -3506,9 +3769,7 @@ async function loadCodingTasks() {
     ctDom.list.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Loading coding tasks...</div>';
     try {
         const body = { action: 'list_coding_tasks' };
-        const project = ctDom.filterProject.value;
         const status = ctDom.filterStatus.value;
-        if (project) body.project = project;
         if (!activeQuickFilter && status) body.status = status;
 
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
@@ -3521,10 +3782,24 @@ async function loadCodingTasks() {
 
         let tasks = data.thoughts;
         
-        // Client-side workstream filter
-        const workstreamFilter = ctDom.filterWorkstream.value;
-        if (workstreamFilter) {
-            tasks = tasks.filter(t => t.metadata?.coding_task?.workstream === workstreamFilter);
+        // Resolve project key with legacy workstream fallback for each task
+        tasks.forEach(t => {
+            if (t.metadata && t.metadata.coding_task) {
+                t.metadata.coding_task.resolvedProject = t.metadata.coding_task.workstream || t.metadata.coding_task.project || 'uncategorized';
+            }
+        });
+
+        // Client-side project filter supporting parent-child hierarchy
+        const projectFilter = ctDom.filterProject.value;
+        if (projectFilter) {
+            const parentProj = projectTree.find(p => p.key === projectFilter);
+            const childKeys = parentProj && parentProj.subprojects ? parentProj.subprojects.map(s => s.key) : [];
+            const allowedKeys = [projectFilter, ...childKeys];
+            
+            tasks = tasks.filter(t => {
+                const projKey = t.metadata?.coding_task?.resolvedProject || 'uncategorized';
+                return allowedKeys.includes(projKey);
+            });
         }
 
         if (activeQuickFilter === 'draft') {
@@ -3669,9 +3944,8 @@ function renderCodingTaskCard(t) {
 
     const priority = ct.priority || 'medium';
     const status = ct.status || 'draft';
-    const project = ct.project || 'uncategorized';
+    const project = ct.resolvedProject || ct.workstream || ct.project || 'uncategorized';
     const complexity = ct.complexity || 'moderate';
-    const workstream = ct.workstream || '';
     const summary = meta.summary || t.content.substring(0, 80);
 
     el.innerHTML = `
@@ -3682,7 +3956,6 @@ function renderCodingTaskCard(t) {
                 <div class="ct-meta-row">
                     <span class="ct-badge status-${status}">${STATUS_LABELS[status] || status}</span>
                     <span class="ct-badge project">${PROJECT_LABELS[project] || project}</span>
-                    ${workstream ? `<span class="ct-badge workstream-badge">${WORKSTREAM_LABELS[workstream] || workstream}</span>` : ''}
                     <span class="ct-badge priority-badge priority-${priority}">${priority === 'high' ? '🔴 High' : priority === 'low' ? '🟢 Low' : '🟡 Medium'}</span>
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
@@ -3699,20 +3972,19 @@ function renderCodingTaskCard(t) {
                         `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`
                     ).join('')}
                 </select>
-                <select class="ct-inline-select ct-workstream-select" title="Workstream">
-                    <option value="">No Workstream</option>
-                    <option value="maximus_ui_ux" ${workstream === 'maximus_ui_ux' ? 'selected' : ''}>UI & UX</option>
-                    <option value="google_tasks_sync" ${workstream === 'google_tasks_sync' ? 'selected' : ''}>Google Sync</option>
-                    <option value="task_deletion_logging" ${workstream === 'task_deletion_logging' ? 'selected' : ''}>Deletion/Logs</option>
-                    <option value="ai_categorization_processing" ${workstream === 'ai_categorization_processing' ? 'selected' : ''}>AI Categorization</option>
-                    <option value="chatops_participants" ${workstream === 'chatops_participants' ? 'selected' : ''}>CO Participants</option>
-                    <option value="chatops_intentions" ${workstream === 'chatops_intentions' ? 'selected' : ''}>CO Intentions</option>
-                    <option value="chatops_today_enrichment" ${workstream === 'chatops_today_enrichment' ? 'selected' : ''}>CO Today</option>
-                    <option value="chatops_external_integrations" ${workstream === 'chatops_external_integrations' ? 'selected' : ''}>CO Ext Integrations</option>
-                    <option value="stream_scheduling_automation" ${workstream === 'stream_scheduling_automation' ? 'selected' : ''}>Stream Scheduling</option>
-                    <option value="openbrain_migration" ${workstream === 'openbrain_migration' ? 'selected' : ''}>OpenBrain Ingestion</option>
-                    <option value="api_mail_integration" ${workstream === 'api_mail_integration' ? 'selected' : ''}>API & Mail</option>
-                    <option value="system_backups" ${workstream === 'system_backups' ? 'selected' : ''}>Backups</option>
+                <select class="ct-inline-select ct-project-select" title="Project">
+                    ${projectTree.map(proj => {
+                        if (proj.subprojects && proj.subprojects.length > 0) {
+                            return `<optgroup label="${proj.name}">
+                                <option value="${proj.key}" ${proj.key === project ? 'selected' : ''}>${proj.name} (Main)</option>
+                                ${proj.subprojects.map(sub => 
+                                    `<option value="${sub.key}" ${sub.key === project ? 'selected' : ''}>${sub.name}</option>`
+                                ).join('')}
+                            </optgroup>`;
+                        } else {
+                            return `<option value="${proj.key}" ${proj.key === project ? 'selected' : ''}>${proj.name}</option>`;
+                        }
+                    }).join('')}
                 </select>
                 <select class="ct-inline-select ct-priority-select" title="Priority">
                     <option value="high" ${priority === 'high' ? 'selected' : ''}>🔴 High</option>
@@ -3775,10 +4047,12 @@ function renderCodingTaskCard(t) {
         await updateCodingTaskMeta(t.id, meta);
     });
 
-    // Workstream change
-    el.querySelector('.ct-workstream-select').addEventListener('change', async function() {
-        const newWorkstream = this.value || null;
-        ct.workstream = newWorkstream;
+    // Project change
+    el.querySelector('.ct-project-select').addEventListener('change', async function() {
+        const newProject = this.value;
+        ct.project = newProject;
+        ct.workstream = null;
+        ct.workspace = getWorkspaceForProjectKey(newProject);
         await updateCodingTaskMeta(t.id, meta);
         loadCodingTasks();
     });
@@ -4595,8 +4869,7 @@ ctDom.addSubmit.addEventListener('click', async () => {
                 project: ctDom.addProject.value,
                 priority: ctDom.addPriority.value,
                 complexity: ctDom.addComplexity.value,
-                status: ctDom.addStatus.value,
-                workstream: ctDom.addWorkstream.value || null
+                status: ctDom.addStatus.value
             })
         });
 
@@ -4607,6 +4880,112 @@ ctDom.addSubmit.addEventListener('click', async () => {
     } finally {
         ctDom.addSubmit.textContent = 'Create Task';
         ctDom.addSubmit.disabled = false;
+    }
+});
+
+// --- ADD PROJECT MODAL LOGIC ---
+function openAddProjectModal() {
+    ctDom.addProjectParent.value = '';
+    ctDom.addProjectName.value = '';
+    ctDom.addProjectKey.value = '';
+    ctDom.addProjectWorkspace.value = 'openbrain';
+    ctDom.addProjectDesc.value = '';
+    ctDom.addProjectWorkspaceRow.classList.remove('hidden');
+    ctDom.addProjectError.classList.add('hidden');
+    ctDom.addProjectModal.classList.remove('hidden');
+    ctDom.addProjectName.focus();
+}
+
+function closeAddProjectModal() {
+    ctDom.addProjectModal.classList.add('hidden');
+}
+
+// Toggle Workspace visibility based on Parent Project selection
+ctDom.addProjectParent.addEventListener('change', () => {
+    if (ctDom.addProjectParent.value) {
+        ctDom.addProjectWorkspaceRow.classList.add('hidden');
+    } else {
+        ctDom.addProjectWorkspaceRow.classList.remove('hidden');
+    }
+});
+
+// Close listeners
+ctDom.closeAddProject.addEventListener('click', closeAddProjectModal);
+ctDom.addProjectCancel.addEventListener('click', closeAddProjectModal);
+ctDom.addProjectModal.addEventListener('click', (e) => {
+    if (e.target === ctDom.addProjectModal) closeAddProjectModal();
+});
+
+// Submit handler
+ctDom.addProjectSubmit.addEventListener('click', async () => {
+    const parentKey = ctDom.addProjectParent.value;
+    const name = ctDom.addProjectName.value.trim();
+    const key = ctDom.addProjectKey.value.trim().toLowerCase();
+    const workspace = ctDom.addProjectWorkspace.value;
+    const desc = ctDom.addProjectDesc.value.trim();
+    const errorEl = ctDom.addProjectError;
+
+    if (!name) {
+        errorEl.textContent = 'Project name is required.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    
+    // Validate key
+    if (!key) {
+        errorEl.textContent = 'Project key is required.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    
+    if (!/^[a-z0-9_]+$/.test(key)) {
+        errorEl.textContent = 'Project key must contain only lowercase letters, numbers, and underscores.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Check for duplicate keys
+    let isDuplicate = false;
+    projectTree.forEach(proj => {
+        if (proj.key === key) isDuplicate = true;
+        if (proj.subprojects) {
+            proj.subprojects.forEach(sub => {
+                if (sub.key === key) isDuplicate = true;
+            });
+        }
+    });
+
+    if (isDuplicate) {
+        errorEl.textContent = `Project key "${key}" is already in use. Please select a unique key.`;
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    ctDom.addProjectSubmit.textContent = 'Creating...';
+    ctDom.addProjectSubmit.disabled = true;
+
+    try {
+        if (parentKey) {
+            const parentProj = projectTree.find(p => p.key === parentKey);
+            if (parentProj) {
+                if (!parentProj.subprojects) parentProj.subprojects = [];
+                parentProj.subprojects.push({ key, name, desc });
+            }
+        } else {
+            projectTree.push({ key, name, desc, workspace, subprojects: [] });
+        }
+
+        await saveProjectsConfigToDb(projectTree, generalCategories);
+        rebuildProjectLookups();
+        populateProjectDropdowns(key);
+        closeAddProjectModal();
+        loadCodingTasks();
+    } catch (err) {
+        errorEl.textContent = 'Failed to save project. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        ctDom.addProjectSubmit.textContent = 'Create Project';
+        ctDom.addProjectSubmit.disabled = false;
     }
 });
 
@@ -4642,7 +5021,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v124';
+let versionStr = 'v125';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');
@@ -4674,7 +5053,8 @@ function initNavigationIntercept() {
         { el: ctDom.projectInfoModal, level: 2 },
         { el: dom.quickCaptureOverlay, level: 2 },
         { el: dom.liveVoicePanel, level: 2 },
-        { el: dom.reclassifyPicker, level: 2 }
+        { el: dom.reclassifyPicker, level: 2 },
+        { el: ctDom.addProjectModal, level: 2 }
     ];
 
     // Helper to compute active UI level
@@ -4686,7 +5066,8 @@ function initNavigationIntercept() {
             (ctDom.projectInfoModal && !ctDom.projectInfoModal.classList.contains('hidden')) ||
             (dom.quickCaptureOverlay && !dom.quickCaptureOverlay.classList.contains('hidden')) ||
             (dom.liveVoicePanel && !dom.liveVoicePanel.classList.contains('hidden')) ||
-            (dom.reclassifyPicker && !dom.reclassifyPicker.classList.contains('hidden'))) {
+            (dom.reclassifyPicker && !dom.reclassifyPicker.classList.contains('hidden')) ||
+            (ctDom.addProjectModal && !ctDom.addProjectModal.classList.contains('hidden'))) {
             return 2;
         }
         if ((ctDom.panel && !ctDom.panel.classList.contains('hidden')) ||
@@ -4782,6 +5163,9 @@ function initNavigationIntercept() {
                 if (dom.reclassifyPicker && !dom.reclassifyPicker.classList.contains('hidden')) {
                     dom.reclassifyPicker.classList.add('hidden');
                 }
+                if (ctDom.addProjectModal && !ctDom.addProjectModal.classList.contains('hidden')) {
+                    closeAddProjectModal();
+                }
             }
 
             if (targetLevel === 0) {
@@ -4827,5 +5211,8 @@ function initViewportHandler() {
     adjustLayoutForKeyboard();
 }
 initViewportHandler();
+
+// Initialize dynamic project hierarchy configuration
+loadProjectsConfig();
 
 

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=124">
+    <link rel="stylesheet" href="style.css?v=125">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -246,33 +246,9 @@
             <div class="ct-filter-bar">
                 <select id="ct-filter-project" class="ct-filter-select">
                     <option value="">All Projects</option>
-                    <option value="chatops">Chat Ops</option>
-                    <option value="quote_manager">Quote Manager</option>
-                    <option value="liturgy_explorer">Liturgy Explorer</option>
-                    <option value="homily_pipeline">Homily Pipeline</option>
-                    <option value="stream_management">Stream Management</option>
-                    <option value="backups_devops">Backups & DevOps</option>
-                    <option value="maximus_core">Maximus Core</option>
-                    <option value="open_brain">Open Brain</option>
-                    <option value="infrastructure">Infrastructure</option>
                 </select>
                 <button id="ct-copy-search-btn" class="ct-copy-btn" title="Copy ready search query to clipboard">Copy</button>
                 <button id="ct-project-info-btn" class="ct-copy-btn" title="Show information about the selected project">Info</button>
-                <select id="ct-filter-workstream" class="ct-filter-select">
-                    <option value="">All Workstreams</option>
-                    <option value="maximus_ui_ux">Maximus UI & UX</option>
-                    <option value="google_tasks_sync">Google Tasks Sync</option>
-                    <option value="task_deletion_logging">Task Deletion & Logs</option>
-                    <option value="ai_categorization_processing">AI Categorization</option>
-                    <option value="chatops_participants">CO Participants</option>
-                    <option value="chatops_intentions">CO Intentions</option>
-                    <option value="chatops_today_enrichment">CO Today Panel</option>
-                    <option value="chatops_external_integrations">CO Ext Integrations</option>
-                    <option value="stream_scheduling_automation">Stream Scheduling</option>
-                    <option value="openbrain_migration">OpenBrain Ingestion</option>
-                    <option value="api_mail_integration">API & Mail</option>
-                    <option value="system_backups">System Backups</option>
-                </select>
                 <select id="ct-filter-status" class="ct-filter-select">
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
@@ -322,15 +298,6 @@
                         <div class="modal-field">
                             <label class="modal-label">Project</label>
                             <select id="add-ct-project" class="modal-select">
-                                <option value="maximus_core" selected>Maximus Core</option>
-                                <option value="chatops">Chat Ops</option>
-                                <option value="quote_manager">Quote Manager</option>
-                                <option value="liturgy_explorer">Liturgy Explorer</option>
-                                <option value="homily_pipeline">Homily Pipeline</option>
-                                <option value="stream_management">Stream Management</option>
-                                <option value="backups_devops">Backups & DevOps</option>
-                                <option value="open_brain">Open Brain</option>
-                                <option value="infrastructure">Infrastructure</option>
                             </select>
                         </div>
                         <div class="modal-field">
@@ -362,30 +329,66 @@
                             </select>
                         </div>
                     </div>
-                    <div class="modal-row">
-                        <div class="modal-field" style="width: 100%;">
-                            <label class="modal-label">Workstream</label>
-                            <select id="add-ct-workstream" class="modal-select">
-                                <option value="">None</option>
-                                <option value="maximus_ui_ux">Maximus UI & UX</option>
-                                <option value="google_tasks_sync">Google Tasks Sync</option>
-                                <option value="task_deletion_logging">Task Deletion & Logs</option>
-                                <option value="ai_categorization_processing">AI Categorization</option>
-                                <option value="chatops_participants">CO Participants</option>
-                                <option value="chatops_intentions">CO Intentions</option>
-                                <option value="chatops_today_enrichment">CO Today Panel</option>
-                                <option value="chatops_external_integrations">CO Ext Integrations</option>
-                                <option value="stream_scheduling_automation">Stream Scheduling</option>
-                                <option value="openbrain_migration">OpenBrain Ingestion</option>
-                                <option value="api_mail_integration">API & Mail</option>
-                                <option value="system_backups">System Backups</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="add-ct-cancel" class="modal-btn modal-btn-danger">Cancel</button>
                     <button id="add-ct-submit" class="modal-btn modal-btn-primary">Create Task</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Project Modal -->
+        <div id="add-project-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New Project</h2>
+                    <button id="close-add-project" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Parent Project</label>
+                            <select id="add-project-parent" class="modal-select">
+                                <option value="">None (Main Project)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Project Name</label>
+                            <input type="text" id="add-project-name" class="modal-input" placeholder="e.g. Saint Max Remodeling">
+                        </div>
+                    </div>
+                    <div class="modal-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Project Key (lowercase, letters, numbers, underscores)</label>
+                            <input type="text" id="add-project-key" class="modal-input" placeholder="e.g. st_max_remodel">
+                        </div>
+                    </div>
+                    <div class="modal-row" id="add-project-workspace-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Workspace</label>
+                            <select id="add-project-workspace" class="modal-select">
+                                <option value="openbrain">Open Brain</option>
+                                <option value="airmaria">AirMaria</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-row">
+                        <div class="modal-field" style="width: 100%;">
+                            <label class="modal-label">Description</label>
+                            <textarea id="add-project-desc" class="modal-input" rows="3" placeholder="Describe the project/sub-project..."></textarea>
+                        </div>
+                    </div>
+                    <div id="add-project-error" class="login-error hidden" style="margin-top: 10px; margin-bottom: 0;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="add-project-cancel" class="modal-btn modal-btn-danger">Cancel</button>
+                    <button id="add-project-submit" class="modal-btn modal-btn-primary">Create Project</button>
                 </div>
             </div>
         </div>
@@ -513,16 +516,6 @@
                             <div class="modal-field">
                                 <label class="modal-label">Project</label>
                                 <select id="modal-ct-project" class="modal-select">
-                                    <option value="chatops">Chat Ops</option>
-                                    <option value="quote_manager">Quote Manager</option>
-                                    <option value="liturgy_explorer">Liturgy Explorer</option>
-                                    <option value="homily_pipeline">Homily Pipeline</option>
-                                    <option value="stream_management">Stream Mgmt</option>
-                                    <option value="backups_devops">Backups & DevOps</option>
-                                    <option value="maximus_core">Maximus Core</option>
-                                    <option value="open_brain">Open Brain</option>
-                                    <option value="infrastructure">Infrastructure</option>
-                                    <option value="uncategorized">Other</option>
                                 </select>
                             </div>
                             <div class="modal-field">
@@ -552,26 +545,6 @@
                             </div>
                             <div class="modal-field" style="display:flex; align-items:flex-end;">
                                 <button id="modal-ct-improve-btn" class="modal-btn ct-btn-improve" style="width:100%;">✨ Improve</button>
-                            </div>
-                        </div>
-                        <div class="modal-row">
-                            <div class="modal-field" style="width: 100%;">
-                                <label class="modal-label">Workstream</label>
-                                <select id="modal-ct-workstream" class="modal-select">
-                                    <option value="">None</option>
-                                    <option value="maximus_ui_ux">Maximus UI & UX</option>
-                                    <option value="google_tasks_sync">Google Tasks Sync</option>
-                                    <option value="task_deletion_logging">Task Deletion & Logs</option>
-                                    <option value="ai_categorization_processing">AI Categorization</option>
-                                    <option value="chatops_participants">CO Participants</option>
-                                    <option value="chatops_intentions">CO Intentions</option>
-                                    <option value="chatops_today_enrichment">CO Today Panel</option>
-                                    <option value="chatops_external_integrations">CO Ext Integrations</option>
-                                    <option value="stream_scheduling_automation">Stream Scheduling</option>
-                                    <option value="openbrain_migration">OpenBrain Ingestion</option>
-                                    <option value="api_mail_integration">API & Mail</option>
-                                    <option value="system_backups">System Backups</option>
-                                </select>
                             </div>
                         </div>
                     </div>
@@ -728,7 +701,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=124"> </script>
+    <script src="app.js?v=125"> </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {

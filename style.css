@@ -1955,11 +1955,6 @@ input:checked + .toggle-slider::before {
     color: #818cf8;
 }
 
-.ct-badge.workstream-badge {
-    background: rgba(168, 85, 247, 0.15);
-    color: #c084fc;
-}
-
 /* Expanded Card Detail */
 .ct-expanded {
     display: none;

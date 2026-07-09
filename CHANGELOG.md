@@ -6,6 +6,21 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v125] - 2026-07-09
+
+### Task: Unifying Maximus Project Architecture
+- **ID**: `a36f1690-63cb-486f-860e-eb18f826a946`
+- **Changes**:
+  - Transitioned project configuration to a dynamic database-backed storage layer using Supabase (`projects_config` thought type).
+  - Populated dropdowns dynamically using `<optgroup>` groupings from the loaded database configuration.
+  - Replaced the workstream selector on all pages with the unified project dropdown selector.
+  - Implemented the `Add Project` modal with validations (lowercase, numbers, underscores), duplicate key checks, and parent project selection.
+  - Added backward-compatible fallback parsing client-side for legacy `workstream` metadata.
+  - Configured details modal saves and inline dropdown changes to update the project and automatically clear out the legacy workstream metadata in Supabase.
+  - Bumped Service Worker cache version and asset query version strings to `v125`.
+
+---
+
 ## [v119] - 2026-06-19
 
 ### Task: Add yearly recurrence to recurring events and tasks (Rework - Hotfix)
