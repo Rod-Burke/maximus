@@ -3678,18 +3678,6 @@ if (ctDom.copySearchBtn) {
 }
 
 // Project Descriptions data and Event Handler
-const PROJECT_DESCRIPTIONS = {
-    chatops: "UI panel and administrative tools for chat moderation, message history, participant intentions, and prayer orchestration.",
-    quote_manager: "Management of saint quotes, Eucharistic reflections, liturgical seasons, categories, and quote group tracking.",
-    liturgy_explorer: "Liturgical readings, mass calendar explorer, weekday fetcher, readings parser, and missal database synchronization.",
-    homily_pipeline: "AI homily processing pipeline, including audio uploads, FFmpeg/Whisper transcribing, text refinement, and YouTube publishing.",
-    stream_management: "Live stream scheduler, title/description templates, stream state tracking, and canceled stream handlers.",
-    backups_devops: "Database backups, data exports, system health monitoring, environment configs, and server integrations.",
-    maximus_core: "Central PWA dashboard, voice capturing, voice agenda query system, task tracking, and sync pipelines.",
-    open_brain: "Supabase vector database for storing thoughts, tasks, references, and embeddings for semantic search.",
-    infrastructure: "Server configs, API routes, Supabase edge functions, database migrations, and performance optimization.",
-    uncategorized: "General tasks and uncategorized features not tied to a specific sub-project."
-};
 
 function updateProjectInfoTooltip() {
     if (!ctDom.projectInfoBtn) return;
@@ -5021,7 +5009,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v125';
+let versionStr = 'v126';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');

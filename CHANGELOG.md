@@ -6,7 +6,7 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
-## [v125] - 2026-07-09
+## [v126] - 2026-07-09
 
 ### Task: Unifying Maximus Project Architecture
 - **ID**: `a36f1690-63cb-486f-860e-eb18f826a946`
@@ -17,7 +17,8 @@ This file contains the persistent record of all completed tasks, architectural u
   - Implemented the `Add Project` modal with validations (lowercase, numbers, underscores), duplicate key checks, and parent project selection.
   - Added backward-compatible fallback parsing client-side for legacy `workstream` metadata.
   - Configured details modal saves and inline dropdown changes to update the project and automatically clear out the legacy workstream metadata in Supabase.
-  - Bumped Service Worker cache version and asset query version strings to `v125`.
+  - Resolved a duplicate global declaration syntax error for `PROJECT_DESCRIPTIONS` in `app.js` which was preventing PWA script loading.
+  - Bumped Service Worker cache version and asset query version strings to `v126`.
 
 ---
 
