@@ -1302,6 +1302,7 @@ button#send-btn svg {
     border-color: var(--accent-gold);
 }
 
+.modal-select optgroup,
 .modal-select option {
     background: #1e293b;
     color: white;
@@ -1755,6 +1756,7 @@ input:checked + .toggle-slider::before {
     cursor: pointer;
 }
 
+.ct-filter-select optgroup,
 .ct-filter-select option {
     background: #1e293b;
     color: white;
@@ -2059,8 +2061,10 @@ input:checked + .toggle-slider::before {
     cursor: pointer;
 }
 
+.ct-inline-select optgroup,
 .ct-inline-select option {
     background: #1e293b;
+    color: white;
 }
 
 .ct-action-btn {

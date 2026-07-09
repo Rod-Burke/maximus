@@ -6,7 +6,7 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
-## [v126] - 2026-07-09
+## [v127] - 2026-07-09
 
 ### Task: Unifying Maximus Project Architecture
 - **ID**: `a36f1690-63cb-486f-860e-eb18f826a946`
@@ -18,7 +18,8 @@ This file contains the persistent record of all completed tasks, architectural u
   - Added backward-compatible fallback parsing client-side for legacy `workstream` metadata.
   - Configured details modal saves and inline dropdown changes to update the project and automatically clear out the legacy workstream metadata in Supabase.
   - Resolved a duplicate global declaration syntax error for `PROJECT_DESCRIPTIONS` in `app.js` which was preventing PWA script loading.
-  - Bumped Service Worker cache version and asset query version strings to `v126`.
+  - Fixed standard browser styling bug on dark-themed select elements by styling `<optgroup>` headers to match dark option backgrounds, resolving the light banded background layout.
+  - Bumped Service Worker cache version and asset query version strings to `v127`.
 
 ---
 
