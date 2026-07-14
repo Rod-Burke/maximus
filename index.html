@@ -219,6 +219,33 @@
             </div>
         </div>
 
+        <!-- Month View Panel (hidden by default) -->
+        <div id="month-view-panel" class="history-panel hidden">
+            <div class="history-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <button id="month-prev-btn" class="icon-btn" title="Previous Month">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <h2 id="month-view-title" style="min-width: 140px; text-align: center; text-transform: uppercase; letter-spacing: 0.1rem; font-size: 1.1rem; font-weight: 300;">Month 2026</h2>
+                    <button id="month-next-btn" class="icon-btn" title="Next Month">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <button id="close-month-view" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="month-events-list" class="history-list tasks-list">
+                <!-- Month events populated by JS -->
+            </div>
+        </div>
+
         <!-- Coding Tasks Panel (hidden by default) -->
         <div id="coding-tasks-panel" class="history-panel hidden">
             <div class="history-header">

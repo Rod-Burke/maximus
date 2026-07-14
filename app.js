@@ -192,7 +192,14 @@ const dom = {
     liveVoiceEnd: document.getElementById('live-voice-end'),
     liveVoiceStatus: document.getElementById('live-voice-status'),
     liveVoiceCaption: document.getElementById('live-voice-caption'),
-    voiceWaveform: document.getElementById('voice-waveform')
+    voiceWaveform: document.getElementById('voice-waveform'),
+    // Month View Panel
+    monthViewPanel: document.getElementById('month-view-panel'),
+    monthViewTitle: document.getElementById('month-view-title'),
+    monthPrevBtn: document.getElementById('month-prev-btn'),
+    monthNextBtn: document.getElementById('month-next-btn'),
+    monthEventsList: document.getElementById('month-events-list'),
+    closeMonthView: document.getElementById('close-month-view')
 };
 
 // --- VOICE LOGIC (Android-safe: continuous=false with multi-utterance accumulation) ---
@@ -229,6 +236,9 @@ let editSource = null;       // Tracks 'history' or 'tasks' origin for active ed
 let isNavigationTransitioning = false; // Prevents history.back() when hiding panels during level transitions
 let historyScrollTop = 0;    // Temporarily stores vertical scroll offset of History list
 let tasksScrollTop = 0;      // Temporarily stores vertical scroll offset of Tasks list
+let cachedTasksAndEvents = [];
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth();
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -1299,6 +1309,7 @@ async function loadTasksDashboard() {
         });
         const data = await res.json();
         if (!data.thoughts) return;
+        cachedTasksAndEvents = data.thoughts;
 
         // Auto-roll forward past recurring events in background
         const todayStr_pre = getLocalDateStr();
@@ -1388,6 +1399,12 @@ async function loadTasksDashboard() {
         const todayTasks = [];
         const unscheduled = [];
         const todayStr = getLocalDateStr();
+        
+        // Calculate one week from today for filtering upcoming events
+        const todayObj = new Date();
+        const oneWeekLaterObj = new Date();
+        oneWeekLaterObj.setDate(todayObj.getDate() + 7);
+        const oneWeekLaterStr = getLocalDateStr(oneWeekLaterObj);
 
         actionable.forEach(t => {
             const meta = t.metadata || {};
@@ -1397,7 +1414,7 @@ async function loadTasksDashboard() {
             if (meta.type === 'event') {
                 if (meta.due_date && meta.due_date < todayStr) {
                     pastEvents.push(t);
-                } else {
+                } else if (meta.due_date && meta.due_date <= oneWeekLaterStr) {
                     upcomingEvents.push(t);
                 }
             } else if (isDailyType && (!meta.due_date || meta.due_date <= todayStr)) {
@@ -1445,8 +1462,8 @@ async function loadTasksDashboard() {
             dom.tasksList.appendChild(jumpLink);
         }
 
-        if (pastEvents.length) renderTaskSection('Past Events', pastEvents.slice(0, 2));
-        if (upcomingEvents.length) renderTaskSection('Upcoming Events', upcomingEvents.slice(0, 4));
+        if (pastEvents.length) renderTaskSection('Past Events', pastEvents.slice(0, 2), { collapsible: true, startCollapsed: true });
+        renderTaskSection('Upcoming Events', upcomingEvents, { showMonthButton: true, emptyMessage: 'No events this week' });
         if (todayTasks.length) renderTaskSection('Today\'s Priorities', todayTasks);
         if (unscheduled.length) renderTaskSection('Unscheduled Tasks', unscheduled);
         
@@ -1477,16 +1494,84 @@ async function loadTasksDashboard() {
     }
 }
 
-function renderTaskSection(title, items) {
+function format12HourTime(time24) {
+    if (!time24) return '';
+    const parts = time24.split(':');
+    if (parts.length < 2) return time24;
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return `${hours}:${minutes} ${ampm}`;
+}
+
+function formatEventDateTime(meta) {
+    if (!meta.due_date) return '';
+    let dateStr = '';
+    try {
+        const parts = meta.due_date.split('-');
+        if (parts.length === 3) {
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+    } catch(e) {
+        dateStr = meta.due_date;
+    }
+    
+    let timeStr = 'All Day';
+    if (meta.all_day === false) {
+        const start = meta.start_time ? format12HourTime(meta.start_time) : '';
+        const end = meta.end_time ? format12HourTime(meta.end_time) : '';
+        timeStr = [start, end].filter(Boolean).join(' - ');
+    }
+    
+    return `${dateStr} | ${timeStr}`;
+}
+
+function renderTaskSection(title, items, options = {}) {
     const header = document.createElement('div');
     header.className = 'section-header';
-    header.innerText = title;
-    dom.tasksList.appendChild(header);
-
+    
+    const titleSpan = document.createElement('span');
+    titleSpan.innerText = title;
+    
     const container = document.createElement('div');
     container.className = 'task-section-container';
     container.dataset.sectionTitle = title;
+
+    if (options.collapsible) {
+        header.classList.add('collapsible');
+        const arrow = document.createElement('span');
+        arrow.className = 'collapse-arrow';
+        arrow.innerText = options.startCollapsed ? '▶' : '▼';
+        header.appendChild(arrow);
+        
+        if (options.startCollapsed) {
+            container.classList.add('collapsed');
+        }
+        
+        header.addEventListener('click', () => {
+            const isCollapsed = container.classList.toggle('collapsed');
+            arrow.innerText = isCollapsed ? '▶' : '▼';
+        });
+    }
     
+    header.appendChild(titleSpan);
+    
+    if (options.showMonthButton) {
+        const monthBtn = document.createElement('button');
+        monthBtn.className = 'section-header-btn open-month-view-btn';
+        monthBtn.innerText = 'Full Month';
+        monthBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openMonthView();
+        });
+        header.appendChild(monthBtn);
+    }
+    
+    dom.tasksList.appendChild(header);
+
     // Dropzone logic for reordering
     container.addEventListener('dragover', e => {
         e.preventDefault();
@@ -1497,321 +1582,338 @@ function renderTaskSection(title, items) {
         }
     });
 
-    items.forEach((t, index) => {
-        const meta = t.metadata || {};
-        const el = document.createElement('div');
-        el.className = 'task-item';
-        el.draggable = true;
-        el.dataset.id = t.id;
-        el.dataset.meta = JSON.stringify(meta);
-        
-        const dueMeta = meta.due_date ? `Due: ${meta.due_date}` : '';
-        const recMeta = meta.recurrence ? `↺ ${formatRecurrence(meta.recurrence)}` : '';
-        const metaStr = [dueMeta, recMeta].filter(Boolean).join(' | ');
-
-        const isCompleted = meta.status === 'completed';
-        const checkboxClass = isCompleted ? 'task-checkbox checked' : 'task-checkbox';
-        const displayText = meta.summary || t.content;
-        const hasMore = meta.summary && meta.summary !== t.content;
-
-        const isEvent = meta.type === 'event';
-        const checkboxHtml = isEvent ? '' : `<div class="${checkboxClass}"></div>`;
-
-        el.innerHTML = `
-            ${checkboxHtml}
-            <div class="task-content-wrapper">
-                <div class="task-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
-                ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
-            </div>
-            <div class="task-actions">
-                <button class="bump-btn" title="Bump to Top">↑</button>
-            </div>
-        `;
-
-        if (isCompleted) {
-            el.style.opacity = '0.5';
-            const contentEl = el.querySelector('.task-content');
-            if (contentEl) contentEl.style.textDecoration = 'line-through';
-        }
-
-        // Drag and Drop Handlers
-        el.addEventListener('dragstart', () => {
-            draggedTask = el;
-            el.classList.add('drag-ghost');
-        });
-
-        el.addEventListener('dragend', async () => {
-            el.classList.remove('drag-ghost');
-            draggedTask = null;
+    if (items.length === 0) {
+        const emptyPlaceholder = document.createElement('div');
+        emptyPlaceholder.className = 'task-empty-placeholder';
+        emptyPlaceholder.innerText = options.emptyMessage || 'No items';
+        container.appendChild(emptyPlaceholder);
+    } else {
+        items.forEach((t, index) => {
+            const meta = t.metadata || {};
+            const el = document.createElement('div');
+            el.className = 'task-item';
+            el.draggable = true;
+            el.dataset.id = t.id;
+            el.dataset.meta = JSON.stringify(meta);
             
-            const newContainer = el.closest('.task-section-container');
-            const oldContainer = container;
+            const isEvent = meta.type === 'event';
+            let metaStr = '';
             
-            if (newContainer && newContainer !== oldContainer) {
-                const newSection = newContainer.dataset.sectionTitle;
-                let taskMeta = JSON.parse(el.dataset.meta || '{}');
-                const todayStr = getLocalDateStr();
-                
-                if (newSection === "Today's Priorities") {
-                    if (!taskMeta.due_date) {
-                        taskMeta.due_date = todayStr;
-                    }
-                    taskMeta.bumped_at = null;
-                } else if (newSection === "Unscheduled Tasks") {
-                    taskMeta.due_date = null;
-                    taskMeta.bumped_at = null;
-                }
-                
-                el.dataset.meta = JSON.stringify(taskMeta);
-                
-                // Update UI metadata string immediately
-                const metaTextEl = el.querySelector('.task-meta');
-                const newDueMeta = taskMeta.due_date ? `Due: ${taskMeta.due_date}` : '';
-                const newRecMeta = taskMeta.recurrence ? `↺ ${formatRecurrence(taskMeta.recurrence)}` : '';
-                const newMetaStr = [newDueMeta, newRecMeta].filter(Boolean).join(' | ');
-                
-                if (metaTextEl) {
-                    if (newMetaStr) {
-                        metaTextEl.innerText = newMetaStr;
-                    } else {
-                        metaTextEl.remove();
-                    }
-                } else if (newMetaStr) {
-                    const wrapper = el.querySelector('.task-content-wrapper');
-                    const newMetaEl = document.createElement('div');
-                    newMetaEl.className = 'task-meta';
-                    newMetaEl.innerText = newMetaStr;
-                    wrapper.appendChild(newMetaEl);
-                }
-
-                try {
-                    await fetch(CONFIG.MANAGE_ENDPOINT, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ action: 'update', id: t.id, metadata: taskMeta })
-                    });
-                } catch (err) {
-                    console.error("Failed to update transitioned task metadata:", err);
-                }
+            if (isEvent) {
+                const eventDateTime = formatEventDateTime(meta);
+                const recMeta = meta.recurrence ? `↺ ${formatRecurrence(meta.recurrence)}` : '';
+                metaStr = [eventDateTime, recMeta].filter(Boolean).join(' | ');
+            } else {
+                const dueMeta = meta.due_date ? `Due: ${meta.due_date}` : '';
+                const recMeta = meta.recurrence ? `↺ ${formatRecurrence(meta.recurrence)}` : '';
+                metaStr = [dueMeta, recMeta].filter(Boolean).join(' | ');
             }
-            
-            await saveNewOrder();
-        });
 
-        // Checkbox complete / uncomplete
-        const checkboxEl = el.querySelector('.task-checkbox');
-        if (checkboxEl) {
-            checkboxEl.addEventListener('click', function(e) {
-                e.stopPropagation();
+            const isCompleted = meta.status === 'completed';
+            const checkboxClass = isCompleted ? 'task-checkbox checked' : 'task-checkbox';
+            const displayText = meta.summary || t.content;
+            const hasMore = meta.summary && meta.summary !== t.content;
 
-                // If there's an active undo button on this item, treat clicking the checkbox as an UNDO
-                const activeUndoBtn = el.querySelector('.undo-complete-btn');
-                if (activeUndoBtn) {
-                    activeUndoBtn.click();
-                    return;
-                }
+            const checkboxHtml = isEvent ? '' : `<div class="${checkboxClass}"></div>`;
 
-                const wasCompleted = meta.status === 'completed';
+            el.innerHTML = `
+                ${checkboxHtml}
+                <div class="task-content-wrapper">
+                    <div class="task-content">${displayText}${hasMore ? ' <span class="more-indicator">+</span>' : ''}</div>
+                    ${metaStr ? `<div class="task-meta">${metaStr}</div>` : ''}
+                </div>
+                <div class="task-actions">
+                    <button class="bump-btn" title="Bump to Top">↑</button>
+                </div>
+            `;
+
+            if (isCompleted) {
+                el.style.opacity = '0.5';
                 const contentEl = el.querySelector('.task-content');
+                if (contentEl) contentEl.style.textDecoration = 'line-through';
+            }
 
-                if (wasCompleted) {
-                    // UNCOMPLETE TASK
-                    this.classList.remove('checked');
-                    el.style.opacity = '1';
-                    if (contentEl) contentEl.style.textDecoration = 'none';
-                    meta.status = 'pending';
+            // Drag and Drop Handlers
+            el.addEventListener('dragstart', () => {
+                draggedTask = el;
+                el.classList.add('drag-ghost');
+            });
+
+            el.addEventListener('dragend', async () => {
+                el.classList.remove('drag-ghost');
+                draggedTask = null;
+                
+                const newContainer = el.closest('.task-section-container');
+                const oldContainer = container;
+                
+                if (newContainer && newContainer !== oldContainer) {
+                    const newSection = newContainer.dataset.sectionTitle;
+                    let taskMeta = JSON.parse(el.dataset.meta || '{}');
+                    const todayStr = getLocalDateStr();
                     
-                    fetch(CONFIG.MANAGE_ENDPOINT, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'pending' }})
-                    }).catch(err => {
-                        this.classList.add('checked');
+                    if (newSection === "Today's Priorities") {
+                        if (!taskMeta.due_date) {
+                            taskMeta.due_date = todayStr;
+                        }
+                        taskMeta.bumped_at = null;
+                    } else if (newSection === "Unscheduled Tasks") {
+                        taskMeta.due_date = null;
+                        taskMeta.bumped_at = null;
+                    }
+                    
+                    el.dataset.meta = JSON.stringify(taskMeta);
+                    
+                    // Update UI metadata string immediately
+                    const metaTextEl = el.querySelector('.task-meta');
+                    let newMetaStr = '';
+                    if (taskMeta.type === 'event') {
+                        const eventDateTime = formatEventDateTime(taskMeta);
+                        const newRecMeta = taskMeta.recurrence ? `↺ ${formatRecurrence(taskMeta.recurrence)}` : '';
+                        newMetaStr = [eventDateTime, newRecMeta].filter(Boolean).join(' | ');
+                    } else {
+                        const newDueMeta = taskMeta.due_date ? `Due: ${taskMeta.due_date}` : '';
+                        const newRecMeta = taskMeta.recurrence ? `↺ ${formatRecurrence(taskMeta.recurrence)}` : '';
+                        newMetaStr = [newDueMeta, newRecMeta].filter(Boolean).join(' | ');
+                    }
+                    
+                    if (metaTextEl) {
+                        if (newMetaStr) {
+                            metaTextEl.innerText = newMetaStr;
+                        } else {
+                            metaTextEl.remove();
+                        }
+                    } else if (newMetaStr) {
+                        const wrapper = el.querySelector('.task-content-wrapper');
+                        const newMetaEl = document.createElement('div');
+                        newMetaEl.className = 'task-meta';
+                        newMetaEl.innerText = newMetaStr;
+                        wrapper.appendChild(newMetaEl);
+                    }
+
+                    try {
+                        await fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ action: 'update', id: t.id, metadata: taskMeta })
+                        });
+                    } catch (err) {
+                        console.error("Failed to update transitioned task metadata:", err);
+                    }
+                }
+                
+                await saveNewOrder();
+            });
+
+            // Checkbox complete / uncomplete
+            const checkboxEl = el.querySelector('.task-checkbox');
+            if (checkboxEl) {
+                checkboxEl.addEventListener('click', function(e) {
+                    e.stopPropagation();
+
+                    // If there's an active undo button on this item, treat clicking the checkbox as an UNDO
+                    const activeUndoBtn = el.querySelector('.undo-complete-btn');
+                    if (activeUndoBtn) {
+                        activeUndoBtn.click();
+                        return;
+                    }
+
+                    const wasCompleted = meta.status === 'completed';
+                    const contentEl = el.querySelector('.task-content');
+
+                    if (wasCompleted) {
+                        // UNCOMPLETE TASK
+                        this.classList.remove('checked');
+                        el.style.opacity = '1';
+                        if (contentEl) contentEl.style.textDecoration = 'none';
+                        meta.status = 'pending';
+                        
+                        fetch(CONFIG.MANAGE_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                            body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'pending' }})
+                        }).catch(err => {
+                            this.classList.add('checked');
+                            el.style.opacity = '0.5';
+                            if (contentEl) contentEl.style.textDecoration = 'line-through';
+                            meta.status = 'completed';
+                            alert('Error uncompleting task.');
+                        });
+                    } else {
+                        // COMPLETE TASK (with 3-second Undo countdown)
+                        const checkboxEl = this;
+                        checkboxEl.classList.add('checked');
                         el.style.opacity = '0.5';
                         if (contentEl) contentEl.style.textDecoration = 'line-through';
-                        meta.status = 'completed';
-                        alert('Error uncompleting task.');
-                    });
-                } else {
-                    // COMPLETE TASK (with 3-second Undo countdown)
-                    const checkboxEl = this;
-                    checkboxEl.classList.add('checked');
-                    el.style.opacity = '0.5';
-                    if (contentEl) contentEl.style.textDecoration = 'line-through';
 
-                    const actionContainer = el.querySelector('.task-actions');
-                    const bumpBtn = actionContainer.querySelector('.bump-btn');
-                    if (bumpBtn) bumpBtn.style.display = 'none';
+                        const actionContainer = el.querySelector('.task-actions');
+                        const bumpBtn = actionContainer.querySelector('.bump-btn');
+                        if (bumpBtn) bumpBtn.style.display = 'none';
 
-                    const undoBtn = document.createElement('span');
-                    undoBtn.className = 'undo-complete-btn';
-                    undoBtn.style.cssText = 'color: var(--accent-light, #00a8cc); font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: rgba(0, 168, 204, 0.15); font-size: 0.8rem; user-select: none;';
-                    undoBtn.innerText = 'Undo 3s';
-                    actionContainer.appendChild(undoBtn);
+                        const undoBtn = document.createElement('span');
+                        undoBtn.className = 'undo-complete-btn';
+                        undoBtn.style.cssText = 'color: var(--accent-light, #00a8cc); font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: rgba(0, 168, 204, 0.15); font-size: 0.8rem; user-select: none;';
+                        undoBtn.innerText = 'Undo 3s';
+                        actionContainer.appendChild(undoBtn);
 
-                    let remaining = 3;
-                    const countdownInterval = setInterval(() => {
-                        remaining--;
-                        if (remaining > 0) {
-                            undoBtn.innerText = `Undo ${remaining}s`;
-                        } else {
-                            clearInterval(countdownInterval);
-                        }
-                    }, 1000);
+                        let remaining = 3;
+                        const countdownInterval = setInterval(() => {
+                            remaining--;
+                            if (remaining > 0) {
+                                undoBtn.innerText = `Undo ${remaining}s`;
+                            } else {
+                                clearInterval(countdownInterval);
+                            }
+                        }, 1000);
 
-                    const saveTimeout = setTimeout(async () => {
-                        undoBtn.remove();
-                        if (bumpBtn) bumpBtn.style.display = '';
+                        const saveTimeout = setTimeout(async () => {
+                            undoBtn.remove();
+                            if (bumpBtn) bumpBtn.style.display = '';
 
-                        let updatePromise;
-                        if (meta.recurrence) {
-                            // Recurring task: roll due_date forward
-                            const nextDate = await getNextRecurrenceDateAsync(meta.recurrence, meta.due_date);
-                            const endDate = meta.recurrence_end;
-                            if (endDate && nextDate > endDate) {
+                            let updatePromise;
+                            if (meta.recurrence) {
+                                // Recurring task: roll due_date forward
+                                const nextDate = await getNextRecurrenceDateAsync(meta.recurrence, meta.due_date);
+                                const endDate = meta.recurrence_end;
+                                if (endDate && nextDate > endDate) {
+                                    meta.status = 'completed';
+                                    updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
+                                    });
+                                } else {
+                                    meta.due_date = nextDate;
+                                    meta.bumped_at = null;
+                                    updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                                        body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
+                                    });
+                                }
+                            } else {
                                 meta.status = 'completed';
                                 updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
                                     body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
                                 });
-                            } else {
-                                meta.due_date = nextDate;
-                                meta.bumped_at = null;
-                                updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, due_date: nextDate, bumped_at: null }})
-                                });
                             }
-                        } else {
-                            meta.status = 'completed';
-                            updatePromise = fetch(CONFIG.MANAGE_ENDPOINT, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, status: 'completed' }})
-                            });
-                        }
 
-                        updatePromise.catch(err => {
+                            updatePromise.catch(err => {
+                                checkboxEl.classList.remove('checked');
+                                el.style.opacity = '1';
+                                if (contentEl) contentEl.style.textDecoration = 'none';
+                                if (!meta.recurrence) meta.status = 'pending';
+                                alert('Error completing task.');
+                            });
+
+                            // Only remove the element visually if we aren't in semantic search view
+                            if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
+                                setTimeout(() => { 
+                                    el.remove(); 
+                                    if (container.querySelectorAll('.task-item').length === 0) {
+                                        if (header) header.remove();
+                                        container.remove();
+                                    }
+                                }, 500);
+                            }
+                        }, 3000);
+
+                        undoBtn.addEventListener('click', (undoEvent) => {
+                            undoEvent.stopPropagation();
+                            clearInterval(countdownInterval);
+                            clearTimeout(saveTimeout);
+
+                            undoBtn.remove();
+                            if (bumpBtn) bumpBtn.style.display = '';
+
                             checkboxEl.classList.remove('checked');
                             el.style.opacity = '1';
                             if (contentEl) contentEl.style.textDecoration = 'none';
-                            if (!meta.recurrence) meta.status = 'pending';
-                            alert('Error completing task.');
                         });
-
-                        // Only remove the element visually if we aren't in semantic search view
-                        if (!document.querySelector('.section-header')?.innerText.includes('Semantic Matches')) {
-                            setTimeout(() => { 
-                                el.remove(); 
-                                if (container.querySelectorAll('.task-item').length === 0) {
-                                    if (header) header.remove();
-                                    container.remove();
-                                }
-                            }, 500);
-                        }
-                    }, 3000);
-
-                    undoBtn.addEventListener('click', (undoEvent) => {
-                        undoEvent.stopPropagation();
-                        clearInterval(countdownInterval);
-                        clearTimeout(saveTimeout);
-
-                        undoBtn.remove();
-                        if (bumpBtn) bumpBtn.style.display = '';
-
-                        checkboxEl.classList.remove('checked');
-                        el.style.opacity = '1';
-                        if (contentEl) contentEl.style.textDecoration = 'none';
-                    });
-                }
-            });
-        }
-
-        // Bump to Top (AJAX — no page reload, keeps scroll position)
-        el.querySelector('.bump-btn').addEventListener('click', async (e) => {
-            e.stopPropagation();
-
-            // --- Optimistic DOM move ---
-            // Find the "Today's Priorities" section, or fall back to the first section
-            let targetContainer = null;
-            const sectionHeaders = dom.tasksList.querySelectorAll('.section-header');
-            for (const h of sectionHeaders) {
-                if (h.innerText.includes("Today")) {
-                    targetContainer = h.nextElementSibling;
-                    break;
-                }
-            }
-            // If no "Today's Priorities" section exists yet, create one
-            if (!targetContainer) {
-                const firstHeader = sectionHeaders[0];
-                const newHeader = document.createElement('div');
-                newHeader.className = 'section-header';
-                newHeader.innerText = "Today's Priorities";
-                const newContainer = document.createElement('div');
-                newContainer.className = 'task-section-container';
-                if (firstHeader) {
-                    dom.tasksList.insertBefore(newContainer, firstHeader);
-                    dom.tasksList.insertBefore(newHeader, newContainer);
-                } else {
-                    dom.tasksList.appendChild(newHeader);
-                    dom.tasksList.appendChild(newContainer);
-                }
-                targetContainer = newContainer;
+                    }
+                });
             }
 
-            // Remove from old container, clean up empty section
-            const oldContainer = el.closest('.task-section-container');
-            const oldHeader = oldContainer ? oldContainer.previousElementSibling : null;
+            // Bump to Top (AJAX — no page reload, keeps scroll position)
+            el.querySelector('.bump-btn').addEventListener('click', async (e) => {
+                e.stopPropagation();
 
-            // Animate the bump: shrink out from old position
-            el.style.transition = 'opacity 0.2s, transform 0.2s';
-            el.style.opacity = '0.3';
-            el.style.transform = 'scale(0.95)';
-
-            setTimeout(() => {
-                // Move element to top of target section
-                el.remove();
-                targetContainer.prepend(el);
-
-                // Clean up empty old section
-                if (oldContainer && oldContainer !== targetContainer && oldContainer.querySelectorAll('.task-item').length === 0) {
-                    if (oldHeader && oldHeader.classList.contains('section-header')) oldHeader.remove();
-                    oldContainer.remove();
+                // --- Optimistic DOM move ---
+                let targetContainer = null;
+                const sectionHeaders = dom.tasksList.querySelectorAll('.section-header');
+                for (const h of sectionHeaders) {
+                    if (h.innerText.includes("Today")) {
+                        targetContainer = h.nextElementSibling;
+                        break;
+                    }
+                }
+                if (!targetContainer) {
+                    const firstHeader = sectionHeaders[0];
+                    const newHeader = document.createElement('div');
+                    newHeader.className = 'section-header';
+                    newHeader.innerText = "Today's Priorities";
+                    const newContainer = document.createElement('div');
+                    newContainer.className = 'task-section-container';
+                    if (firstHeader) {
+                        dom.tasksList.insertBefore(newContainer, firstHeader);
+                        dom.tasksList.insertBefore(newHeader, newContainer);
+                    } else {
+                        dom.tasksList.appendChild(newHeader);
+                        dom.tasksList.appendChild(newContainer);
+                    }
+                    targetContainer = newContainer;
                 }
 
-                // Animate in at new position
-                el.style.opacity = '1';
-                el.style.transform = 'scale(1)';
-                el.style.background = 'rgba(76, 175, 80, 0.15)';
-                setTimeout(() => { el.style.background = ''; el.style.transition = ''; }, 800);
+                // Remove from old container, clean up empty section
+                const oldContainer = el.closest('.task-section-container');
+                const oldHeader = oldContainer ? oldContainer.previousElementSibling : null;
 
-                // Update the stored metadata so future actions have the bumped_at
-                meta.bumped_at = new Date().toISOString();
-                meta.order = 0;
-                el.dataset.meta = JSON.stringify(meta);
-            }, 200);
+                // Animate the bump
+                el.style.transition = 'opacity 0.2s, transform 0.2s';
+                el.style.opacity = '0.3';
+                el.style.transform = 'scale(0.95)';
 
-            // Fire-and-forget API call in background
-            fetch(CONFIG.MANAGE_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
-                body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, bumped_at: new Date().toISOString(), order: 0 }})
-            }).catch(err => {
-                console.error('Bump save failed:', err);
+                setTimeout(() => {
+                    el.remove();
+                    targetContainer.prepend(el);
+
+                    // Clean up empty old section
+                    if (oldContainer && oldContainer !== targetContainer && oldContainer.querySelectorAll('.task-item').length === 0) {
+                        if (oldHeader && oldHeader.classList.contains('section-header')) oldHeader.remove();
+                        oldContainer.remove();
+                    }
+
+                    // Animate in at new position
+                    el.style.opacity = '1';
+                    el.style.transform = 'scale(1)';
+                    el.style.background = 'rgba(76, 175, 80, 0.15)';
+                    setTimeout(() => { el.style.background = ''; el.style.transition = ''; }, 800);
+
+                    meta.bumped_at = new Date().toISOString();
+                    meta.order = 0;
+                    el.dataset.meta = JSON.stringify(meta);
+                }, 200);
+
+                fetch(CONFIG.MANAGE_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+                    body: JSON.stringify({ action: 'update', id: t.id, metadata: { ...meta, bumped_at: new Date().toISOString(), order: 0 }})
+                }).catch(err => {
+                    console.error('Bump save failed:', err);
+                });
             });
-        });
 
-        // Click to open Task Detail Modal
-        el.querySelector('.task-content-wrapper').addEventListener('click', () => {
-            editSource = 'tasks';
-            tasksScrollTop = dom.tasksList.scrollTop;
-            openTaskModal(t.id, t.content, meta);
-        });
+            // Click to open Task Detail Modal
+            el.querySelector('.task-content-wrapper').addEventListener('click', () => {
+                editSource = 'tasks';
+                tasksScrollTop = dom.tasksList.scrollTop;
+                openTaskModal(t.id, t.content, meta);
+            });
 
-        container.appendChild(el);
-    });
+            container.appendChild(el);
+        });
+    }
 
     dom.tasksList.appendChild(container);
 }
@@ -2417,6 +2519,127 @@ function getCustomRecurrenceValue() {
     return val;
 }
 
+// --- EVENTS CALENDAR / MONTH VIEW ---
+function openMonthView() {
+    currentCalendarYear = new Date().getFullYear();
+    currentCalendarMonth = new Date().getMonth();
+    dom.monthViewPanel.classList.remove('hidden');
+    loadMonthView(currentCalendarYear, currentCalendarMonth);
+}
+
+function loadMonthView(year, month) {
+    // Format month title
+    const monthName = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    dom.monthViewTitle.innerText = monthName;
+    
+    // Filter events for this month
+    const monthStr = String(month + 1).padStart(2, '0');
+    const prefix = `${year}-${monthStr}`;
+    
+    const eventsInMonth = (cachedTasksAndEvents || []).filter(t => {
+        const meta = t.metadata || {};
+        return meta.type === 'event' && meta.due_date && meta.due_date.startsWith(prefix);
+    });
+    
+    // Sort events
+    eventsInMonth.sort((a, b) => {
+        const dateA = a.metadata.due_date;
+        const dateB = b.metadata.due_date;
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        
+        const allDayA = a.metadata.all_day !== false;
+        const allDayB = b.metadata.all_day !== false;
+        if (allDayA && !allDayB) return -1;
+        if (!allDayA && allDayB) return 1;
+        
+        const timeA = a.metadata.start_time || '';
+        const timeB = b.metadata.start_time || '';
+        return timeA.localeCompare(timeB);
+    });
+    
+    dom.monthEventsList.innerHTML = '';
+    
+    if (eventsInMonth.length === 0) {
+        dom.monthEventsList.innerHTML = '<div class="history-empty">No events scheduled for this month.</div>';
+        return;
+    }
+    
+    eventsInMonth.forEach(t => {
+        const meta = t.metadata || {};
+        const el = document.createElement('div');
+        el.className = 'month-event-item';
+        
+        let dayNum = '??';
+        let weekday = '??';
+        try {
+            const parts = meta.due_date.split('-');
+            if (parts.length === 3) {
+                const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                dayNum = d.getDate();
+                weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+            }
+        } catch (e) {
+            console.error('Failed to parse date for month view item:', e);
+        }
+        
+        const allDay = meta.all_day !== false;
+        let timeStr = 'All Day';
+        if (!allDay) {
+            const start = meta.start_time ? format12HourTime(meta.start_time) : '';
+            const end = meta.end_time ? format12HourTime(meta.end_time) : '';
+            timeStr = [start, end].filter(Boolean).join(' - ');
+        }
+        
+        el.innerHTML = `
+            <div class="month-event-date-badge">
+                <span class="day-num">${dayNum}</span>
+                <span class="day-name">${weekday}</span>
+            </div>
+            <div class="month-event-details">
+                <div class="month-event-title">${meta.summary || t.content}</div>
+                <div class="month-event-time">${timeStr}</div>
+            </div>
+        `;
+        
+        el.addEventListener('click', () => {
+            editSource = 'month_view';
+            tasksScrollTop = dom.tasksList.scrollTop;
+            openTaskModal(t.id, t.content, meta);
+        });
+        
+        dom.monthEventsList.appendChild(el);
+    });
+}
+
+// Wire up calendar navigation listeners
+if (dom.monthPrevBtn) {
+    dom.monthPrevBtn.addEventListener('click', () => {
+        currentCalendarMonth--;
+        if (currentCalendarMonth < 0) {
+            currentCalendarMonth = 11;
+            currentCalendarYear--;
+        }
+        loadMonthView(currentCalendarYear, currentCalendarMonth);
+    });
+}
+
+if (dom.monthNextBtn) {
+    dom.monthNextBtn.addEventListener('click', () => {
+        currentCalendarMonth++;
+        if (currentCalendarMonth > 11) {
+            currentCalendarMonth = 0;
+            currentCalendarYear++;
+        }
+        loadMonthView(currentCalendarYear, currentCalendarMonth);
+    });
+}
+
+if (dom.closeMonthView) {
+    dom.closeMonthView.addEventListener('click', () => {
+        dom.monthViewPanel.classList.add('hidden');
+    });
+}
+
 function closeTaskModal() {
     dom.modal.classList.add('hidden');
     dom.customPanel.classList.add('hidden');
@@ -2611,6 +2834,9 @@ dom.modalSave.addEventListener('click', async () => {
                 dom.historyList.scrollTop = scrollTop;
             } else if (source === 'coding_tasks') {
                 await loadCodingTasks();
+            } else if (source === 'month_view') {
+                await loadTasksDashboard();
+                loadMonthView(currentCalendarYear, currentCalendarMonth);
             } else {
                 loadTasksDashboard();
             }
@@ -2658,6 +2884,11 @@ dom.modalDelete.addEventListener('click', async () => {
             dom.historyList.scrollTop = scrollTop;
         } else if (source === 'coding_tasks') {
             await loadCodingTasks();
+        } else if (source === 'month_view') {
+            await loadTasksDashboard();
+            loadMonthView(currentCalendarYear, currentCalendarMonth);
+        } else {
+            loadTasksDashboard();
         }
     } catch (e) {
         alert('Delete failed.');
@@ -2714,6 +2945,11 @@ dom.modalComplete.addEventListener('click', async () => {
         if (source === 'history') {
             await loadHistory();
             dom.historyList.scrollTop = scrollTop;
+        } else if (source === 'month_view') {
+            await loadTasksDashboard();
+            loadMonthView(currentCalendarYear, currentCalendarMonth);
+        } else {
+            loadTasksDashboard();
         }
     } catch (e) {
         alert('Error updating task status.');
