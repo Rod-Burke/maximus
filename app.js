@@ -3547,66 +3547,66 @@ const DEFAULT_PROJECT_TREE = [
         desc: 'Central PWA dashboard, voice capturing, and task tracking.',
         workspace: 'openbrain',
         subprojects: [
-            { key: 'maximus_ui_ux', name: 'UI & UX Design', desc: 'UI improvements, styling, animations, and layouts.' },
-            { key: 'google_tasks_sync', name: 'Google Tasks Sync', desc: 'Two-way tasks sync with Google Tasks.' },
-            { key: 'task_deletion_logging', name: 'Task Deletion & Logging', desc: 'Logging creation, updates, and deletions.' }
+            { key: 'maximus_ui_ux', name: 'UI & UX Design', desc: 'UI improvements, styling, micro-animations, and responsive layouts.' },
+            { key: 'google_tasks_sync', name: 'Google Tasks Sync', desc: 'Two-way task synchronization between Maximus and Google Tasks.' },
+            { key: 'task_deletion_logging', name: 'Task Deletion & Logging', desc: 'Comprehensive logging for task creation, status updates, and deletions.' }
         ]
     },
     {
         key: 'chatops',
         name: 'Chat Ops',
-        desc: 'UI panel and administrative tools for chat moderation, message history, participant intentions, and prayer orchestration.',
+        desc: 'Chat moderation, message history, participant intentions, and prayer admin tools.',
         workspace: 'airmaria',
         subprojects: [
-            { key: 'chatops_participants', name: 'Participants Management', desc: 'Tracking chat participants.' },
-            { key: 'chatops_intentions', name: 'Intentions Tracker', desc: 'Orchestrating prayer intentions.' },
-            { key: 'chatops_today_enrichment', name: 'Today Enrichment', desc: 'Enriching chat streams with today\'s data.' },
-            { key: 'chatops_external_integrations', name: 'External Integrations', desc: 'Integrations with external chat platforms.' }
+            { key: 'chatops_participants', name: 'Participants Management', desc: 'Tracking chat participant details, roles, and attendance status.' },
+            { key: 'chatops_intentions', name: 'Intentions Tracker', desc: 'Orchestrating, categorizing, and tracking community prayer intentions.' },
+            { key: 'chatops_today_enrichment', name: 'Today Enrichment', desc: 'Enriching live chat streams and daily dashboards with real-time data.' },
+            { key: 'chatops_external_integrations', name: 'External Integrations', desc: 'Integrations with YouTube live chat and external communication platforms.' }
         ]
     },
     {
         key: 'liturgy_explorer',
         name: 'Liturgy Explorer',
-        desc: 'Liturgical readings calendar, weekday fetcher, and missal database.',
+        desc: 'Liturgical readings calendar, weekday readings fetcher, and missal database.',
         workspace: 'airmaria'
     },
     {
         key: 'homily_pipeline',
         name: 'Homily Pipeline',
-        desc: 'AI homily processing: audio upload, transcription, and YouTube publishing.',
+        desc: 'Automated homily processing: media upload, Whisper transcription, and YouTube publishing.',
         workspace: 'airmaria'
     },
     {
         key: 'stream_management',
         name: 'Stream Management',
-        desc: 'Live stream scheduling and stream cancellation automation.',
+        desc: 'Live stream event scheduling, custom broadcast automation, and cancellation rules.',
         workspace: 'airmaria',
         subprojects: [
-            { key: 'stream_scheduling_automation', name: 'Scheduling Automation', desc: 'Automating custom event creation and templates.' }
+            { key: 'stream_scheduling_automation', name: 'Scheduling Automation', desc: 'Automating custom stream event creation, scheduling rules, and templates.' }
         ]
     },
     {
         key: 'backups_devops',
         name: 'Backups & DevOps',
-        desc: 'Database backups, exports, health monitoring, and server configs.',
+        desc: 'Database backup orchestration, system health monitoring, and server configurations.',
         workspace: 'airmaria',
         subprojects: [
-            { key: 'system_backups', name: 'System Backups', desc: 'Automating database and files backup.' }
+            { key: 'system_backups', name: 'System Backups', desc: 'Scheduled database snapshots, S3 backup rotation, and GFS retention management.' }
         ]
     },
     {
         key: 'open_brain',
         name: 'Open Brain',
-        desc: 'Supabase vector database, semantic search, and reference storage.',
+        desc: 'Central Supabase vector database, semantic memory search, and thought storage.',
         workspace: 'openbrain',
         subprojects: [
-            { key: 'openbrain_migration', name: 'OpenBrain Ingestion', desc: 'Ingestion pipelines and migrations.' }
+            { key: 'openbrain_migration', name: 'OpenBrain Ingestion', desc: 'Ingestion scripts, data migrations, and automated document parsing pipelines.' }
         ]
     },
     {
         key: 'infrastructure',
         name: 'Infrastructure',
-        desc: 'Server configs, edge functions, migrations, and performance.',
+        desc: 'Supabase Edge functions, server infrastructure, database migrations, and performance.',
         workspace: 'openbrain'
     },
     {
@@ -3748,20 +3748,22 @@ async function saveProjectsConfigToDb(tree, categories) {
 function populateProjectDropdowns(selectedKey) {
     if (ctDom.filterProject) {
         const currentVal = selectedKey || ctDom.filterProject.value || '';
-        let html = '<option value="">All Projects</option>';
+        let html = '<option value="" title="Unified dashboard displaying coding tasks across all subsystems of Saint Max and AirMaria.">All Projects</option>';
         projectTree.forEach(proj => {
+            const projDesc = escapeHtml(proj.desc || '');
             if (proj.subprojects && proj.subprojects.length > 0) {
                 html += `<optgroup label="${proj.name}">`;
-                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name} (Main)</option>`;
                 proj.subprojects.forEach(sub => {
-                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                    const subDesc = escapeHtml(sub.desc || '');
+                    html += `<option value="${sub.key}" title="${subDesc}">${sub.name}</option>`;
                 });
                 html += `</optgroup>`;
             } else {
-                html += `<option value="${proj.key}">${proj.name}</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name}</option>`;
             }
         });
-        html += `<option value="_add_new_project_">+ Add New Project...</option>`;
+        html += `<option value="_add_new_project_" title="Create a new project category">+ Add New Project...</option>`;
         ctDom.filterProject.innerHTML = html;
         ctDom.filterProject.value = currentVal;
         previousFilterProjectVal = currentVal;
@@ -3771,15 +3773,17 @@ function populateProjectDropdowns(selectedKey) {
         const currentVal = ctDom.addProject.value || 'maximus_core';
         let html = '';
         projectTree.forEach(proj => {
+            const projDesc = escapeHtml(proj.desc || '');
             if (proj.subprojects && proj.subprojects.length > 0) {
                 html += `<optgroup label="${proj.name}">`;
-                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name} (Main)</option>`;
                 proj.subprojects.forEach(sub => {
-                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                    const subDesc = escapeHtml(sub.desc || '');
+                    html += `<option value="${sub.key}" title="${subDesc}">${sub.name}</option>`;
                 });
                 html += `</optgroup>`;
             } else {
-                html += `<option value="${proj.key}">${proj.name}</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name}</option>`;
             }
         });
         ctDom.addProject.innerHTML = html;
@@ -3791,15 +3795,17 @@ function populateProjectDropdowns(selectedKey) {
         const currentVal = dom.modalCtProject.value || 'uncategorized';
         let html = '';
         projectTree.forEach(proj => {
+            const projDesc = escapeHtml(proj.desc || '');
             if (proj.subprojects && proj.subprojects.length > 0) {
                 html += `<optgroup label="${proj.name}">`;
-                html += `<option value="${proj.key}">${proj.name} (Main)</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name} (Main)</option>`;
                 proj.subprojects.forEach(sub => {
-                    html += `<option value="${sub.key}">${sub.name}</option>`;
+                    const subDesc = escapeHtml(sub.desc || '');
+                    html += `<option value="${sub.key}" title="${subDesc}">${sub.name}</option>`;
                 });
                 html += `</optgroup>`;
             } else {
-                html += `<option value="${proj.key}">${proj.name}</option>`;
+                html += `<option value="${proj.key}" title="${projDesc}">${proj.name}</option>`;
             }
         });
         dom.modalCtProject.innerHTML = html;
@@ -3808,9 +3814,10 @@ function populateProjectDropdowns(selectedKey) {
     }
     
     if (ctDom.addProjectParent) {
-        let html = '<option value="">None (Main Project)</option>';
+        let html = '<option value="" title="Main top-level project">None (Main Project)</option>';
         projectTree.forEach(proj => {
-            html += `<option value="${proj.key}">${proj.name}</option>`;
+            const projDesc = escapeHtml(proj.desc || '');
+            html += `<option value="${proj.key}" title="${projDesc}">${proj.name}</option>`;
         });
         ctDom.addProjectParent.innerHTML = html;
     }

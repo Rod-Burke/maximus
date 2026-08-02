@@ -6,6 +6,46 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v129] - 2026-08-02
+
+### Task: Add Hover Descriptions to Project Selector Items
+- **ID**: `bc2db364-f2fd-46fb-a2ec-36c405baf879`
+- **Changes**:
+  - Generated concise (~100 character) hover descriptions for all 19 project selector items across Maximus PWA.
+  - Updated `DEFAULT_PROJECT_TREE` in `app.js` with the concise project descriptions.
+  - Updated `populateProjectDropdowns` in `app.js` to render escaped `title="${projDesc}"` attributes on `<option>` tags.
+  - Updated Supabase `projects_config` thought `de690f2b-8957-488f-952d-59c6fa31bb87` metadata to persist hover descriptions for all client sessions.
+  - Verified mobile support via the dedicated "Info" button and Project Info modal layout.
+  - Bumped Service Worker cache version to `v129`.
+
+---
+
+## [v128.1] - 2026-07-31
+
+### Task: Ingesting Nate Jones Substack Archive (Phase 2 Incremental Sync)
+- **ID**: `0a20d715-560a-43f7-b53b-1073fb04769e`
+- **Changes**:
+  - Swept, cleaned, and ingested remaining Substack newsletters from the Outlook mailbox.
+  - Handled transactional filtering to auto-archive login/verification emails while skipping database ingestion.
+  - Verified archive integrity in Outlook with 119 newsletters read and moved to the 'Nate Jones' archive folder (0 remaining in Inbox).
+  - Compiled and updated the workspace strategic roadmap at `nate_jones_synthesis.md` to catalog model bakeoff configurations, safety brake layers, and token-saving skills.
+
+---
+
+## [v128] - 2026-07-20
+
+### Task: Pruning S3 Backup Retention
+- **ID**: `5fbf13fb-ba57-4024-b889-a2f0de3b4fd3`
+- **Changes**:
+  - Replaced legacy S3 backup pruning logic in `cron_backup_s3.php` and `cron_backup_supabase.php` with a standard Grandfather-Father-Son (GFS) retention policy (last 5 days rolling, 1st of month for 1 year, Jan 1st indefinitely).
+  - Configured hard-deletion of S3 backup files outside of the retention scope.
+  - Parsed and isolated port numbers from hostnames in `samp_db.php` to resolve Windows CLI DNS hangs during mysqli connections.
+  - Configured `cron_backup_supabase.php` to bypass SSL peer verification when executing under the local development stack.
+  - Executed backup-pruning runs locally, removing 25 legacy MySQL backups and 15 legacy Supabase backups from S3.
+  - Added port-splitting guidelines to the local PHP CLI debugging knowledge guide.
+
+---
+
 ## [v127] - 2026-07-09
 
 ### Task: Unifying Maximus Project Architecture
