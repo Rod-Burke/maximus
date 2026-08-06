@@ -6,7 +6,7 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
-## [v129] - 2026-08-02
+## [v130] - 2026-08-06
 
 ### Task: Add Hover Descriptions to Project Selector Items
 - **ID**: `bc2db364-f2fd-46fb-a2ec-36c405baf879`
