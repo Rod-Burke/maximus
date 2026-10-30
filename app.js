@@ -4,7 +4,7 @@ const CONFIG = {
     SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
     GEMINI_LIVE_TOKEN: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live/token',
     GEMINI_LIVE_TOOL: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/gemini-live/tool',
-    KEY: '4f4bfce4ae96af52c35c0f6c4491a9b5e20caea9c52489a07ccd6083f1d2455d',
+    KEY: '370a701b6b2d262447bde2d0a4c483903ba3a51a0297efc815b816f0b34bc259',
     EMAIL: 'Fra_roderic@outlook.com'
 };
 

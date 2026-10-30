@@ -1,4 +1,5 @@
 # Automatically stage, commit, and push changes to GitHub Pages
+Set-Location $PSScriptRoot
 git add .
 $current_time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 git commit -m "Deploy: Maximus PWA Update - $current_time"

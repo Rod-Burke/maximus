@@ -6,6 +6,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v131] - 2026-10-30
+
+### Task: Supabase OpenBrain Key Rotation
+- **Changes**:
+  - Rotated active Supabase access key to `370a701b6b2d262447bde2d0a4c483903ba3a51a0297efc815b816f0b34bc259` in `app.js` and `migration.js`.
+  - Bumped Service Worker cache name to `maximus-v131` in `sw.js` to ensure immediate asset cache invalidation and client-side reload.
+  - Aligned client endpoints with dual-key grace mode on Supabase Edge Functions (`open-brain-mcp`, `manage-thoughts`, `ingest-thought`, `voice-gateway`, `sync-google`).
+
+---
+
 ## [v130] - 2026-08-06
 
 ### Task: Add Hover Descriptions to Project Selector Items
