@@ -6,6 +6,20 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v132] - 2026-11-02
+
+### Task: Direct Feature UI Links in Verification Checklist
+- **ID**: `f7a4e589-0039-4d9e-a13e-ea0a14d062c2`
+- **Changes**:
+  - Implemented 3-tier feature URL resolution algorithm (`resolveFeatureVerificationUrl`) detecting explicit `verification_url`, links embedded in steps/content, or heuristic mapping across AirMaria (Credentials Console, Backups Dashboard, ChatOps, Stream Scheduling, Liturgy Explorer, Homilies Admin) and Maximus PWA.
+  - Added dedicated Feature UI banner in `.ct-verification-section` with one-click external link (`🚀 Open Feature UI ↗`), auto-detection indicators (`🤖 Auto`), internal Maximus panel jump button, and inline URL override (`✏️`).
+  - Added full support for active clickable markdown links `[label](url)` and bare URLs in verification checklist items with `event.stopPropagation()` to prevent accidental checkbox toggling.
+  - Added `Verification / Feature UI URL` input field in Task Details modal, preventing metadata clobbering during modal updates.
+  - Extended CLI tool `tasks.py` to support `--url` / `--verification-url` in `status` and `add` subcommands.
+  - Bumped Service Worker cache name to `maximus-v132` in `sw.js` and asset query version to `v132` in `index.html`.
+
+---
+
 ## [v131] - 2026-10-30
 
 ### Task: Supabase OpenBrain Key Rotation

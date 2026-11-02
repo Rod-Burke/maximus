@@ -171,6 +171,7 @@ const dom = {
     modalCtProject: document.getElementById('modal-ct-project'),
     modalCtComplexity: document.getElementById('modal-ct-complexity'),
     modalCtStatus: document.getElementById('modal-ct-status'),
+    modalCtVerificationUrl: document.getElementById('modal-ct-verification-url'),
     modalCtImproveBtn: document.getElementById('modal-ct-improve-btn'),
     // Reclassify
     reclassifyBtn: document.getElementById('reclassify-btn'),
@@ -2360,6 +2361,7 @@ async function saveNewOrder() {
 
 // --- TASK DETAIL MODAL ---
 let modalThoughtId = null;
+let modalThoughtMeta = null;
 
 function renderNotesLinks(text) {
     if (!text) {
@@ -2379,6 +2381,7 @@ function renderNotesLinks(text) {
 
 function openTaskModal(id, content, meta) {
     modalThoughtId = id;
+    modalThoughtMeta = meta;
     dom.modalContent.innerHTML = simpleMarkdownToHtml(content);
     dom.modalSummary.value = meta.summary || content;
     dom.modalNotes.value = meta.notes || '';
@@ -2426,10 +2429,16 @@ function openTaskModal(id, content, meta) {
         dom.modalCtProject.value = projectKey;
         dom.modalCtComplexity.value = meta.coding_task.complexity || 'moderate';
         dom.modalCtStatus.value = meta.coding_task.status || 'draft';
+        if (dom.modalCtVerificationUrl) {
+            dom.modalCtVerificationUrl.value = meta.coding_task.verification_url || '';
+        }
     } else {
         dom.modalCtProject.value = 'uncategorized';
         dom.modalCtComplexity.value = 'moderate';
         dom.modalCtStatus.value = 'draft';
+        if (dom.modalCtVerificationUrl) {
+            dom.modalCtVerificationUrl.value = '';
+        }
     }
     
     // Toggle Complete button label based on current status
@@ -2647,6 +2656,7 @@ function closeTaskModal() {
     dom.codingTaskFields.classList.add('hidden');
     resetDayButtons();
     modalThoughtId = null;
+    modalThoughtMeta = null;
 
     if (editSource === 'history') {
         dom.historyPanel.classList.remove('hidden');
@@ -2808,12 +2818,14 @@ dom.modalSave.addEventListener('click', async () => {
                 // Coding task fields
                 ...(dom.modalType.value === 'coding_task' ? {
                     coding_task: {
+                        ...(modalThoughtMeta?.coding_task || {}),
                         project: dom.modalCtProject.value,
                         complexity: dom.modalCtComplexity.value,
                         status: dom.modalCtStatus.value,
                         priority: dom.modalPriority.value === 'high' ? 'high' : dom.modalPriority.value === 'low' ? 'low' : 'medium',
                         workspace: getWorkspaceForProjectKey(dom.modalCtProject.value),
                         workstream: null,
+                        verification_url: dom.modalCtVerificationUrl ? (dom.modalCtVerificationUrl.value.trim() || null) : (modalThoughtMeta?.coding_task?.verification_url || null)
                     }
                 } : {})
             }
@@ -4165,6 +4177,181 @@ function getPromptTextForStatus(status, summary, taskId) {
     }
 }
 
+function renderVerificationLabelHtml(text) {
+    if (!text) return '';
+    let escaped = escapeHtml(text);
+    
+    // Markdown links: [label](https://...)
+    escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)<>"]+)\)/g, (match, label, url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ct-verification-inline-link" onclick="event.stopPropagation()">${label} <span class="ext-icon">↗</span></a>`;
+    });
+    
+    // Bare URLs: https://...
+    escaped = escaped.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (match, prefix, url) => {
+        let cleanUrl = url;
+        let suffix = '';
+        if (/[.,;:)\]]$/.test(cleanUrl)) {
+            suffix = cleanUrl.slice(-1);
+            cleanUrl = cleanUrl.slice(0, -1);
+        }
+        return `${prefix}<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="ct-verification-inline-link" onclick="event.stopPropagation()">${cleanUrl} <span class="ext-icon">↗</span></a>${suffix}`;
+    });
+    
+    return escaped;
+}
+
+function resolveFeatureVerificationUrl(t) {
+    if (!t) return null;
+    const meta = t.metadata || {};
+    const ct = meta.coding_task || {};
+    
+    // Tier 1: Explicit Metadata
+    const explicitUrl = ct.verification_url || ct.feature_url || ct.target_url || meta.verification_url || meta.feature_url;
+    if (explicitUrl && typeof explicitUrl === 'string' && explicitUrl.trim().startsWith('http')) {
+        let title = 'Configured Feature Target';
+        try {
+            const parsed = new URL(explicitUrl.trim());
+            title = parsed.pathname.split('/').filter(Boolean).pop() || parsed.hostname;
+        } catch (e) {}
+        return {
+            url: explicitUrl.trim(),
+            title: ct.verification_url_title || title,
+            isAutoDetected: false
+        };
+    }
+
+    // Tier 2: Extracted from Verification Steps or Description
+    const items = ct.verification_items || [];
+    const urlRegex = /https?:\/\/[^\s)>\]"']+/i;
+    
+    for (const item of items) {
+        const itemText = (typeof item === 'object' && item !== null) ? (item.label || '') : String(item);
+        const match = itemText.match(urlRegex);
+        if (match) {
+            return {
+                url: match[0],
+                title: 'Referenced Verification Link',
+                isAutoDetected: true
+            };
+        }
+    }
+    
+    if (t.content) {
+        const match = t.content.match(urlRegex);
+        if (match) {
+            return {
+                url: match[0],
+                title: 'Referenced Feature Link',
+                isAutoDetected: true
+            };
+        }
+    }
+
+    // Tier 3: Heuristic Intelligence ("Figure It Out")
+    const project = (ct.resolvedProject || ct.workstream || ct.project || '').toLowerCase();
+    const workspace = (ct.workspace || (typeof getWorkspaceForProjectKey === 'function' ? getWorkspaceForProjectKey(ct.project) : '') || '').toLowerCase();
+    const summary = (meta.summary || '').toLowerCase();
+    const content = (t.content || '').toLowerCase();
+    const allText = `${project} ${workspace} ${summary} ${content} ${items.map(i => (typeof i === 'object' && i !== null ? (i.label || '') : String(i))).join(' ')}`.toLowerCase();
+
+    // AirMaria Ecosystem
+    if (workspace === 'airmaria' || project.includes('airmaria') || project.includes('chatops') || project.includes('stream') || project.includes('liturgy') || project.includes('homily') || project.includes('backups')) {
+        if (allText.includes('credential') || allText.includes('security') || allText.includes('lifecycle')) {
+            return {
+                url: 'https://airmaria.com/wp-admin/admin.php?page=airmaria-credentials',
+                title: 'AirMaria Security & Credentials Console',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('backup') || allText.includes('gfs') || allText.includes('snapshot')) {
+            return {
+                url: 'https://airmaria.com/am-admin/backups_dashboard.php',
+                title: 'AirMaria Backups Dashboard',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('chatops') || allText.includes('chat ops') || allText.includes('prayer') || allText.includes('intention') || allText.includes('participant')) {
+            return {
+                url: 'https://airmaria.com/am-admin/chat_ops.php',
+                title: 'AirMaria ChatOps Console',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('stream') || allText.includes('schedule') || allText.includes('broadcast') || allText.includes('sunday talk')) {
+            return {
+                url: 'https://airmaria.com/am-admin/manage_scheduled.php',
+                title: 'AirMaria Stream Management',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('liturgy') || allText.includes('missal') || allText.includes('reading') || allText.includes('mass')) {
+            return {
+                url: 'https://airmaria.com/am-admin/litrgyfllr_form.php',
+                title: 'AirMaria Liturgy Explorer & Filler',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('homily') || allText.includes('transcript') || allText.includes('video') || allText.includes('upload')) {
+            return {
+                url: 'https://airmaria.com/am-admin/vid_update.php',
+                title: 'AirMaria Video & Homilies Admin',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('contact') || allText.includes('donation') || allText.includes('crm')) {
+            return {
+                url: 'https://airmaria.com/am-admin/contacts_detail.php',
+                title: 'AirMaria CRM & Contacts',
+                isAutoDetected: true
+            };
+        }
+        return {
+            url: 'https://airmaria.com/am-admin/',
+            title: 'AirMaria Admin Hub',
+            isAutoDetected: true
+        };
+    }
+
+    // Maximus Ecosystem
+    if (workspace === 'openbrain' || project.includes('maximus') || project.includes('open_brain') || project.includes('google_tasks')) {
+        if (allText.includes('task') || allText.includes('todo') || allText.includes('sync') || allText.includes('google task')) {
+            return {
+                url: 'https://rod-burke.github.io/maximus/index.html#tasks',
+                title: 'Maximus Tasks Dashboard',
+                isInternalPwa: true,
+                targetPanel: 'tasks',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('month') || allText.includes('calendar') || allText.includes('recurren') || allText.includes('event')) {
+            return {
+                url: 'https://rod-burke.github.io/maximus/index.html#calendar',
+                title: 'Maximus Month Calendar',
+                isInternalPwa: true,
+                targetPanel: 'month',
+                isAutoDetected: true
+            };
+        }
+        if (allText.includes('history') || allText.includes('message') || allText.includes('search') || allText.includes('declutter')) {
+            return {
+                url: 'https://rod-burke.github.io/maximus/index.html#history',
+                title: 'Maximus Message History',
+                isInternalPwa: true,
+                targetPanel: 'history',
+                isAutoDetected: true
+            };
+        }
+        return {
+            url: 'https://rod-burke.github.io/maximus/index.html',
+            title: 'Maximus Main Dashboard',
+            isInternalPwa: true,
+            isAutoDetected: true
+        };
+    }
+
+    return null;
+}
+
 function renderCodingTaskCard(t) {
     const meta = t.metadata || {};
     const ct = meta.coding_task || {};
@@ -4229,11 +4416,12 @@ function renderCodingTaskCard(t) {
                 <button class="ct-action-btn ct-btn-save hidden">💾 Save</button>
                 <button class="ct-action-btn ct-btn-delete">🗑</button>
             </div>
-            <div class="ct-verification-section" style="display:${(ct.verification_items && ct.verification_items.length > 0) ? 'block' : 'none'}">
+            <div class="ct-verification-section" style="display:${((ct.verification_items && ct.verification_items.length > 0) || status === 'needs_verification') ? 'block' : 'none'}">
                 <div class="ct-verification-header">
                     <span class="ct-verification-title">🔍 Verification Checklist</span>
                     <span class="ct-verification-progress"></span>
                 </div>
+                <div class="ct-feature-target-banner"></div>
                 <ul class="ct-verification-list"></ul>
                 <div class="ct-verification-actions">
                     <button class="ct-action-btn ct-btn-mark-done" style="display:none">✅ All Verified → Send for Logging</button>
@@ -4374,13 +4562,108 @@ function renderCodingTaskCard(t) {
         evaluateCodingTask(t.id, t.content, el, meta);
     });
 
-    // Verification checklist logic
+    // Verification checklist & feature target logic
     const vList = el.querySelector('.ct-verification-list');
     const vProgress = el.querySelector('.ct-verification-progress');
+    const targetBanner = el.querySelector('.ct-feature-target-banner');
     const markDoneBtn = el.querySelector('.ct-btn-mark-done');
     const sendbackSection = el.querySelector('.ct-sendback-section');
     const sendbackInput = el.querySelector('.ct-sendback-input');
     const sendbackBtn = el.querySelector('.ct-btn-sendback');
+
+    function renderFeatureBanner() {
+        if (!targetBanner) return;
+        const featureInfo = resolveFeatureVerificationUrl(t);
+        if (!featureInfo || !featureInfo.url) {
+            targetBanner.innerHTML = `
+                <div class="ct-feature-banner-row">
+                    <span class="ct-feature-empty-label">No target UI link detected</span>
+                    <button class="ct-feature-edit-btn" title="Add feature link">➕ Add Link</button>
+                </div>
+                <div class="ct-feature-edit-form hidden">
+                    <input type="url" class="ct-feature-url-input" placeholder="https://... target UI URL">
+                    <button class="ct-feature-save-btn">Save</button>
+                    <button class="ct-feature-cancel-btn">Cancel</button>
+                </div>
+            `;
+        } else {
+            const isAuto = featureInfo.isAutoDetected;
+            const url = featureInfo.url;
+            const title = featureInfo.title || url;
+            const autoBadge = isAuto ? `<span class="ct-feature-badge-auto" title="Inferred automatically from project & keywords">🤖 Auto</span>` : '';
+            const internalBtn = featureInfo.isInternalPwa && featureInfo.targetPanel ? `
+                <button class="ct-feature-jump-btn" title="Switch panel inside Maximus">Open Panel</button>
+            ` : '';
+
+            targetBanner.innerHTML = `
+                <div class="ct-feature-banner-row">
+                    <span class="ct-feature-prompt-label">Feature UI:</span>
+                    <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="ct-feature-action-link" title="Open ${escapeHtml(url)}">
+                        <span class="ct-feature-link-icon">🚀</span>
+                        <span class="ct-feature-link-name">${escapeHtml(title)}</span>
+                        <span class="ct-feature-link-arrow">↗</span>
+                    </a>
+                    ${autoBadge}
+                    ${internalBtn}
+                    <button class="ct-feature-edit-btn" title="Override target link">✏️</button>
+                </div>
+                <div class="ct-feature-edit-form hidden">
+                    <input type="url" class="ct-feature-url-input" value="${escapeHtml(ct.verification_url || url)}" placeholder="https://... target UI URL">
+                    <button class="ct-feature-save-btn">Save</button>
+                    <button class="ct-feature-cancel-btn">Cancel</button>
+                </div>
+            `;
+        }
+
+        const editBtn = targetBanner.querySelector('.ct-feature-edit-btn');
+        const editForm = targetBanner.querySelector('.ct-feature-edit-form');
+        const bannerRow = targetBanner.querySelector('.ct-feature-banner-row');
+        const urlInput = targetBanner.querySelector('.ct-feature-url-input');
+        const saveBtn = targetBanner.querySelector('.ct-feature-save-btn');
+        const cancelBtn = targetBanner.querySelector('.ct-feature-cancel-btn');
+        const jumpBtn = targetBanner.querySelector('.ct-feature-jump-btn');
+
+        if (editBtn && editForm && bannerRow) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                bannerRow.classList.add('hidden');
+                editForm.classList.remove('hidden');
+                if (urlInput) urlInput.focus();
+            });
+        }
+
+        if (cancelBtn && editForm && bannerRow) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                editForm.classList.add('hidden');
+                bannerRow.classList.remove('hidden');
+            });
+        }
+
+        if (saveBtn && editForm && urlInput) {
+            saveBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const val = urlInput.value.trim();
+                ct.verification_url = val || null;
+                await updateCodingTaskMeta(t.id, meta);
+                renderFeatureBanner();
+            });
+        }
+
+        if (jumpBtn && featureInfo && featureInfo.targetPanel) {
+            jumpBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetPanel = featureInfo.targetPanel;
+                if (targetPanel === 'tasks' && dom.tasksBtn) {
+                    dom.tasksBtn.click();
+                } else if (targetPanel === 'month' && dom.monthViewPanel) {
+                    openMonthView();
+                } else if (targetPanel === 'history' && dom.historyBtn) {
+                    dom.historyBtn.click();
+                }
+            });
+        }
+    }
 
     let sendbackDebounceTimer;
     sendbackInput.addEventListener('input', () => {
@@ -4440,7 +4723,7 @@ function renderCodingTaskCard(t) {
 
             const label = document.createElement('span');
             label.className = 'ct-verification-label' + (isChecked ? ' verified' : '');
-            label.textContent = labelText;
+            label.innerHTML = renderVerificationLabelHtml(labelText);
 
             const notesInput = document.createElement('input');
             notesInput.type = 'text';
@@ -4492,8 +4775,11 @@ function renderCodingTaskCard(t) {
         }
     }
 
-    if (ct.verification_items && ct.verification_items.length > 0) {
-        updateVerificationUI();
+    if ((ct.verification_items && ct.verification_items.length > 0) || status === 'needs_verification') {
+        renderFeatureBanner();
+        if (ct.verification_items && ct.verification_items.length > 0) {
+            updateVerificationUI();
+        }
     }
 
     // Mark Done handler
