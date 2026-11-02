@@ -5554,6 +5554,10 @@ const versionEl = document.querySelector('.app-version');
 if (versionEl) {
     versionEl.textContent = versionStr;
 }
+const toastVerEl = document.getElementById('update-toast-version');
+if (toastVerEl) {
+    toastVerEl.textContent = versionStr;
+}
 
 // --- NAVIGATION INTERCEPT (BACK BUTTON) ---
 function initNavigationIntercept() {
