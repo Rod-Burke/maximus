@@ -1,4 +1,4 @@
-const CONFIG = {
+﻿const CONFIG = {
     ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/voice-gateway',
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
     SYNC_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
@@ -4721,9 +4721,29 @@ function renderCodingTaskCard(t) {
             checkbox.checked = isChecked;
             if (isChecked) checkedCount++;
 
+            // Generous hit-target wrapper around the checkbox (36px desktop / 44px mobile touch target)
+            const cbWrap = document.createElement('div');
+            cbWrap.className = 'ct-verification-cb-wrap';
+            cbWrap.title = isChecked ? 'Mark unverified' : 'Mark verified';
+            cbWrap.appendChild(checkbox);
+
+            cbWrap.addEventListener('click', (e) => {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            });
+
             const label = document.createElement('span');
             label.className = 'ct-verification-label' + (isChecked ? ' verified' : '');
             label.innerHTML = renderVerificationLabelHtml(labelText);
+
+            // Allow clicking anywhere on label text to toggle checkbox (ignoring inline feature links)
+            label.addEventListener('click', (e) => {
+                if (e.target.closest('a')) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
 
             const notesInput = document.createElement('input');
             notesInput.type = 'text';
@@ -4758,7 +4778,7 @@ function renderCodingTaskCard(t) {
 
             const topRow = document.createElement('div');
             topRow.className = 'ct-verification-item-row';
-            topRow.appendChild(checkbox);
+            topRow.appendChild(cbWrap);
             topRow.appendChild(label);
 
             li.appendChild(topRow);
@@ -5538,7 +5558,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v132';
+let versionStr = 'v133';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');

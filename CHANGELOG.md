@@ -6,6 +6,18 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v133] - 2026-11-02
+
+### Task: Expanded Verification Checkbox Clickable Target Area
+- **Changes**:
+  - Enlarged the verification checkbox element `.ct-verification-cb` from 15px to 20px (and 22px on touch/coarse devices) for direct optical clarity and effortless clicking.
+  - Introduced `.ct-verification-cb-wrap`, wrapping each checkbox in a generous 36px x 36px click target on desktop, expanded to 44px x 44px on coarse pointers (`@media (pointer: coarse)`), satisfying WCAG 2.5.8 Target Size (Minimum) Level AA.
+  - Added interactive hover (`rgba(255, 255, 255, 0.08)`) and active press feedback (`rgba(255, 255, 255, 0.16)`) around the checkbox target area.
+  - Enabled label-click toggling so tapping or clicking anywhere on the verification description text automatically toggles the checkbox, while isolating embedded feature UI links (`e.target.closest('a')`).
+  - Switched row alignment to `align-items: flex-start` with negative margin offsets on the hit-box wrapper so multi-line text remains cleanly aligned with the checkbox.
+
+---
+
 ## [v132] - 2026-11-02
 
 ### Task: Direct Feature UI Links in Verification Checklist
