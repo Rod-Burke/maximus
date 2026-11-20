@@ -3520,6 +3520,16 @@ const ctDom = {
     projectInfoText: document.getElementById('project-info-text'),
     closeProjectInfo: document.getElementById('close-project-info'),
     projectInfoOk: document.getElementById('project-info-ok'),
+    // Verification Explanation Modal
+    explainModal: document.getElementById('verification-explain-modal'),
+    closeExplainModal: document.getElementById('close-verification-explain'),
+    explainStepText: document.getElementById('verification-explain-step-text'),
+    explainResult: document.getElementById('verification-explain-result'),
+    explainFollowupInput: document.getElementById('verification-explain-followup-input'),
+    explainAskBtn: document.getElementById('verification-explain-ask-btn'),
+    explainCacheBadge: document.getElementById('verification-explain-cache-indicator'),
+    explainRefreshBtn: document.getElementById('verification-explain-refresh-btn'),
+    explainCloseBtn: document.getElementById('verification-explain-close-btn'),
 };
 
 // Simple markdown to HTML converter
@@ -4717,6 +4727,7 @@ function renderCodingTaskCard(t) {
             const labelText = isObj ? (item.label || '') : item;
             const isChecked = isObj ? !!item.checked : false;
             const itemNotes = isObj ? (item.notes || '') : '';
+            const itemExplanation = isObj ? (item.explanation || '') : '';
 
             checkbox.checked = isChecked;
             if (isChecked) checkedCount++;
@@ -4780,6 +4791,24 @@ function renderCodingTaskCard(t) {
             topRow.className = 'ct-verification-item-row';
             topRow.appendChild(cbWrap);
             topRow.appendChild(label);
+
+            const infoBtn = document.createElement('button');
+            infoBtn.type = 'button';
+            infoBtn.className = 'ct-verification-info-btn' + (itemExplanation ? ' has-guide' : '');
+            infoBtn.title = itemExplanation ? 'Testing Guide (Cached)' : 'Generate Testing Guide with Gemini';
+            infoBtn.setAttribute('aria-label', 'Verification Testing Guide');
+            infoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>`;
+
+            infoBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openVerificationExplainModal(t, items[idx], idx, meta, updateVerificationUI);
+            });
+
+            topRow.appendChild(infoBtn);
 
             li.appendChild(topRow);
             li.appendChild(notesInput);
@@ -5370,6 +5399,166 @@ ctDom.closeImprove.addEventListener('click', () => {
     ctImproveTaskId = null;
 });
 
+// --- VERIFICATION STEP EXPLANATION MODAL ---
+
+let currentExplainContext = null;
+
+async function openVerificationExplainModal(task, item, idx, meta, onUpdateUI, forceRefresh = false) {
+    if (!ctDom.explainModal) return;
+
+    currentExplainContext = { task, item, idx, meta, onUpdateUI };
+    const isObj = (typeof item === 'object' && item !== null);
+    const stepLabel = isObj ? (item.label || '') : item;
+    const cachedExplanation = isObj ? (item.explanation || '') : '';
+    const project = (meta && meta.coding_task && meta.coding_task.project) || 'uncategorized';
+
+    ctDom.explainStepText.textContent = stepLabel;
+    ctDom.explainFollowupInput.value = '';
+    ctDom.explainModal.classList.remove('hidden');
+
+    // If already cached and not forcing refresh, display instantly!
+    if (cachedExplanation && !forceRefresh) {
+        ctDom.explainResult.innerHTML = simpleMarkdownToHtml(cachedExplanation);
+        ctDom.explainCacheBadge.textContent = '⚡ Instant (Cached)';
+        ctDom.explainCacheBadge.className = 'verification-cache-badge';
+        ctDom.explainCacheBadge.style.display = 'inline-block';
+        return;
+    }
+
+    // Call API via manage-thoughts
+    ctDom.explainCacheBadge.textContent = '✨ Generating with Gemini...';
+    ctDom.explainCacheBadge.className = 'verification-cache-badge live';
+    ctDom.explainCacheBadge.style.display = 'inline-block';
+    ctDom.explainResult.innerHTML = '<div class="ct-loading"><div class="ct-spinner"></div>Generating testing guide with Gemini...</div>';
+
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({
+                action: 'explain_verification_step',
+                step_label: stepLabel,
+                task_content: task.content || '',
+                project: project
+            })
+        });
+        const data = await res.json();
+        const explanation = data.explanation || 'Unable to generate testing guide at this time.';
+
+        ctDom.explainResult.innerHTML = simpleMarkdownToHtml(explanation);
+        ctDom.explainCacheBadge.textContent = '✨ Generated & Cached';
+        ctDom.explainCacheBadge.className = 'verification-cache-badge';
+
+        // Cache into the item object and persist to DB
+        const items = (meta && meta.coding_task && meta.coding_task.verification_items) || [];
+        if (typeof items[idx] === 'string') {
+            items[idx] = { label: items[idx], checked: false, notes: '', explanation: explanation };
+        } else if (items[idx]) {
+            items[idx].explanation = explanation;
+        }
+        await updateCodingTaskMeta(task.id, meta);
+
+        // Update the card UI so the button reflects the cached guide state
+        if (typeof onUpdateUI === 'function') onUpdateUI();
+    } catch (err) {
+        console.error('Error generating verification explanation:', err);
+        ctDom.explainResult.innerHTML = `<p style="color:#ef4444;">Failed to generate testing guide: ${escapeHtml(err.message)}</p>`;
+        ctDom.explainCacheBadge.style.display = 'none';
+    }
+}
+
+async function submitVerificationFollowUp() {
+    if (!currentExplainContext) return;
+    const followUp = ctDom.explainFollowupInput.value.trim();
+    if (!followUp) return;
+
+    const { task, item, idx, meta } = currentExplainContext;
+    const isObj = (typeof item === 'object' && item !== null);
+    const stepLabel = isObj ? (item.label || '') : item;
+    const currentExplanation = ctDom.explainResult.innerText || (isObj ? (item.explanation || '') : '');
+    const project = (meta && meta.coding_task && meta.coding_task.project) || 'uncategorized';
+
+    ctDom.explainAskBtn.disabled = true;
+    ctDom.explainAskBtn.textContent = 'Thinking...';
+
+    // Append user question container to result
+    const qDiv = document.createElement('div');
+    qDiv.style.marginTop = '1rem';
+    qDiv.style.paddingTop = '0.75rem';
+    qDiv.style.borderTop = '1px dashed var(--glass-border)';
+    qDiv.innerHTML = `<p style="color:var(--accent-gold); font-weight:600;">Q: ${escapeHtml(followUp)}</p><div class="ct-loading"><div class="ct-spinner"></div>Consulting Gemini...</div>`;
+    ctDom.explainResult.appendChild(qDiv);
+    ctDom.explainResult.scrollTop = ctDom.explainResult.scrollHeight;
+
+    try {
+        const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
+            body: JSON.stringify({
+                action: 'explain_verification_step',
+                step_label: stepLabel,
+                task_content: task.content || '',
+                project: project,
+                existing_explanation: currentExplanation,
+                follow_up_question: followUp
+            })
+        });
+        const data = await res.json();
+        const answer = data.explanation || 'No response received.';
+
+        qDiv.innerHTML = `<p style="color:var(--accent-gold); font-weight:600;">Q: ${escapeHtml(followUp)}</p>` + simpleMarkdownToHtml(answer);
+        ctDom.explainFollowupInput.value = '';
+        ctDom.explainResult.scrollTop = ctDom.explainResult.scrollHeight;
+    } catch (err) {
+        qDiv.innerHTML += `<p style="color:#ef4444;">Error: ${escapeHtml(err.message)}</p>`;
+    } finally {
+        ctDom.explainAskBtn.disabled = false;
+        ctDom.explainAskBtn.textContent = 'Ask AI';
+    }
+}
+
+// Attach event listeners for Verification Explanation Modal
+if (ctDom.closeExplainModal) {
+    ctDom.closeExplainModal.addEventListener('click', () => {
+        ctDom.explainModal.classList.add('hidden');
+    });
+}
+if (ctDom.explainCloseBtn) {
+    ctDom.explainCloseBtn.addEventListener('click', () => {
+        ctDom.explainModal.classList.add('hidden');
+    });
+}
+if (ctDom.explainModal) {
+    ctDom.explainModal.addEventListener('click', (e) => {
+        if (e.target === ctDom.explainModal) ctDom.explainModal.classList.add('hidden');
+    });
+}
+if (ctDom.explainRefreshBtn) {
+    ctDom.explainRefreshBtn.addEventListener('click', () => {
+        if (currentExplainContext) {
+            openVerificationExplainModal(
+                currentExplainContext.task,
+                currentExplainContext.item,
+                currentExplainContext.idx,
+                currentExplainContext.meta,
+                currentExplainContext.onUpdateUI,
+                true
+            );
+        }
+    });
+}
+if (ctDom.explainAskBtn) {
+    ctDom.explainAskBtn.addEventListener('click', submitVerificationFollowUp);
+}
+if (ctDom.explainFollowupInput) {
+    ctDom.explainFollowupInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitVerificationFollowUp();
+        }
+    });
+}
+
 // --- ADD CODING TASK MODAL ---
 
 ctDom.addBtn.addEventListener('click', () => {
@@ -5558,7 +5747,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v133';
+let versionStr = 'v134';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');

@@ -6,6 +6,30 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v134] - 2026-11-20
+
+### Task: Maximus War Chart (Phase 1) — Project Columns Board & Weekly Calendar Strip
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - Built dedicated full-width desktop War Chart page (`warchart.html`, `warchart.css`, `warchart.js`) sharing Saint Max authentication and live Supabase `manage-thoughts` persistence.
+  - Added draggable project/realm columns (left/right header reordering persisted in Supabase as `warchart_config`), seeded with Notion realms and synced with `projects_config` coding projects.
+  - Added draggable task cards (up/down fractional ordering via `metadata.warchart_order`, cross-column reassignment, edge auto-scroll, and drag-to-schedule onto the collapsible top Weekly Calendar strip).
+  - Placed inline completion checkboxes directly in front of each task title with red (unscheduled), amber (scheduled), and green (completed) left-border status indicators, plus per-column Manual/Date sort toggles and inline `+` quick-add.
+  - Included collapsible leftmost `Inbox / Unassigned` column for triaging unassigned OpenBrain tasks, Scope (`All`/`General`/`Coding`) and Status (`All Active`/`Unscheduled`/`Scheduled`/`Done`) filters, always-visible high-contrast horizontal board scrollbar, and native `<dialog>` Task Detail and Column Manager modals.
+  - Added a War Chart columns button to `index.html` header, registered War Chart assets in `sw.js`, and extended `deploy.ps1 -Bump` to version-sync `warchart.html`.
+
+### Task: Verification Step Explanation & Testing Guide Modal
+- **ID**: `cac3951e-4cb2-4e0b-a79f-764c3e69331c`
+- **Changes**:
+  - Added on-demand AI testing guide generation for coding task verification steps in Maximus PWA.
+  - Added subtle `ℹ️` info button next to each checklist item in `.ct-verification-item-row`.
+  - Added `#verification-explain-modal` displaying the step being tested, a loading spinner, rendered Markdown explanation, and an interactive follow-up Q&A input.
+  - Implemented `explain_verification_step` in Supabase Edge function `manage-thoughts`, prompting Gemini to generate structured output: 🎯 Context & Intent, 🛠️ How to Test, and ✅ Expected Result.
+  - Implemented persistent database caching (`item.explanation`): once generated, opening the testing guide is instant (0ms latency, zero API calls), with an active gold visual cue (`has-guide`) on the icon button.
+  - Included a follow-up query input inside the modal to ask Gemini specific technical questions without stalling verification or triggering rework status.
+
+---
+
 ## [v133] - 2026-11-02
 
 ### Task: Expanded Verification Checkbox Clickable Target Area

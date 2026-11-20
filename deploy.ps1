@@ -19,6 +19,7 @@ Set-Location $PSScriptRoot
 $swFile = Join-Path $PSScriptRoot "sw.js"
 $htmlFile = Join-Path $PSScriptRoot "index.html"
 $appFile = Join-Path $PSScriptRoot "app.js"
+$warchartHtmlFile = Join-Path $PSScriptRoot "warchart.html"
 
 # 1. Determine Current Version
 $currentSw = Get-Content $swFile -Raw -Encoding utf8
@@ -62,6 +63,15 @@ if ($targetVerNum) {
     $appContent = $appContent -replace "let versionStr = 'v\d+';", "let versionStr = 'v$targetVerNum';"
     [System.IO.File]::WriteAllText($appFile, $appContent, [System.Text.Encoding]::UTF8)
     Write-Host "  [OK] Updated app.js (default versionStr: 'v$targetVerNum')" -ForegroundColor Green
+
+    # D. Update warchart.html
+    if (Test-Path $warchartHtmlFile) {
+        $wcContent = Get-Content $warchartHtmlFile -Raw -Encoding utf8
+        $wcContent = $wcContent -replace 'warchart\.css\?v=\d+', "warchart.css?v=$targetVerNum"
+        $wcContent = $wcContent -replace 'warchart\.js\?v=\d+', "warchart.js?v=$targetVerNum"
+        [System.IO.File]::WriteAllText($warchartHtmlFile, $wcContent, [System.Text.Encoding]::UTF8)
+        Write-Host "  [OK] Updated warchart.html (warchart.css?v=$targetVerNum, warchart.js?v=$targetVerNum)" -ForegroundColor Green
+    }
     
     $commitVerTag = "v$targetVerNum"
 } else {

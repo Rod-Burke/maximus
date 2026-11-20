@@ -1,5 +1,5 @@
-﻿const CACHE_NAME = 'maximus-v133';
-const ASSETS = ['index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'migration.html', 'migration.js'];
+﻿const CACHE_NAME = 'maximus-v134';
+const ASSETS = ['index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'migration.html', 'migration.js', 'warchart.html', 'warchart.css', 'warchart.js'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

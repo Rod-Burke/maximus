@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=133">
+    <link rel="stylesheet" href="style.css?v=134">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -47,6 +47,13 @@
                 <h1>Saint Max <span class="app-version"></span></h1>
             </div>
             <div class="header-actions">
+                <a id="warchart-btn" href="warchart.html" class="icon-btn" title="War Chart" aria-label="Open War Chart" style="text-decoration: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="5" height="18" rx="1"/>
+                        <rect x="10" y="3" width="5" height="12" rx="1"/>
+                        <rect x="17" y="3" width="4" height="15" rx="1"/>
+                    </svg>
+                </a>
                 <button id="coding-tasks-btn" class="icon-btn" title="Coding Tasks">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="16 18 22 12 16 6"/>
@@ -485,6 +492,43 @@
             </div>
         </div>
 
+        <!-- Verification Step Explanation Modal -->
+        <div id="verification-explain-modal" class="modal-overlay hidden">
+            <div class="verification-explain-content">
+                <div class="verification-explain-header">
+                    <h2>🔍 Verification Testing Guide</h2>
+                    <button id="close-verification-explain" class="icon-btn" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="verification-explain-body">
+                    <div class="verification-step-badge">
+                        <span class="verification-step-badge-label">Step Being Verified:</span>
+                        <div id="verification-explain-step-text" class="verification-step-badge-text"></div>
+                    </div>
+                    
+                    <div id="verification-explain-result" class="verification-explain-result-box">
+                        <!-- Populated dynamically with spinner or rendered markdown guide -->
+                    </div>
+
+                    <div class="verification-explain-followup">
+                        <label class="verification-explain-label">💬 Need more clarification? Ask a follow-up:</label>
+                        <div class="verification-explain-input-row">
+                            <input type="text" id="verification-explain-followup-input" class="modal-input" placeholder="e.g. Where is this button located? What logs should I check?">
+                            <button id="verification-explain-ask-btn" class="modal-btn modal-btn-primary">Ask AI</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="verification-explain-footer">
+                    <span id="verification-explain-cache-indicator" class="verification-cache-badge">⚡ Instant (Cached)</span>
+                    <button id="verification-explain-refresh-btn" class="modal-btn modal-btn-secondary" title="Regenerate guide from Gemini">🔄 Regenerate</button>
+                    <button id="verification-explain-close-btn" class="modal-btn modal-btn-secondary">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Task Detail Modal -->
         <div id="task-detail-modal" class="modal-overlay hidden">
             <div class="modal-content">
@@ -721,7 +765,7 @@
 
     <!-- PWA Update Notification Toast -->
     <div id="update-toast" class="update-toast hidden">
-        <span class="update-toast-text">Maximus has been updated (<span id="update-toast-version">v133</span>).</span>
+        <span class="update-toast-text">Maximus has been updated (<span id="update-toast-version">v134</span>).</span>
         <button id="update-toast-btn">Reload</button>
     </div>
 
@@ -734,7 +778,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=133"></script>
+    <script src="app.js?v=134"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
