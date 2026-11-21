@@ -6,6 +6,7 @@ const CONFIG = {
 };
 
 const INBOX_KEY = '__inbox__';
+const M2M_COLUMN_RENDER_CAP = 60;
 
 const COLOR_PALETTE = [
     '#22c55e', // Green
@@ -30,7 +31,39 @@ const DEFAULT_REALM_COLUMNS = [
     { key: 'm2m_workflow', name: 'M2M Workflow', color: '#ec4899', kind: 'realm', sortMode: 'manual', hidden: false },
     { key: 'computer_admin', name: 'Computer & Admin', color: '#3b82f6', kind: 'realm', sortMode: 'manual', hidden: false },
     { key: 'personal_health', name: 'Personal & Health', color: '#14b8a6', kind: 'realm', sortMode: 'manual', hidden: false },
-    { key: 'house_chapter', name: 'House Chapter', color: '#eab308', kind: 'realm', sortMode: 'manual', hidden: false }
+    { key: 'house_chapter', name: 'House Chapter', color: '#eab308', kind: 'realm', sortMode: 'manual', hidden: false },
+    { key: 'fill_in', name: 'Fill-In Jobs', color: '#06b6d4', kind: 'realm', sortMode: 'manual', hidden: false }
+];
+
+const M2M_STAGES = [
+    { key: 'idea', name: '💡 Ideas', color: '#94a3b8', frontLine: false },
+    { key: 'queued', name: '🎯 Queued Next', color: '#f59e0b', frontLine: true },
+    { key: 'research', name: '📚 Research', color: '#3b82f6', frontLine: true },
+    { key: 'script', name: '✍️ Script Draft', color: '#a855f7', frontLine: true },
+    { key: 'record', name: '🎙️ Record', color: '#ef4444', frontLine: true },
+    { key: 'edit_graphics', name: '🎬 Edit & Graphics', color: '#ec4899', frontLine: true },
+    { key: 'published', name: '🚀 Published', color: '#22c55e', frontLine: false }
+];
+
+const M2M_SUBSERIES = [
+    { key: 'Peace to the Moon', color: '#38bdf8' },
+    { key: 'Holy Science', color: '#fbbf24' },
+    { key: 'Ad Astra', color: '#a78bfa' },
+    { key: 'Religion in Space', color: '#f472b6' },
+    { key: 'Space Follies', color: '#fb923c' },
+    { key: 'Lost in Cyberspace', color: '#818cf8' },
+    { key: 'Franciscan Ecology', color: '#4ade80' },
+    { key: 'Rev Copernican Rev', color: '#2dd4bf' }
+];
+
+const M2M_CHECKLIST_STEPS = [
+    { key: 'hook', label: 'Hook & Outline' },
+    { key: 'recorded', label: 'Base Recording' },
+    { key: 'pauses', label: 'Pauses Cleaned' },
+    { key: 'broll', label: 'Stock / AI B-Roll' },
+    { key: 'music', label: 'Music & Audio' },
+    { key: 'thumbnail', label: 'Thumbnail & Title' },
+    { key: 'published', label: 'Published Live' }
 ];
 
 const CODING_STATUS_LABELS = {
@@ -47,25 +80,36 @@ const CODING_STATUS_LABELS = {
 
 // --- APPLICATION STATE ---
 const state = {
-    thoughts: [],              // All task, event, coding_task items
+    activeBoard: 'life',       // 'life' | 'm2m'
+    thoughts: [],              // Life board items (task, event, coding_task)
+    m2mEpisodes: [],           // M2M Studio items (thoughts with metadata.m2m)
     configThoughtId: null,     // Supabase thought ID for warchart_config
     boardConfig: {
         columns: [],
         calendarCollapsed: false,
         compactMode: false,
-        inboxCollapsed: false
+        inboxCollapsed: false,
+        fillInSeeded: false,
+        quickDeleteMode: true
     },
+    lastDeleted: null,
+    undoTimer: null,
     subprojectToParent: {},    // Maps coding subproject keys -> parent project key
     scopeFilter: 'all',        // 'all' | 'general' | 'coding'
     statusFilter: 'all_active',// 'all_active' | 'unscheduled' | 'scheduled' | 'completed'
+    m2mSubseriesFilter: 'all', // 'all' | subseries name
+    m2mExpandedStages: new Set(),
     searchQuery: '',
     weekStart: getSundayOfWeek(new Date()),
     editingTaskId: null,
+    editingM2mId: null,
+    m2mActiveTab: 'research',
+    m2mResearchMode: 'read',   // 'read' | 'edit'
     editingColumnKey: null,
     selectedColor: COLOR_PALETTE[0],
     drag: {
-        mode: null,            // 'card' | 'column' | 'cal-item'
-        id: null,              // task id or column key
+        mode: null,            // 'card' | 'column' | 'cal-item' | 'm2m-card'
+        id: null,
         sourceColKey: null
     },
     autoScrollDir: 0,
@@ -77,12 +121,25 @@ const state = {
 const dom = {
     app: document.querySelector('.wc-app'),
     saveStatus: document.getElementById('wc-save-status'),
+    boardLifeTab: document.getElementById('wc-board-life'),
+    boardM2mTab: document.getElementById('wc-board-m2m'),
+    m2mBadge: document.getElementById('wc-m2m-badge'),
+    lifeFilters: document.getElementById('wc-life-filters'),
     searchInput: document.getElementById('wc-search-input'),
     toggleCalBtn: document.getElementById('wc-toggle-cal-btn'),
     compactBtn: document.getElementById('wc-compact-btn'),
+    quickDeleteBtn: document.getElementById('wc-quick-delete-btn'),
     manageColsBtn: document.getElementById('wc-manage-cols-btn'),
     refreshBtn: document.getElementById('wc-refresh-btn'),
     addColBtn: document.getElementById('wc-add-col-btn'),
+    addEpisodeBtn: document.getElementById('wc-add-episode-btn'),
+    undoToast: document.getElementById('wc-undo-toast'),
+    undoText: document.getElementById('wc-undo-text'),
+    undoBtn: document.getElementById('wc-undo-btn'),
+
+    // M2M SubSeries Filter Bar
+    m2mSubseriesBar: document.getElementById('wc-m2m-subseries-bar'),
+    subseriesPills: document.getElementById('wc-subseries-pills'),
 
     // Calendar
     calPane: document.getElementById('wc-calendar-pane'),
@@ -104,7 +161,7 @@ const dom = {
     loginError: document.getElementById('wc-login-error'),
     loginSubmit: document.getElementById('wc-login-submit'),
 
-    // Detail Dialog
+    // Life Task Detail Dialog
     detailDialog: document.getElementById('wc-detail-dialog'),
     detailHeading: document.getElementById('wc-detail-heading'),
     detailStatusDot: document.getElementById('wc-detail-status-dot'),
@@ -133,6 +190,33 @@ const dom = {
     detailDelete: document.getElementById('wc-detail-delete'),
     detailCancel: document.getElementById('wc-detail-cancel'),
     detailSave: document.getElementById('wc-detail-save'),
+
+    // M2M Episode Workspace Dialog
+    m2mDialog: document.getElementById('wc-m2m-dialog'),
+    m2mHeading: document.getElementById('wc-m2m-heading'),
+    m2mClose: document.getElementById('wc-m2m-close'),
+    m2mForm: document.getElementById('wc-m2m-form'),
+    m2mTitle: document.getElementById('wc-m2m-title'),
+    m2mSubseries: document.getElementById('wc-m2m-subseries'),
+    m2mStage: document.getElementById('wc-m2m-stage'),
+    m2mPanelResearch: document.getElementById('wc-m2m-panel-research'),
+    m2mPanelScript: document.getElementById('wc-m2m-panel-script'),
+    m2mPanelProduction: document.getElementById('wc-m2m-panel-production'),
+    m2mResearchStats: document.getElementById('wc-m2m-research-stats'),
+    m2mResearchReadBtn: document.getElementById('wc-m2m-research-read-btn'),
+    m2mResearchEditBtn: document.getElementById('wc-m2m-research-edit-btn'),
+    m2mResearchReader: document.getElementById('wc-m2m-research-reader'),
+    m2mResearchInput: document.getElementById('wc-m2m-research-input'),
+    m2mLinksPreview: document.getElementById('wc-m2m-links-preview'),
+    m2mScriptStats: document.getElementById('wc-m2m-script-stats'),
+    m2mScriptInput: document.getElementById('wc-m2m-script-input'),
+    m2mChecklist: document.getElementById('wc-m2m-checklist'),
+    m2mVideoUrl: document.getElementById('wc-m2m-video-url'),
+    m2mGraphicsInput: document.getElementById('wc-m2m-graphics-input'),
+    m2mDelete: document.getElementById('wc-m2m-delete'),
+    m2mMetaInfo: document.getElementById('wc-m2m-meta-info'),
+    m2mCancel: document.getElementById('wc-m2m-cancel'),
+    m2mSave: document.getElementById('wc-m2m-save'),
 
     // Column Dialog
     colDialog: document.getElementById('wc-column-dialog'),
@@ -220,6 +304,59 @@ function slugifyKey(name) {
     return base || `col_${Date.now().toString(36)}`;
 }
 
+function countWords(text) {
+    const trimmed = (text || '').trim();
+    return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+function renderSimpleMarkdown(rawText) {
+    if (!rawText || !rawText.trim()) {
+        return '<p style="color: var(--wc-text-dim); font-style: italic;">No research notes yet. Click "Edit" above to start writing or pasting research.</p>';
+    }
+    const safe = escapeHtml(rawText);
+    const lines = safe.split(/\r?\n/);
+    let html = '';
+    let inList = false;
+
+    const inlineFormat = (line) => {
+        return line
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+            .replace(/(^|[\s(])(https?:\/\/[^\s<)"]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    };
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            if (inList) { html += '</ul>'; inList = false; }
+            continue;
+        }
+        if (trimmed.startsWith('### ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<h3>${inlineFormat(trimmed.slice(4))}</h3>`;
+        } else if (trimmed.startsWith('## ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<h2>${inlineFormat(trimmed.slice(3))}</h2>`;
+        } else if (trimmed.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<h1>${inlineFormat(trimmed.slice(2))}</h1>`;
+        } else if (/^[-*•]\s+/.test(trimmed)) {
+            if (!inList) { html += '<ul>'; inList = true; }
+            html += `<li>${inlineFormat(trimmed.replace(/^[-*•]\s+/, ''))}</li>`;
+        } else {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p>${inlineFormat(trimmed)}</p>`;
+        }
+    }
+    if (inList) html += '</ul>';
+    return html;
+}
+
+function getSubseriesColor(name) {
+    const found = M2M_SUBSERIES.find(s => s.key.toLowerCase() === (name || '').toLowerCase());
+    return found ? found.color : '#94a3b8';
+}
+
 // --- STATUS INDICATOR ---
 function setSaveStatus(mode, text) {
     dom.saveStatus.className = 'wc-save-status';
@@ -287,7 +424,6 @@ function openLoginDialog() {
     }
 }
 
-// Prevent Esc dismissing login dialog while unauthenticated
 dom.loginDialog.addEventListener('cancel', (e) => {
     if (!CONFIG.KEY) e.preventDefault();
 });
@@ -325,7 +461,7 @@ dom.loginForm.addEventListener('submit', async (e) => {
     }
 });
 
-// --- LIGHT-DISMISS FALLBACK FOR <dialog closedby="any"> (Modern Web Guidance) ---
+// --- LIGHT-DISMISS FALLBACK FOR <dialog closedby="any"> ---
 function setupDialogLightDismissFallback() {
     if ('closedBy' in HTMLDialogElement.prototype) return;
 
@@ -352,10 +488,11 @@ function setupDialogLightDismissFallback() {
 async function loadAllData() {
     setSaveStatus('saving', 'Loading…');
     try {
-        const [wcConfigRes, projConfigRes, itemsRes] = await Promise.all([
+        const [wcConfigRes, projConfigRes, itemsRes, m2mRes] = await Promise.all([
             apiCall({ action: 'list', types: ['warchart_config'], limit: 1 }),
             apiCall({ action: 'list', types: ['projects_config'], limit: 1 }),
-            apiCall({ action: 'list', types: ['task', 'event', 'coding_task'], limit: 1000 })
+            apiCall({ action: 'list', types: ['task', 'event', 'coding_task'], limit: 1000 }),
+            apiCall({ action: 'list', m2m_only: true, limit: 1000 })
         ]);
 
         // 1. Parse projects_config for coding project columns & subproject rollup
@@ -395,23 +532,35 @@ async function loadAllData() {
                 })),
                 calendarCollapsed: Boolean(wcConfigThought.metadata.calendarCollapsed),
                 compactMode: Boolean(wcConfigThought.metadata.compactMode),
-                inboxCollapsed: Boolean(wcConfigThought.metadata.inboxCollapsed)
+                inboxCollapsed: Boolean(wcConfigThought.metadata.inboxCollapsed),
+                fillInSeeded: Boolean(wcConfigThought.metadata.fillInSeeded),
+                quickDeleteMode: wcConfigThought.metadata.quickDeleteMode !== undefined
+                    ? Boolean(wcConfigThought.metadata.quickDeleteMode)
+                    : true
             };
-            // Append any newly added coding projects from projects_config not yet in boardConfig
             const existingKeys = new Set(state.boardConfig.columns.map(c => c.key));
-            let addedNew = false;
+            let changed = false;
+
+            // One-time seed of Fill-In Jobs column for existing configs
+            if (!state.boardConfig.fillInSeeded && !existingKeys.has('fill_in')) {
+                const insertAt = state.boardConfig.columns.findIndex(c => c.kind === 'coding');
+                const fillInCol = { key: 'fill_in', name: 'Fill-In Jobs', color: '#06b6d4', kind: 'realm', sortMode: 'manual', hidden: false };
+                if (insertAt >= 0) state.boardConfig.columns.splice(insertAt, 0, fillInCol);
+                else state.boardConfig.columns.push(fillInCol);
+                existingKeys.add('fill_in');
+                state.boardConfig.fillInSeeded = true;
+                changed = true;
+            }
+
             codingProjects.forEach(cp => {
                 if (!existingKeys.has(cp.key)) {
                     state.boardConfig.columns.push(cp);
                     existingKeys.add(cp.key);
-                    addedNew = true;
+                    changed = true;
                 }
             });
-            if (addedNew) {
-                saveBoardConfig();
-            }
+            if (changed) saveBoardConfig();
         } else {
-            // First-time seed: Notion realms + Maximus coding projects
             const seeded = [...DEFAULT_REALM_COLUMNS.map(c => ({ ...c }))];
             const keys = new Set(seeded.map(c => c.key));
             codingProjects.forEach(cp => {
@@ -424,17 +573,21 @@ async function loadAllData() {
                 columns: seeded,
                 calendarCollapsed: false,
                 compactMode: false,
-                inboxCollapsed: false
+                inboxCollapsed: false,
+                fillInSeeded: true,
+                quickDeleteMode: true
             };
             await saveBoardConfig();
         }
 
-        // 3. Store tasks/events/coding_tasks
+        // 3. Store Life tasks & M2M episodes
         state.thoughts = Array.isArray(itemsRes.thoughts) ? itemsRes.thoughts : [];
+        state.m2mEpisodes = Array.isArray(m2mRes.thoughts) ? m2mRes.thoughts : [];
+        dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
 
-        applyLayoutToggles();
+        applyBoardModeUI();
         renderAll();
-        setSaveStatus('saved', `Synced (${state.thoughts.length})`);
+        setSaveStatus('saved', `Synced (${state.thoughts.length + state.m2mEpisodes.length})`);
     } catch (err) {
         if (err.message !== 'Unauthorized') {
             setSaveStatus('error', 'Load failed');
@@ -450,7 +603,9 @@ async function saveBoardConfig() {
         columns: state.boardConfig.columns,
         calendarCollapsed: state.boardConfig.calendarCollapsed,
         compactMode: state.boardConfig.compactMode,
-        inboxCollapsed: state.boardConfig.inboxCollapsed
+        inboxCollapsed: state.boardConfig.inboxCollapsed,
+        fillInSeeded: state.boardConfig.fillInSeeded,
+        quickDeleteMode: state.boardConfig.quickDeleteMode
     };
 
     const req = state.configThoughtId
@@ -470,8 +625,9 @@ function getTaskType(t) {
 
 function getTaskTitle(t) {
     const m = t?.metadata || {};
-    const title = (m.summary || t?.content || '').trim();
-    return title || '(Untitled task)';
+    let title = (m.summary || t?.content || '').trim();
+    title = title.replace(/^Notion Note\s*-\s*/i, '').replace(/:\s*$/, '').trim();
+    return title || '(Untitled)';
 }
 
 function isTaskCompleted(t) {
@@ -502,7 +658,6 @@ function getTaskColumnKey(t) {
     if (!rawKey || rawKey === 'uncategorized') return INBOX_KEY;
     if (validKeys.has(rawKey)) return rawKey;
 
-    // Roll up coding subproject to parent column if parent exists
     const parentKey = state.subprojectToParent[rawKey];
     if (parentKey && validKeys.has(parentKey)) return parentKey;
 
@@ -520,16 +675,13 @@ function getTaskOrderValue(t, fallbackIndex = 0) {
     return (fallbackIndex + 1) * 100000;
 }
 
-function matchesFilters(t) {
+function matchesLifeFilters(t) {
     const type = getTaskType(t);
-    // Events display on the weekly calendar; columns hold tasks & coding_tasks
     if (type === 'event') return false;
 
-    // Scope filter
     if (state.scopeFilter === 'general' && type !== 'task') return false;
     if (state.scopeFilter === 'coding' && type !== 'coding_task') return false;
 
-    // Status filter
     const completed = isTaskCompleted(t);
     const scheduled = Boolean(t.metadata?.due_date);
 
@@ -538,7 +690,6 @@ function matchesFilters(t) {
     if (state.statusFilter === 'scheduled' && (completed || !scheduled)) return false;
     if (state.statusFilter === 'completed' && !completed) return false;
 
-    // Search query
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
         const hay = [
@@ -550,6 +701,28 @@ function matchesFilters(t) {
         if (!hay.includes(q)) return false;
     }
 
+    return true;
+}
+
+function matchesM2mFilters(ep) {
+    const m2m = ep.metadata?.m2m || {};
+    if (state.m2mSubseriesFilter !== 'all') {
+        if ((m2m.subseries || '').toLowerCase() !== state.m2mSubseriesFilter.toLowerCase()) {
+            return false;
+        }
+    }
+    if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        const hay = [
+            ep.metadata?.summary,
+            ep.content,
+            m2m.subseries,
+            m2m.research_doc,
+            m2m.script_draft,
+            m2m.graphics_notes
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+    }
     return true;
 }
 
@@ -569,20 +742,46 @@ function sortColumnTasks(tasks, sortMode) {
     return copy;
 }
 
-// --- LAYOUT TOGGLES ---
-function applyLayoutToggles() {
-    dom.calPane.classList.toggle('is-collapsed', state.boardConfig.calendarCollapsed);
+// --- BOARD MODE & LAYOUT TOGGLES ---
+function applyBoardModeUI() {
+    const isM2m = state.activeBoard === 'm2m';
+
+    dom.boardLifeTab.classList.toggle('active', !isM2m);
+    dom.boardLifeTab.setAttribute('aria-selected', String(!isM2m));
+    dom.boardM2mTab.classList.toggle('active', isM2m);
+    dom.boardM2mTab.setAttribute('aria-selected', String(isM2m));
+
+    dom.lifeFilters.hidden = isM2m;
+    dom.m2mSubseriesBar.hidden = !isM2m;
+    dom.toggleCalBtn.hidden = isM2m;
+    dom.manageColsBtn.hidden = isM2m;
+    dom.addColBtn.hidden = isM2m;
+    dom.addEpisodeBtn.hidden = !isM2m;
+
+    dom.searchInput.placeholder = isM2m ? 'Search episodes & research…' : 'Search tasks…';
+
+    dom.calPane.classList.toggle('is-collapsed', isM2m || state.boardConfig.calendarCollapsed);
     dom.toggleCalBtn.classList.toggle('active', !state.boardConfig.calendarCollapsed);
     dom.app.classList.toggle('is-compact', state.boardConfig.compactMode);
     dom.compactBtn.classList.toggle('active', state.boardConfig.compactMode);
+    dom.app.classList.toggle('is-quick-delete', state.boardConfig.quickDeleteMode);
+    dom.quickDeleteBtn.classList.toggle('is-danger-active', state.boardConfig.quickDeleteMode);
+    dom.quickDeleteBtn.classList.toggle('active', state.boardConfig.quickDeleteMode);
 }
 
-// --- RENDERING ---
+// --- RENDERING DISPATCH ---
 function renderAll() {
-    renderCalendar();
-    renderBoard();
+    dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
+    if (state.activeBoard === 'm2m') {
+        renderM2mSubseriesBar();
+        renderM2mBoard();
+    } else {
+        renderCalendar();
+        renderLifeBoard();
+    }
 }
 
+// --- WEEKLY CALENDAR (LIFE BOARD) ---
 function renderCalendar() {
     const start = state.weekStart;
     const end = addDays(start, 6);
@@ -596,7 +795,6 @@ function renderCalendar() {
     });
     dom.calRangeTitle.textContent = `${startLabel} – ${endLabel}`;
 
-    // Bucket dated items (events + tasks/coding_tasks matching scope/search)
     const itemsByDate = new Map();
     for (let i = 0; i < 7; i++) {
         itemsByDate.set(getLocalDateStr(addDays(start, i)), []);
@@ -643,7 +841,6 @@ function renderCalendar() {
         const listEl = dayEl.querySelector('.wc-cal-day-items');
         const dayItems = itemsByDate.get(dateStr) || [];
 
-        // Sort: Events with start_time first, then other events, then tasks
         dayItems.sort((a, b) => {
             const ea = getTaskType(a) === 'event' ? 0 : 1;
             const eb = getTaskType(b) === 'event' ? 0 : 1;
@@ -690,7 +887,6 @@ function renderCalendar() {
             listEl.appendChild(chip);
         }
 
-        // Calendar drop target for scheduling cards or rescheduling chips
         dayEl.addEventListener('dragover', (e) => {
             if (state.drag.mode !== 'card' && state.drag.mode !== 'cal-item') return;
             e.preventDefault();
@@ -718,7 +914,8 @@ function renderCalendar() {
     }
 }
 
-function getVisibleColumns() {
+// --- LIFE WAR CHART BOARD ---
+function getVisibleLifeColumns() {
     return state.boardConfig.columns.filter((col) => {
         if (col.hidden) return false;
         if (state.scopeFilter === 'general' && col.kind === 'coding') return false;
@@ -727,23 +924,20 @@ function getVisibleColumns() {
     });
 }
 
-function renderBoard() {
-    // Group filtered tasks by column key
+function renderLifeBoard() {
     const grouped = new Map();
     grouped.set(INBOX_KEY, []);
     state.boardConfig.columns.forEach(c => grouped.set(c.key, []));
 
     for (const t of state.thoughts) {
-        if (!matchesFilters(t)) continue;
+        if (!matchesLifeFilters(t)) continue;
         const colKey = getTaskColumnKey(t);
-        if (!grouped.has(colKey)) grouped.set(INBOX_KEY, grouped.get(INBOX_KEY));
         (grouped.get(colKey) || grouped.get(INBOX_KEY)).push(t);
     }
 
     const scrollLeft = dom.boardViewport.scrollLeft;
     dom.boardTrack.innerHTML = '';
 
-    // 1. Inbox / Unassigned Column on the left
     const inboxTasks = sortColumnTasks(grouped.get(INBOX_KEY) || [], 'manual');
     const inboxCol = {
         key: INBOX_KEY,
@@ -752,25 +946,22 @@ function renderBoard() {
         kind: 'inbox',
         sortMode: 'manual'
     };
-    dom.boardTrack.appendChild(createColumnElement(inboxCol, inboxTasks, true));
+    dom.boardTrack.appendChild(createLifeColumnElement(inboxCol, inboxTasks, true));
 
-    // 2. Visible Project / Realm Columns
-    const visibleCols = getVisibleColumns();
-    for (const col of visibleCols) {
+    for (const col of getVisibleLifeColumns()) {
         const colTasks = sortColumnTasks(grouped.get(col.key) || [], col.sortMode);
-        dom.boardTrack.appendChild(createColumnElement(col, colTasks, false));
+        dom.boardTrack.appendChild(createLifeColumnElement(col, colTasks, false));
     }
 
     dom.boardViewport.scrollLeft = scrollLeft;
 }
 
-function createColumnElement(col, tasks, isInbox) {
+function createLifeColumnElement(col, tasks, isInbox) {
     const colEl = document.createElement('section');
     colEl.className = `wc-column${isInbox ? ' is-inbox' : ''}${isInbox && state.boardConfig.inboxCollapsed ? ' is-collapsed' : ''}`;
     colEl.dataset.colKey = col.key;
     colEl.style.setProperty('--col-accent', col.color || '#fbbf24');
 
-    // Header
     const headerEl = document.createElement('div');
     headerEl.className = 'wc-col-header';
     if (!isInbox) {
@@ -806,46 +997,40 @@ function createColumnElement(col, tasks, isInbox) {
         <div class="wc-col-actions">${actionsHtml}</div>
     `;
 
-    // Collapsed Inbox expands on click
     if (isInbox) {
         headerEl.addEventListener('click', (e) => {
             if (e.target.closest('button')) return;
             if (state.boardConfig.inboxCollapsed) {
                 state.boardConfig.inboxCollapsed = false;
-                renderBoard();
+                renderLifeBoard();
                 saveBoardConfig();
             }
         });
         headerEl.querySelector('.wc-inbox-collapse-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             state.boardConfig.inboxCollapsed = true;
-            renderBoard();
+            renderLifeBoard();
             saveBoardConfig();
         });
     } else {
-        // Sort toggle
         headerEl.querySelector('.wc-col-sort-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             col.sortMode = col.sortMode === 'date' ? 'manual' : 'date';
-            renderBoard();
+            renderLifeBoard();
             saveBoardConfig();
         });
-        // Edit column
         headerEl.querySelector('.wc-col-edit-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             openColumnEditDialog(col.key);
         });
     }
 
-    // Inline Quick-Add container
     const quickAddEl = document.createElement('div');
     quickAddEl.className = 'wc-col-quick-add';
     quickAddEl.hidden = true;
     quickAddEl.innerHTML = `
         <input type="text" class="wc-quick-add-input" placeholder="New task title… (Enter to add)">
-        <div class="wc-quick-add-hint">
-            <span>Enter to save · Esc to close</span>
-        </div>
+        <div class="wc-quick-add-hint"><span>Enter to save · Esc to close</span></div>
     `;
     const quickInput = quickAddEl.querySelector('.wc-quick-add-input');
 
@@ -869,7 +1054,7 @@ function createColumnElement(col, tasks, isInbox) {
             if (!title) return;
             quickInput.disabled = true;
             try {
-                await createQuickTask(col, title);
+                await createQuickLifeTask(col, title);
                 quickInput.value = '';
                 quickInput.disabled = false;
                 quickInput.focus();
@@ -879,7 +1064,6 @@ function createColumnElement(col, tasks, isInbox) {
         }
     });
 
-    // Body (Cards List)
     const bodyEl = document.createElement('div');
     bodyEl.className = 'wc-col-body';
     bodyEl.dataset.colKey = col.key;
@@ -890,12 +1074,12 @@ function createColumnElement(col, tasks, isInbox) {
         emptyEl.textContent = isInbox ? 'All tasks organized!' : 'Drop tasks here or click +';
         bodyEl.appendChild(emptyEl);
     } else {
-        for (const task of tasks) {
-            bodyEl.appendChild(createCardElement(task, col.key));
-        }
+        const highlightFrontLine = !isInbox && state.statusFilter !== 'completed';
+        tasks.forEach((task, idx) => {
+            bodyEl.appendChild(createLifeCardElement(task, col.key, idx, highlightFrontLine && idx === 0));
+        });
     }
 
-    // --- COLUMN DRAG-AND-DROP (Left / Right Reorder) ---
     if (!isInbox) {
         headerEl.addEventListener('dragstart', (e) => {
             if (e.target.closest('button')) {
@@ -907,11 +1091,9 @@ function createColumnElement(col, tasks, isInbox) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', `col:${col.key}`);
         });
-
         headerEl.addEventListener('dragend', clearDragState);
     }
 
-    // Column receives BOTH column drops (to reorder columns) AND card drops (anywhere on column)
     colEl.addEventListener('dragover', (e) => {
         updateAutoScroll(e.clientX);
 
@@ -929,7 +1111,6 @@ function createColumnElement(col, tasks, isInbox) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             colEl.classList.add('card-drop-hover');
-            // Auto-expand collapsed inbox if dragging onto it
             if (isInbox && state.boardConfig.inboxCollapsed) {
                 state.boardConfig.inboxCollapsed = false;
                 colEl.classList.remove('is-collapsed');
@@ -941,9 +1122,7 @@ function createColumnElement(col, tasks, isInbox) {
     colEl.addEventListener('dragleave', (e) => {
         if (!colEl.contains(e.relatedTarget)) {
             colEl.classList.remove('col-drop-before', 'col-drop-after', 'card-drop-hover');
-            if (dropIndicator.parentElement === bodyEl) {
-                dropIndicator.remove();
-            }
+            if (dropIndicator.parentElement === bodyEl) dropIndicator.remove();
         }
     });
 
@@ -960,7 +1139,7 @@ function createColumnElement(col, tasks, isInbox) {
 
         if (state.drag.mode === 'card' && state.drag.id) {
             const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
-            moveCardToColumn(state.drag.id, col.key, insertIdx);
+            moveLifeCardToColumn(state.drag.id, col.key, insertIdx);
             clearDragState();
         }
     });
@@ -971,19 +1150,18 @@ function createColumnElement(col, tasks, isInbox) {
     return colEl;
 }
 
-function createCardElement(task, colKey) {
+function createLifeCardElement(task, colKey, idx, isFrontLine) {
     const card = document.createElement('article');
     const statusClass = getTaskStatusClass(task);
     const completed = isTaskCompleted(task);
     const m = task.metadata || {};
     const type = getTaskType(task);
 
-    card.className = `wc-card ${statusClass}`;
+    card.className = `wc-card ${statusClass}${isFrontLine ? ' is-front-line' : ''}`;
     card.draggable = true;
     card.dataset.taskId = task.id;
     card.dataset.colKey = colKey;
 
-    // Metadata pills (only shown when meaningful)
     const pills = [];
     if (m.due_date) {
         const isOverdue = !completed && m.due_date < getLocalDateStr();
@@ -1006,8 +1184,20 @@ function createCardElement(task, colKey) {
     }
 
     const metaHtml = pills.length ? `<div class="wc-card-meta">${pills.join('')}</div>` : '';
+    const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Front Line</div>` : '';
+    const topBtnHtml = idx > 0
+        ? `<button type="button" class="wc-card-top-btn" title="Move to Top (Front Line)" aria-label="Move to top">⬆</button>`
+        : '';
+    const delBtnHtml = state.boardConfig.quickDeleteMode
+        ? `<button type="button" class="wc-card-del-btn" title="Delete permanently (does not mark done)" aria-label="Delete task">🗑</button>`
+        : '';
+    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
+        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
+        : '';
 
     card.innerHTML = `
+        ${actionsClusterHtml}
+        ${frontLineHtml}
         <div class="wc-card-main">
             <label class="wc-cb-wrap" title="${completed ? 'Mark incomplete' : 'Mark complete'}">
                 <input type="checkbox" class="wc-cb" ${completed ? 'checked' : ''} aria-label="Mark ${escapeHtml(getTaskTitle(task))} complete">
@@ -1017,25 +1207,31 @@ function createCardElement(task, colKey) {
         ${metaHtml}
     `;
 
-    // Checkbox toggle (isolated from card click & drag)
     const cbWrap = card.querySelector('.wc-cb-wrap');
     const cb = card.querySelector('.wc-cb');
-
     cbWrap.addEventListener('click', (e) => e.stopPropagation());
     cb.addEventListener('change', (e) => {
         e.stopPropagation();
         toggleTaskComplete(task.id, cb.checked);
     });
 
-    // Click card body -> open Task Detail Modal
+    card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moveLifeCardToColumn(task.id, colKey, 0);
+    });
+
+    card.querySelector('.wc-card-del-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickDeleteItem(task.id);
+    });
+
     card.addEventListener('click', (e) => {
-        if (e.target.closest('.wc-cb-wrap')) return;
+        if (e.target.closest('.wc-cb-wrap') || e.target.closest('.wc-card-actions')) return;
         openTaskDetailDialog(task.id);
     });
 
-    // Drag start
     card.addEventListener('dragstart', (e) => {
-        if (e.target.closest('.wc-cb-wrap')) {
+        if (e.target.closest('.wc-cb-wrap') || e.target.closest('.wc-card-actions')) {
             e.preventDefault();
             return;
         }
@@ -1046,7 +1242,267 @@ function createCardElement(task, colKey) {
     });
 
     card.addEventListener('dragend', clearDragState);
+    return card;
+}
 
+// --- M2M STUDIO BOARD ---
+function renderM2mSubseriesBar() {
+    const counts = new Map();
+    let total = 0;
+    for (const ep of state.m2mEpisodes) {
+        total++;
+        const ss = ep.metadata?.m2m?.subseries || 'Other';
+        counts.set(ss, (counts.get(ss) || 0) + 1);
+    }
+
+    dom.subseriesPills.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = `wc-ss-pill${state.m2mSubseriesFilter === 'all' ? ' active' : ''}`;
+    allBtn.innerHTML = `All <span class="wc-ss-count">${total}</span>`;
+    allBtn.addEventListener('click', () => {
+        state.m2mSubseriesFilter = 'all';
+        renderAll();
+    });
+    dom.subseriesPills.appendChild(allBtn);
+
+    M2M_SUBSERIES.forEach(ss => {
+        const c = counts.get(ss.key) || 0;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `wc-ss-pill${state.m2mSubseriesFilter === ss.key ? ' active' : ''}`;
+        btn.style.setProperty('--ss-color', ss.color);
+        btn.innerHTML = `${escapeHtml(ss.key)} <span class="wc-ss-count">${c}</span>`;
+        btn.addEventListener('click', () => {
+            state.m2mSubseriesFilter = ss.key;
+            renderAll();
+        });
+        dom.subseriesPills.appendChild(btn);
+    });
+}
+
+function renderM2mBoard() {
+    const grouped = new Map();
+    M2M_STAGES.forEach(s => grouped.set(s.key, []));
+
+    for (const ep of state.m2mEpisodes) {
+        if (!matchesM2mFilters(ep)) continue;
+        const stg = ep.metadata?.m2m?.stage || 'idea';
+        const bucket = grouped.get(stg) || grouped.get('idea');
+        bucket.push(ep);
+    }
+
+    const scrollLeft = dom.boardViewport.scrollLeft;
+    dom.boardTrack.innerHTML = '';
+
+    for (const stage of M2M_STAGES) {
+        const episodes = sortColumnTasks(grouped.get(stage.key) || [], 'manual');
+        dom.boardTrack.appendChild(createM2mStageColumn(stage, episodes));
+    }
+
+    dom.boardViewport.scrollLeft = scrollLeft;
+}
+
+function createM2mStageColumn(stage, episodes) {
+    const colEl = document.createElement('section');
+    colEl.className = 'wc-column';
+    colEl.dataset.stageKey = stage.key;
+    colEl.style.setProperty('--col-accent', stage.color);
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'wc-col-header';
+    headerEl.innerHTML = `
+        <div class="wc-col-title-wrap">
+            <h2 class="wc-col-title">${escapeHtml(stage.name)}</h2>
+            <span class="wc-col-count">${episodes.length}</span>
+        </div>
+        <div class="wc-col-actions">
+            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(stage.name)}" aria-label="Add episode">+</button>
+        </div>
+    `;
+
+    const quickAddEl = document.createElement('div');
+    quickAddEl.className = 'wc-col-quick-add';
+    quickAddEl.hidden = true;
+    quickAddEl.innerHTML = `
+        <input type="text" class="wc-quick-add-input" placeholder="New episode title… (Enter to add)">
+        <div class="wc-quick-add-hint"><span>Enter to save · Esc to close</span></div>
+    `;
+    const quickInput = quickAddEl.querySelector('.wc-quick-add-input');
+
+    headerEl.querySelector('.wc-col-quickadd-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickAddEl.hidden = !quickAddEl.hidden;
+        if (!quickAddEl.hidden) {
+            quickInput.value = '';
+            quickInput.focus();
+        }
+    });
+
+    quickInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape') {
+            quickAddEl.hidden = true;
+            return;
+        }
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            const title = quickInput.value.trim();
+            if (!title) return;
+            quickInput.disabled = true;
+            try {
+                await createQuickM2mEpisode(stage.key, title);
+                quickInput.value = '';
+                quickInput.disabled = false;
+                quickInput.focus();
+            } catch {
+                quickInput.disabled = false;
+            }
+        }
+    });
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'wc-col-body';
+    bodyEl.dataset.stageKey = stage.key;
+
+    if (episodes.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'wc-col-empty';
+        emptyEl.textContent = 'Drag an episode here or click +';
+        bodyEl.appendChild(emptyEl);
+    } else {
+        const isExpanded = state.m2mExpandedStages.has(stage.key) || Boolean(state.searchQuery) || state.m2mSubseriesFilter !== 'all';
+        const visibleEps = isExpanded ? episodes : episodes.slice(0, M2M_COLUMN_RENDER_CAP);
+
+        visibleEps.forEach((ep, idx) => {
+            bodyEl.appendChild(createM2mCardElement(ep, stage, idx, stage.frontLine && idx === 0));
+        });
+
+        if (!isExpanded && episodes.length > M2M_COLUMN_RENDER_CAP) {
+            const moreBtn = document.createElement('button');
+            moreBtn.type = 'button';
+            moreBtn.className = 'wc-btn wc-btn-ghost wc-btn-xs';
+            moreBtn.style.marginTop = '0.25rem';
+            moreBtn.textContent = `Show all ${episodes.length} episodes (+${episodes.length - M2M_COLUMN_RENDER_CAP})`;
+            moreBtn.addEventListener('click', () => {
+                state.m2mExpandedStages.add(stage.key);
+                renderM2mBoard();
+            });
+            bodyEl.appendChild(moreBtn);
+        }
+    }
+
+    colEl.addEventListener('dragover', (e) => {
+        updateAutoScroll(e.clientX);
+        if (state.drag.mode !== 'm2m-card') return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        colEl.classList.add('card-drop-hover');
+        positionCardDropIndicator(bodyEl, e.clientY);
+    });
+
+    colEl.addEventListener('dragleave', (e) => {
+        if (!colEl.contains(e.relatedTarget)) {
+            colEl.classList.remove('card-drop-hover');
+            if (dropIndicator.parentElement === bodyEl) dropIndicator.remove();
+        }
+    });
+
+    colEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        colEl.classList.remove('card-drop-hover');
+        if (state.drag.mode === 'm2m-card' && state.drag.id) {
+            const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
+            moveM2mEpisodeToStage(state.drag.id, stage.key, insertIdx);
+            clearDragState();
+        }
+    });
+
+    colEl.appendChild(headerEl);
+    colEl.appendChild(quickAddEl);
+    colEl.appendChild(bodyEl);
+    return colEl;
+}
+
+function createM2mCardElement(ep, stage, idx, isFrontLine) {
+    const card = document.createElement('article');
+    const m2m = ep.metadata?.m2m || {};
+    const ss = m2m.subseries || 'Unassigned';
+    const ssColor = getSubseriesColor(ss);
+
+    card.className = `wc-card${isFrontLine ? ' is-front-line' : ''}`;
+    card.style.borderLeftColor = ssColor;
+    card.draggable = true;
+    card.dataset.taskId = ep.id;
+    card.dataset.stageKey = stage.key;
+
+    const pills = [
+        `<span class="wc-pill wc-pill-subseries" style="color:${ssColor}; background:${ssColor}1f">${escapeHtml(ss)}</span>`
+    ];
+
+    const docLen = (m2m.research_doc || '').trim().length;
+    if (docLen > 80) {
+        const label = docLen >= 1000 ? `${(docLen / 1000).toFixed(1)}k` : `${docLen}c`;
+        pills.push(`<span class="wc-pill wc-pill-doc" title="Has full research document">📚 ${label}</span>`);
+    }
+    const scriptWords = countWords(m2m.script_draft || '');
+    if (scriptWords > 20) {
+        pills.push(`<span class="wc-pill wc-pill-script" title="Has script draft">✍️ ${scriptWords}w</span>`);
+    }
+    if (m2m.checklist && typeof m2m.checklist === 'object') {
+        const doneCount = Object.values(m2m.checklist).filter(Boolean).length;
+        if (doneCount > 0) {
+            pills.push(`<span class="wc-pill wc-pill-note">✓ ${doneCount}/${M2M_CHECKLIST_STEPS.length}</span>`);
+        }
+    }
+
+    const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Next Up</div>` : '';
+    const topBtnHtml = idx > 0
+        ? `<button type="button" class="wc-card-top-btn" title="Move to Top of Stage" aria-label="Move to top">⬆</button>`
+        : '';
+    const delBtnHtml = state.boardConfig.quickDeleteMode
+        ? `<button type="button" class="wc-card-del-btn" title="Delete episode permanently" aria-label="Delete episode">🗑</button>`
+        : '';
+    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
+        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
+        : '';
+
+    card.innerHTML = `
+        ${actionsClusterHtml}
+        ${frontLineHtml}
+        <div class="wc-card-main">
+            <div class="wc-card-title">${escapeHtml(getTaskTitle(ep))}</div>
+        </div>
+        <div class="wc-card-meta" style="padding-left: 0;">${pills.join('')}</div>
+    `;
+
+    card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moveM2mEpisodeToStage(ep.id, stage.key, 0);
+    });
+
+    card.querySelector('.wc-card-del-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickDeleteItem(ep.id);
+    });
+
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('.wc-card-actions')) return;
+        openM2mWorkspaceDialog(ep.id);
+    });
+
+    card.addEventListener('dragstart', (e) => {
+        if (e.target.closest('.wc-card-actions')) {
+            e.preventDefault();
+            return;
+        }
+        state.drag = { mode: 'm2m-card', id: ep.id, sourceColKey: stage.key };
+        card.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ep.id);
+    });
+
+    card.addEventListener('dragend', clearDragState);
     return card;
 }
 
@@ -1063,11 +1519,8 @@ function positionCardDropIndicator(bodyEl, clientY) {
         }
     }
 
-    if (insertBeforeEl) {
-        bodyEl.insertBefore(dropIndicator, insertBeforeEl);
-    } else {
-        bodyEl.appendChild(dropIndicator);
-    }
+    if (insertBeforeEl) bodyEl.insertBefore(dropIndicator, insertBeforeEl);
+    else bodyEl.appendChild(dropIndicator);
 }
 
 function computeDropIndex(bodyEl, clientY, draggedId) {
@@ -1088,13 +1541,9 @@ function computeDropIndex(bodyEl, clientY, draggedId) {
 function updateAutoScroll(clientX) {
     const rect = dom.boardViewport.getBoundingClientRect();
     const edge = 85;
-    if (clientX < rect.left + edge) {
-        state.autoScrollDir = -1;
-    } else if (clientX > rect.right - edge) {
-        state.autoScrollDir = 1;
-    } else {
-        state.autoScrollDir = 0;
-    }
+    if (clientX < rect.left + edge) state.autoScrollDir = -1;
+    else if (clientX > rect.right - edge) state.autoScrollDir = 1;
+    else state.autoScrollDir = 0;
 
     if (state.autoScrollDir !== 0 && !state.autoScrollRaf) {
         const step = () => {
@@ -1121,7 +1570,35 @@ function clearDragState() {
         .forEach(el => el.classList.remove('is-dragging', 'col-drop-before', 'col-drop-after', 'card-drop-hover', 'is-drop-target'));
 }
 
-// --- BOARD & TASK MUTATIONS ---
+// --- FRACTIONAL ORDER HELPER ---
+function computeNewOrder(siblings, insertIdx, movedItem) {
+    const prev = insertIdx > 0 ? siblings[insertIdx - 1] : null;
+    const next = insertIdx < siblings.length ? siblings[insertIdx] : null;
+
+    if (!prev && !next) return { newOrder: 1000, respace: [] };
+    if (!prev && next) return { newOrder: getTaskOrderValue(next, 0) - 1000, respace: [] };
+    if (prev && !next) return { newOrder: getTaskOrderValue(prev, siblings.length - 1) + 1000, respace: [] };
+
+    const prevOrd = getTaskOrderValue(prev, insertIdx - 1);
+    const nextOrd = getTaskOrderValue(next, insertIdx);
+    if (Math.abs(nextOrd - prevOrd) > 0.001) {
+        return { newOrder: (prevOrd + nextOrd) / 2, respace: [] };
+    }
+
+    const ordered = siblings.slice();
+    ordered.splice(insertIdx, 0, movedItem);
+    const respace = [];
+    let movedOrder = 1000;
+    ordered.forEach((item, i) => {
+        const ord = (i + 1) * 1000;
+        item.metadata = { ...(item.metadata || {}), warchart_order: ord };
+        if (item.id === movedItem.id) movedOrder = ord;
+        else respace.push({ id: item.id, order: ord });
+    });
+    return { newOrder: movedOrder, respace };
+}
+
+// --- LIFE BOARD MUTATIONS ---
 function reorderColumns(sourceKey, targetKey, insertBefore) {
     const cols = state.boardConfig.columns;
     const srcIdx = cols.findIndex(c => c.key === sourceKey);
@@ -1129,66 +1606,32 @@ function reorderColumns(sourceKey, targetKey, insertBefore) {
 
     const [moved] = cols.splice(srcIdx, 1);
     let dstIdx = cols.findIndex(c => c.key === targetKey);
-    if (dstIdx === -1) {
-        cols.push(moved);
-    } else {
+    if (dstIdx === -1) cols.push(moved);
+    else {
         if (!insertBefore) dstIdx += 1;
         cols.splice(dstIdx, 0, moved);
     }
 
-    renderBoard();
+    renderLifeBoard();
     saveBoardConfig();
 }
 
-async function moveCardToColumn(taskId, targetColKey, insertIdx) {
+async function moveLifeCardToColumn(taskId, targetColKey, insertIdx) {
     const task = state.thoughts.find(t => t.id === taskId);
     if (!task) return;
 
     const targetCol = state.boardConfig.columns.find(c => c.key === targetColKey);
     let configChanged = false;
-    // If target column was sorted by date and user drags a card inside it, switch to manual mode so drag sticks
     if (targetCol && targetCol.sortMode === 'date') {
         targetCol.sortMode = 'manual';
         configChanged = true;
     }
 
-    // Determine sibling tasks already in the target column (excluding dragged task)
     const siblings = sortColumnTasks(
-        state.thoughts.filter(t => t.id !== taskId && matchesFilters(t) && getTaskColumnKey(t) === targetColKey),
+        state.thoughts.filter(t => t.id !== taskId && matchesLifeFilters(t) && getTaskColumnKey(t) === targetColKey),
         'manual'
     );
-
-    // Ensure siblings have clean monotonic warchart_order values if tightly packed
-    let newOrder;
-    const prev = insertIdx > 0 ? siblings[insertIdx - 1] : null;
-    const next = insertIdx < siblings.length ? siblings[insertIdx] : null;
-
-    if (!prev && !next) {
-        newOrder = 1000;
-    } else if (!prev && next) {
-        newOrder = getTaskOrderValue(next, 0) - 1000;
-    } else if (prev && !next) {
-        newOrder = getTaskOrderValue(prev, siblings.length - 1) + 1000;
-    } else {
-        const prevOrd = getTaskOrderValue(prev, insertIdx - 1);
-        const nextOrd = getTaskOrderValue(next, insertIdx);
-        if (Math.abs(nextOrd - prevOrd) > 0.001) {
-            newOrder = (prevOrd + nextOrd) / 2;
-        } else {
-            // Re-space sibling orders cleanly
-            siblings.splice(insertIdx, 0, task);
-            const batchUpdates = [];
-            siblings.forEach((item, i) => {
-                const ord = (i + 1) * 1000;
-                item.metadata = { ...(item.metadata || {}), warchart_order: ord };
-                if (item.id !== taskId) {
-                    batchUpdates.push(apiCall({ action: 'update', id: item.id, metadata: { warchart_order: ord } }));
-                }
-            });
-            newOrder = task.metadata.warchart_order;
-            Promise.all(batchUpdates).catch(err => console.error('Re-space update error:', err));
-        }
-    }
+    const { newOrder, respace } = computeNewOrder(siblings, insertIdx, task);
 
     const assignedKey = targetColKey === INBOX_KEY ? null : targetColKey;
     const metaPatch = { warchart_order: newOrder };
@@ -1198,16 +1641,16 @@ async function moveCardToColumn(taskId, targetColKey, insertIdx) {
             ...(task.metadata?.coding_task || {}),
             project: assignedKey || 'uncategorized'
         };
-        task.metadata = { ...task.metadata, ...metaPatch };
     } else {
         metaPatch.project = assignedKey;
-        task.metadata = { ...task.metadata, ...metaPatch };
     }
 
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
     renderAll();
 
     const ops = [trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }))];
     if (configChanged) ops.push(saveBoardConfig());
+    respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
     await Promise.all(ops);
 }
 
@@ -1228,7 +1671,6 @@ async function toggleTaskComplete(taskId, isComplete) {
 
     task.metadata = { ...(task.metadata || {}), ...metaPatch };
     renderAll();
-
     await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
 }
 
@@ -1239,17 +1681,74 @@ async function updateTaskScheduleDate(taskId, dateStr) {
     const metaPatch = { due_date: dateStr || null };
     task.metadata = { ...(task.metadata || {}), ...metaPatch };
     renderAll();
-
     await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
 }
 
-async function createQuickTask(col, title) {
+async function quickDeleteItem(itemId) {
+    const inLife = state.thoughts.find(t => t.id === itemId);
+    const inM2m = state.m2mEpisodes.find(e => e.id === itemId);
+    const item = inLife || inM2m;
+    if (!item) return;
+
+    const title = getTaskTitle(item);
+    // Keep clean snapshot for instant Undo (strip Google IDs so a restore re-syncs cleanly)
+    const clonedMeta = JSON.parse(JSON.stringify(item.metadata || {}));
+    delete clonedMeta.google_task_id;
+    delete clonedMeta.google_event_id;
+
+    state.lastDeleted = {
+        content: item.content || title,
+        metadata: clonedMeta,
+        wasInLife: Boolean(inLife),
+        wasInM2m: Boolean(inM2m)
+    };
+
+    state.thoughts = state.thoughts.filter(t => t.id !== itemId);
+    state.m2mEpisodes = state.m2mEpisodes.filter(e => e.id !== itemId);
+    renderAll();
+    showUndoToast(`Deleted "${title.slice(0, 48)}${title.length > 48 ? '…' : ''}"`);
+
+    await trackSave(apiCall({ action: 'delete', id: itemId }));
+}
+
+function showUndoToast(message) {
+    dom.undoText.textContent = message;
+    dom.undoToast.hidden = false;
+    if (state.undoTimer) clearTimeout(state.undoTimer);
+    state.undoTimer = setTimeout(() => {
+        dom.undoToast.hidden = true;
+        state.undoTimer = null;
+    }, 6500);
+}
+
+async function undoLastDelete() {
+    const snap = state.lastDeleted;
+    if (!snap) return;
+    state.lastDeleted = null;
+    dom.undoToast.hidden = true;
+    if (state.undoTimer) {
+        clearTimeout(state.undoTimer);
+        state.undoTimer = null;
+    }
+
+    const data = await trackSave(apiCall({
+        action: 'add',
+        content: snap.content,
+        metadata: snap.metadata
+    }));
+    if (data.thought) {
+        if (snap.wasInLife) state.thoughts.unshift(data.thought);
+        if (snap.wasInM2m) state.m2mEpisodes.unshift(data.thought);
+        renderAll();
+    }
+}
+
+async function createQuickLifeTask(col, title) {
     const isInbox = col.key === INBOX_KEY;
     const isCoding = col.kind === 'coding';
 
-    // Put at top of column
     const existing = sortColumnTasks(
-        state.thoughts.filter(t => matchesFilters(t) && getTaskColumnKey(t) === col.key),
+        state.thoughts.filter(t => matchesLifeFilters(t) && getTaskColumnKey(t) === col.key),
         'manual'
     );
     const topOrder = existing.length > 0 ? getTaskOrderValue(existing[0], 0) - 1000 : 1000;
@@ -1261,12 +1760,7 @@ async function createQuickTask(col, title) {
             status: 'pending',
             priority: 'normal',
             warchart_order: topOrder,
-            coding_task: {
-                project: col.key,
-                status: 'draft',
-                priority: 'medium',
-                complexity: 'moderate'
-            }
+            coding_task: { project: col.key, status: 'draft', priority: 'medium', complexity: 'moderate' }
         }
         : {
             type: 'task',
@@ -1284,7 +1778,67 @@ async function createQuickTask(col, title) {
     }
 }
 
-// --- TASK DETAIL MODAL ---
+// --- M2M STUDIO MUTATIONS ---
+async function moveM2mEpisodeToStage(epId, targetStageKey, insertIdx) {
+    const ep = state.m2mEpisodes.find(e => e.id === epId);
+    if (!ep) return;
+
+    const siblings = sortColumnTasks(
+        state.m2mEpisodes.filter(e => e.id !== epId && matchesM2mFilters(e) && (e.metadata?.m2m?.stage || 'idea') === targetStageKey),
+        'manual'
+    );
+    const { newOrder, respace } = computeNewOrder(siblings, insertIdx, ep);
+
+    const newM2m = {
+        ...(ep.metadata?.m2m || {}),
+        stage: targetStageKey
+    };
+    const metaPatch = {
+        warchart_order: newOrder,
+        m2m: newM2m
+    };
+
+    ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+    renderAll();
+
+    const ops = [trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }))];
+    respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
+    await Promise.all(ops);
+}
+
+async function createQuickM2mEpisode(stageKey, title) {
+    const subseries = state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : 'Peace to the Moon';
+    const existing = sortColumnTasks(
+        state.m2mEpisodes.filter(e => matchesM2mFilters(e) && (e.metadata?.m2m?.stage || 'idea') === stageKey),
+        'manual'
+    );
+    const topOrder = existing.length > 0 ? getTaskOrderValue(existing[0], 0) - 1000 : 1000;
+
+    const metadata = {
+        type: 'idea',
+        summary: title,
+        topics: ['Mary to the Moon', subseries],
+        warchart_order: topOrder,
+        m2m: {
+            subseries,
+            stage: stageKey,
+            research_doc: '',
+            script_draft: '',
+            graphics_notes: '',
+            checklist: {}
+        }
+    };
+
+    const content = `Mary to the Moon Episode (${subseries}): ${title}`;
+    const data = await trackSave(apiCall({ action: 'add', content, metadata }));
+    if (data.thought) {
+        state.m2mEpisodes.unshift(data.thought);
+        renderAll();
+    }
+    return data.thought;
+}
+
+// --- LIFE TASK DETAIL MODAL ---
 function populateColumnSelect(selectedKey) {
     dom.detailColumn.innerHTML = '';
 
@@ -1323,23 +1877,23 @@ function populateColumnSelect(selectedKey) {
     dom.detailColumn.value = selectedKey || INBOX_KEY;
 }
 
-function renderLinksPreview(text) {
+function renderLinksPreview(containerEl, text) {
     const urls = (text || '').match(/https?:\/\/[^\s)>"']+/g) || [];
     if (urls.length === 0) {
-        dom.detailLinksPreview.hidden = true;
-        dom.detailLinksPreview.innerHTML = '';
+        containerEl.hidden = true;
+        containerEl.innerHTML = '';
         return;
     }
-    dom.detailLinksPreview.hidden = false;
-    dom.detailLinksPreview.innerHTML = '';
-    const unique = [...new Set(urls)];
+    containerEl.hidden = false;
+    containerEl.innerHTML = '';
+    const unique = [...new Set(urls)].slice(0, 12);
     unique.forEach(u => {
         const a = document.createElement('a');
         a.href = u;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         a.textContent = u.replace(/^https?:\/\//, '').slice(0, 55);
-        dom.detailLinksPreview.appendChild(a);
+        containerEl.appendChild(a);
     });
 }
 
@@ -1360,7 +1914,7 @@ function openTaskDetailDialog(taskId) {
         completed ? 'wc-dot-green' : m.due_date ? 'wc-dot-amber' : 'wc-dot-red'
     );
 
-    dom.detailSummary.value = m.summary || task.content || '';
+    dom.detailSummary.value = getTaskTitle(task);
     dom.detailContent.value = task.content || '';
     populateColumnSelect(getTaskColumnKey(task));
     dom.detailType.value = type;
@@ -1371,7 +1925,7 @@ function openTaskDetailDialog(taskId) {
     dom.detailEndTime.value = m.end_time || '';
     dom.detailLocation.value = m.location || '';
     dom.detailNotes.value = m.notes || '';
-    renderLinksPreview(`${task.content || ''}\n${m.notes || ''}`);
+    renderLinksPreview(dom.detailLinksPreview, `${task.content || ''}\n${m.notes || ''}`);
 
     const isCoding = type === 'coding_task';
     dom.detailCodingSection.hidden = !isCoding;
@@ -1398,13 +1952,10 @@ dom.detailType.addEventListener('change', () => {
 });
 
 dom.detailNotes.addEventListener('input', () => {
-    renderLinksPreview(`${dom.detailContent.value}\n${dom.detailNotes.value}`);
+    renderLinksPreview(dom.detailLinksPreview, `${dom.detailContent.value}\n${dom.detailNotes.value}`);
 });
 
-dom.detailClearDate.addEventListener('click', () => {
-    dom.detailDueDate.value = '';
-});
-
+dom.detailClearDate.addEventListener('click', () => { dom.detailDueDate.value = ''; });
 dom.detailClose.addEventListener('click', () => dom.detailDialog.close());
 dom.detailCancel.addEventListener('click', () => dom.detailDialog.close());
 
@@ -1454,7 +2005,6 @@ dom.detailForm.addEventListener('submit', async (e) => {
 
     const payload = { action: 'update', id: taskId, metadata: metaPatch };
     if (contentChanged) payload.content = content;
-
     await trackSave(apiCall(payload));
 });
 
@@ -1475,8 +2025,189 @@ dom.detailDelete.addEventListener('click', async () => {
     state.thoughts = state.thoughts.filter(t => t.id !== taskId);
     dom.detailDialog.close();
     renderAll();
-
     await trackSave(apiCall({ action: 'delete', id: taskId }));
+});
+
+// --- M2M EPISODE WORKSPACE MODAL ---
+function populateM2mDropdowns() {
+    dom.m2mSubseries.innerHTML = '';
+    M2M_SUBSERIES.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.key;
+        opt.textContent = s.key;
+        dom.m2mSubseries.appendChild(opt);
+    });
+    const otherOpt = document.createElement('option');
+    otherOpt.value = 'Other';
+    otherOpt.textContent = 'Other';
+    dom.m2mSubseries.appendChild(otherOpt);
+
+    dom.m2mStage.innerHTML = '';
+    M2M_STAGES.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st.key;
+        opt.textContent = st.name;
+        dom.m2mStage.appendChild(opt);
+    });
+}
+
+function setM2mTab(tabName) {
+    state.m2mActiveTab = tabName;
+    document.querySelectorAll('[data-m2m-tab]').forEach(btn => {
+        const isActive = btn.dataset.m2mTab === tabName;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', String(isActive));
+    });
+    dom.m2mPanelResearch.hidden = tabName !== 'research';
+    dom.m2mPanelScript.hidden = tabName !== 'script';
+    dom.m2mPanelProduction.hidden = tabName !== 'production';
+}
+
+function setM2mResearchMode(mode) {
+    state.m2mResearchMode = mode;
+    dom.m2mResearchReadBtn.classList.toggle('active', mode === 'read');
+    dom.m2mResearchEditBtn.classList.toggle('active', mode === 'edit');
+    dom.m2mResearchReader.hidden = mode !== 'read';
+    dom.m2mResearchInput.hidden = mode !== 'edit';
+    if (mode === 'read') {
+        dom.m2mResearchReader.innerHTML = renderSimpleMarkdown(dom.m2mResearchInput.value);
+    } else {
+        dom.m2mResearchInput.focus();
+    }
+}
+
+function updateM2mWriterStats() {
+    const rText = dom.m2mResearchInput.value || '';
+    const rWords = countWords(rText);
+    dom.m2mResearchStats.textContent = `${rWords.toLocaleString()} words · ${rText.length.toLocaleString()} chars`;
+
+    const sText = dom.m2mScriptInput.value || '';
+    const sWords = countWords(sText);
+    const mins = (sWords / 130).toFixed(1);
+    dom.m2mScriptStats.textContent = `${sWords.toLocaleString()} words · ~${mins} min spoken (10 min ≈ 1,300 words)`;
+}
+
+function openM2mWorkspaceDialog(epId) {
+    const ep = epId ? state.m2mEpisodes.find(e => e.id === epId) : null;
+    state.editingM2mId = ep ? ep.id : null;
+
+    const m2m = ep?.metadata?.m2m || {};
+    dom.m2mHeading.textContent = ep ? 'Episode Workspace' : 'New M2M Episode';
+    dom.m2mTitle.value = ep ? getTaskTitle(ep) : '';
+
+    const defaultSs = m2m.subseries || (state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : 'Peace to the Moon');
+    dom.m2mSubseries.value = M2M_SUBSERIES.some(s => s.key === defaultSs) ? defaultSs : 'Other';
+    dom.m2mStage.value = m2m.stage || 'idea';
+
+    const researchText = m2m.research_doc || (ep?.content || '');
+    dom.m2mResearchInput.value = researchText;
+    dom.m2mResearchReader.innerHTML = renderSimpleMarkdown(researchText);
+    renderLinksPreview(dom.m2mLinksPreview, researchText);
+
+    dom.m2mScriptInput.value = m2m.script_draft || '';
+    dom.m2mVideoUrl.value = m2m.video_url || '';
+    dom.m2mGraphicsInput.value = m2m.graphics_notes || '';
+
+    // Production checklist
+    const checklistState = m2m.checklist || {};
+    dom.m2mChecklist.innerHTML = '';
+    M2M_CHECKLIST_STEPS.forEach(step => {
+        const lbl = document.createElement('label');
+        lbl.className = 'wc-prod-check-item';
+        lbl.innerHTML = `
+            <input type="checkbox" data-check-key="${step.key}" ${checklistState[step.key] ? 'checked' : ''}>
+            <span>${escapeHtml(step.label)}</span>
+        `;
+        dom.m2mChecklist.appendChild(lbl);
+    });
+
+    dom.m2mDelete.hidden = !ep;
+    dom.m2mMetaInfo.textContent = ep?.created_at
+        ? `Added ${new Date(ep.created_at).toLocaleDateString()}`
+        : 'New episode';
+
+    updateM2mWriterStats();
+    setM2mTab('research');
+    setM2mResearchMode(researchText.trim().length > 60 ? 'read' : 'edit');
+    dom.m2mDialog.showModal();
+    if (!ep) dom.m2mTitle.focus();
+}
+
+document.querySelectorAll('[data-m2m-tab]').forEach(btn => {
+    btn.addEventListener('click', () => setM2mTab(btn.dataset.m2mTab));
+});
+
+dom.m2mResearchReadBtn.addEventListener('click', () => setM2mResearchMode('read'));
+dom.m2mResearchEditBtn.addEventListener('click', () => setM2mResearchMode('edit'));
+
+dom.m2mResearchInput.addEventListener('input', () => {
+    updateM2mWriterStats();
+    renderLinksPreview(dom.m2mLinksPreview, dom.m2mResearchInput.value);
+});
+dom.m2mScriptInput.addEventListener('input', updateM2mWriterStats);
+
+dom.m2mClose.addEventListener('click', () => dom.m2mDialog.close());
+dom.m2mCancel.addEventListener('click', () => dom.m2mDialog.close());
+
+dom.m2mForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = dom.m2mTitle.value.trim();
+    if (!title) return;
+
+    const checklist = {};
+    dom.m2mChecklist.querySelectorAll('input[data-check-key]').forEach(cb => {
+        checklist[cb.dataset.checkKey] = cb.checked;
+    });
+
+    const m2mData = {
+        subseries: dom.m2mSubseries.value,
+        stage: dom.m2mStage.value,
+        research_doc: dom.m2mResearchInput.value,
+        script_draft: dom.m2mScriptInput.value,
+        video_url: dom.m2mVideoUrl.value.trim() || null,
+        graphics_notes: dom.m2mGraphicsInput.value,
+        checklist
+    };
+
+    if (state.editingM2mId) {
+        const ep = state.m2mEpisodes.find(item => item.id === state.editingM2mId);
+        if (!ep) return;
+        const metaPatch = {
+            summary: title,
+            m2m: { ...(ep.metadata?.m2m || {}), ...m2mData }
+        };
+        ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+        dom.m2mDialog.close();
+        renderAll();
+        await trackSave(apiCall({ action: 'update', id: ep.id, metadata: metaPatch }));
+    } else {
+        const metadata = {
+            type: 'idea',
+            summary: title,
+            topics: ['Mary to the Moon', m2mData.subseries],
+            warchart_order: 500,
+            m2m: m2mData
+        };
+        const content = `Mary to the Moon Episode (${m2mData.subseries}): ${title}`;
+        dom.m2mDialog.close();
+        const data = await trackSave(apiCall({ action: 'add', content, metadata }));
+        if (data.thought) {
+            state.m2mEpisodes.unshift(data.thought);
+            renderAll();
+        }
+    }
+});
+
+dom.m2mDelete.addEventListener('click', async () => {
+    const epId = state.editingM2mId;
+    if (!epId) return;
+    if (!confirm('Delete this M2M episode permanently from OpenBrain?')) return;
+
+    state.m2mEpisodes = state.m2mEpisodes.filter(e => e.id !== epId);
+    state.thoughts = state.thoughts.filter(t => t.id !== epId);
+    dom.m2mDialog.close();
+    renderAll();
+    await trackSave(apiCall({ action: 'delete', id: epId }));
 });
 
 // --- COLUMN DIALOG (ADD / EDIT / MANAGE) ---
@@ -1563,7 +2294,7 @@ function renderColumnManagerList() {
             const arr = state.boardConfig.columns;
             [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
             renderColumnManagerList();
-            renderBoard();
+            renderLifeBoard();
             saveBoardConfig();
         });
 
@@ -1572,14 +2303,14 @@ function renderColumnManagerList() {
             if (idx >= arr.length - 1) return;
             [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
             renderColumnManagerList();
-            renderBoard();
+            renderLifeBoard();
             saveBoardConfig();
         });
 
         row.querySelector('.wc-mgr-toggle')?.addEventListener('click', () => {
             col.hidden = !col.hidden;
             renderColumnManagerList();
-            renderBoard();
+            renderLifeBoard();
             saveBoardConfig();
         });
 
@@ -1626,7 +2357,7 @@ dom.colForm.addEventListener('submit', async (e) => {
     }
 
     dom.colDialog.close();
-    renderBoard();
+    renderLifeBoard();
     await saveBoardConfig();
 });
 
@@ -1635,7 +2366,7 @@ dom.colHideBtn.addEventListener('click', async () => {
     if (!col) return;
     col.hidden = !col.hidden;
     dom.colDialog.close();
-    renderBoard();
+    renderLifeBoard();
     await saveBoardConfig();
 });
 
@@ -1646,11 +2377,20 @@ dom.colDeleteBtn.addEventListener('click', async () => {
 
     state.boardConfig.columns = state.boardConfig.columns.filter(c => c.key !== col.key);
     dom.colDialog.close();
-    renderBoard();
+    renderLifeBoard();
     await saveBoardConfig();
 });
 
 // --- TOOLBAR EVENTS ---
+document.querySelectorAll('[data-board]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        state.activeBoard = btn.dataset.board;
+        dom.boardViewport.scrollLeft = 0;
+        applyBoardModeUI();
+        renderAll();
+    });
+});
+
 document.querySelectorAll('[data-scope]').forEach(btn => {
     btn.addEventListener('click', () => {
         state.scopeFilter = btn.dataset.scope;
@@ -1663,7 +2403,7 @@ document.querySelectorAll('[data-status]').forEach(btn => {
     btn.addEventListener('click', () => {
         state.statusFilter = btn.dataset.status;
         document.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('active', b === btn));
-        renderBoard();
+        renderLifeBoard();
     });
 });
 
@@ -1674,21 +2414,30 @@ dom.searchInput.addEventListener('input', () => {
 
 dom.toggleCalBtn.addEventListener('click', () => {
     state.boardConfig.calendarCollapsed = !state.boardConfig.calendarCollapsed;
-    applyLayoutToggles();
+    applyBoardModeUI();
     saveBoardConfig();
 });
 
 dom.compactBtn.addEventListener('click', () => {
     state.boardConfig.compactMode = !state.boardConfig.compactMode;
-    applyLayoutToggles();
+    applyBoardModeUI();
     saveBoardConfig();
 });
 
+dom.quickDeleteBtn.addEventListener('click', () => {
+    state.boardConfig.quickDeleteMode = !state.boardConfig.quickDeleteMode;
+    applyBoardModeUI();
+    renderAll();
+    saveBoardConfig();
+});
+
+dom.undoBtn.addEventListener('click', undoLastDelete);
+
 dom.manageColsBtn.addEventListener('click', openColumnManagerDialog);
 dom.addColBtn.addEventListener('click', openAddColumnDialog);
+dom.addEpisodeBtn.addEventListener('click', () => openM2mWorkspaceDialog(null));
 dom.refreshBtn.addEventListener('click', loadAllData);
 
-// Calendar Week Navigation
 dom.calPrev.addEventListener('click', () => {
     state.weekStart = addDays(state.weekStart, -7);
     renderCalendar();
@@ -1704,10 +2453,10 @@ dom.calNext.addEventListener('click', () => {
     renderCalendar();
 });
 
-// Global dragend safeguard so edge auto-scroll never sticks
 window.addEventListener('dragend', clearDragState);
 
 // --- BOOTSTRAP ---
+populateM2mDropdowns();
 setupDialogLightDismissFallback();
 if (initAuth()) {
     loadAllData();

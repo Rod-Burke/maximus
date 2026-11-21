@@ -6,6 +6,20 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v135] - 2026-11-21
+
+### Task: War Chart Phase 1.5 — Front Line Polish, M2M Studio Board Switcher & Quick Delete
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - Added **Board Switcher** (`⚔️ Life Board` ↔ `🎥 M2M Studio`) in `warchart.html` with live episode badge count.
+  - Built **🎥 M2M Studio** 7-stage video production pipeline (`💡 Ideas` → `🎯 Queued Next` → `📚 Research` → `✍️ Script Draft` → `🎙️ Record` → `🎬 Edit & Graphics` → `🚀 Published`), color-coded SubSeries filter pills, drag-and-drop stage & priority ordering, and a wide native `<dialog>` **Episode Workspace** modal (Read/Edit full untruncated Markdown research, Script Draft with live word count + `~130 wpm` spoken duration, and 7-step Production Checklist + B-Roll/Graphics notes).
+  - Added **Life Board Front Line polish**: gold `★ Front Line` highlight on the `#1` top card of every project column, one-click hover `⬆` Move-to-Top button on cards, and the `Fill-In Jobs` starter column.
+  - Added **one-click `🗑` Quick Delete** button on every Life Board & M2M Studio card (permanent delete without marking done), paired with a 6.5-second non-blocking `Undo` toast and a persisted top-bar `🗑️ Quick Delete` safety toggle.
+  - Backfilled 556 OpenBrain records (122 Notion tasks/events auto-categorized into War Chart columns with `Notion & AI` merged into `Computer & Admin`, 396 M2M episodes tagged with SubSeries & stage, and all 60 truncated long research documents restored in full up to 327 KB).
+  - Deployed updated Supabase Edge Functions (`manage-thoughts` `m2m_only` filter, plus automatic M2M & War Chart realm routing in `_shared/ai.ts` for `ingest-thought` and `voice-gateway`).
+
+---
+
 ## [v134] - 2026-11-20
 
 ### Task: Maximus War Chart (Phase 1) — Project Columns Board & Weekly Calendar Strip

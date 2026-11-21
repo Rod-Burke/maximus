@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=134">
+    <link rel="stylesheet" href="warchart.css?v=135">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,39 +48,49 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
-                    <span id="wc-save-status" class="wc-save-status" aria-live="polite">Loading…</span>
                 </div>
+
+                <!-- Board Switcher: Life War Chart <-> M2M Studio -->
+                <div class="wc-board-switcher" role="tablist" aria-label="Switch board view">
+                    <button type="button" role="tab" id="wc-board-life" class="wc-board-tab active" aria-selected="true" data-board="life">⚔️ Life Board</button>
+                    <button type="button" role="tab" id="wc-board-m2m" class="wc-board-tab" aria-selected="false" data-board="m2m">
+                        🎥 M2M Studio <span id="wc-m2m-badge" class="wc-tab-badge">0</span>
+                    </button>
+                </div>
+
+                <span id="wc-save-status" class="wc-save-status" aria-live="polite">Loading…</span>
             </div>
 
             <div class="wc-topbar-center">
-                <!-- Scope Filter: All / General / Coding -->
-                <div class="wc-segmented" role="group" aria-label="Task scope filter">
-                    <button type="button" class="wc-seg-btn active" data-scope="all">All</button>
-                    <button type="button" class="wc-seg-btn" data-scope="general">General</button>
-                    <button type="button" class="wc-seg-btn" data-scope="coding">Coding</button>
+                <!-- Life War Chart Filters -->
+                <div id="wc-life-filters" class="wc-filter-group">
+                    <div class="wc-segmented" role="group" aria-label="Task scope filter">
+                        <button type="button" class="wc-seg-btn active" data-scope="all">All</button>
+                        <button type="button" class="wc-seg-btn" data-scope="general">General</button>
+                        <button type="button" class="wc-seg-btn" data-scope="coding">Coding</button>
+                    </div>
+
+                    <div class="wc-segmented" role="group" aria-label="Task status filter">
+                        <button type="button" class="wc-seg-btn active" data-status="all_active" title="All incomplete tasks (scheduled and unscheduled)">All Active</button>
+                        <button type="button" class="wc-seg-btn" data-status="unscheduled" title="Only tasks without a date">
+                            <span class="wc-dot wc-dot-red" aria-hidden="true"></span>Unscheduled
+                        </button>
+                        <button type="button" class="wc-seg-btn" data-status="scheduled" title="Only tasks with a due date">
+                            <span class="wc-dot wc-dot-amber" aria-hidden="true"></span>Scheduled
+                        </button>
+                        <button type="button" class="wc-seg-btn" data-status="completed" title="Completed tasks">
+                            <span class="wc-dot wc-dot-green" aria-hidden="true"></span>Done
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Status Filter: Unscheduled / All Active / Scheduled / Completed -->
-                <div class="wc-segmented" role="group" aria-label="Task status filter">
-                    <button type="button" class="wc-seg-btn active" data-status="all_active" title="All incomplete tasks (scheduled and unscheduled)">All Active</button>
-                    <button type="button" class="wc-seg-btn" data-status="unscheduled" title="Only tasks without a date">
-                        <span class="wc-dot wc-dot-red" aria-hidden="true"></span>Unscheduled
-                    </button>
-                    <button type="button" class="wc-seg-btn" data-status="scheduled" title="Only tasks with a due date">
-                        <span class="wc-dot wc-dot-amber" aria-hidden="true"></span>Scheduled
-                    </button>
-                    <button type="button" class="wc-seg-btn" data-status="completed" title="Completed tasks">
-                        <span class="wc-dot wc-dot-green" aria-hidden="true"></span>Done
-                    </button>
-                </div>
-
-                <!-- Search -->
+                <!-- Search (works in both boards) -->
                 <div class="wc-search-wrap">
                     <svg class="wc-search-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="search" id="wc-search-input" class="wc-search-input" placeholder="Search tasks…" aria-label="Search tasks">
+                    <input type="search" id="wc-search-input" class="wc-search-input" placeholder="Search tasks…" aria-label="Search">
                 </div>
             </div>
 
@@ -102,6 +112,10 @@
                     </svg>
                     <span>Compact</span>
                 </button>
+                <button type="button" id="wc-quick-delete-btn" class="wc-btn wc-btn-ghost active" title="Show or hide one-click delete buttons on every card">
+                    <span aria-hidden="true">🗑️</span>
+                    <span>Quick Delete</span>
+                </button>
                 <button type="button" id="wc-manage-cols-btn" class="wc-btn wc-btn-ghost" title="Manage column visibility and order">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -116,7 +130,7 @@
                     </svg>
                     <span>Columns</span>
                 </button>
-                <button type="button" id="wc-refresh-btn" class="wc-icon-btn" title="Reload tasks from Supabase" aria-label="Reload tasks">
+                <button type="button" id="wc-refresh-btn" class="wc-icon-btn" title="Reload from OpenBrain" aria-label="Reload">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M1 4v6h6M23 20v-6h-6"></path>
                         <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
@@ -129,10 +143,27 @@
                     </svg>
                     <span>Column</span>
                 </button>
+                <button type="button" id="wc-add-episode-btn" class="wc-btn wc-btn-primary" hidden title="Add a new Mary to the Moon episode">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Episode</span>
+                </button>
             </div>
         </header>
 
-        <!-- Top Pane: Collapsible Weekly Calendar Strip -->
+        <!-- M2M Studio SubSeries Filter Bar (visible only in M2M Studio mode) -->
+        <section id="wc-m2m-subseries-bar" class="wc-subseries-bar" hidden aria-label="Mary to the Moon SubSeries filter">
+            <div id="wc-subseries-pills" class="wc-subseries-pills">
+                <!-- Populated by warchart.js -->
+            </div>
+            <div class="wc-m2m-bar-hint">
+                <span>Drag episodes left → right across stages · Click any card for full Research &amp; Script workspace</span>
+            </div>
+        </section>
+
+        <!-- Top Pane: Collapsible Weekly Calendar Strip (Life Board) -->
         <section id="wc-calendar-pane" class="wc-calendar-pane" aria-label="Weekly Calendar">
             <div class="wc-cal-toolbar">
                 <div class="wc-cal-nav">
@@ -150,7 +181,7 @@
                     <h2 id="wc-cal-range-title" class="wc-cal-range-title">Week</h2>
                 </div>
                 <div class="wc-cal-hint">
-                    <span>Drag any task card onto a day to schedule it</span>
+                    <span>★ Top row = Front Line · Drag cards up onto a day to schedule</span>
                     <span class="wc-legend">
                         <span><span class="wc-dot wc-dot-red"></span>Unscheduled</span>
                         <span><span class="wc-dot wc-dot-amber"></span>Scheduled</span>
@@ -166,12 +197,18 @@
 
         <!-- Bottom Pane: Horizontal Columns Board (Viewport-Locked Scroller) -->
         <main class="wc-board-shell">
-            <div id="wc-board-viewport" class="wc-board-viewport" aria-label="Project Columns Board">
+            <div id="wc-board-viewport" class="wc-board-viewport" aria-label="Columns Board">
                 <div id="wc-board-track" class="wc-board-track">
                     <!-- Columns populated by warchart.js -->
                 </div>
             </div>
         </main>
+
+        <!-- Non-blocking Undo Toast for Quick Delete -->
+        <div id="wc-undo-toast" class="wc-undo-toast" hidden role="status" aria-live="polite">
+            <span id="wc-undo-text" class="wc-undo-text">Deleted item</span>
+            <button type="button" id="wc-undo-btn" class="wc-btn wc-btn-primary wc-btn-xs">Undo</button>
+        </div>
     </div>
 
     <!-- Task Detail Modal (Native <dialog>) -->
@@ -245,7 +282,6 @@
                 </div>
             </div>
 
-            <!-- Time Fields (shown for events or when time is set) -->
             <div id="wc-detail-time-row" class="wc-form-grid-3">
                 <div class="wc-field">
                     <label for="wc-detail-start-time">Start Time</label>
@@ -261,7 +297,6 @@
                 </div>
             </div>
 
-            <!-- Coding Task Specific Fields -->
             <div id="wc-detail-coding-section" class="wc-coding-section" hidden>
                 <div class="wc-form-grid-2">
                     <div class="wc-field">
@@ -296,7 +331,7 @@
             </div>
 
             <div class="wc-field">
-                <label for="wc-detail-notes">Notes & Links</label>
+                <label for="wc-detail-notes">Notes &amp; Links</label>
                 <textarea id="wc-detail-notes" rows="4" placeholder="Add notes, links, people, or context…"></textarea>
                 <div id="wc-detail-links-preview" class="wc-links-preview" hidden></div>
             </div>
@@ -316,6 +351,97 @@
         </form>
     </dialog>
 
+    <!-- M2M Episode Workspace Modal (Native <dialog>) -->
+    <dialog id="wc-m2m-dialog" class="wc-dialog wc-m2m-dialog" closedby="any" aria-labelledby="wc-m2m-heading">
+        <div class="wc-dialog-header">
+            <div class="wc-dialog-title-group">
+                <span aria-hidden="true">🎥</span>
+                <h2 id="wc-m2m-heading">Episode Workspace</h2>
+            </div>
+            <button type="button" id="wc-m2m-close" class="wc-icon-btn" aria-label="Close episode workspace">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <form id="wc-m2m-form" class="wc-m2m-form">
+            <div class="wc-m2m-meta-bar">
+                <div class="wc-field wc-m2m-title-field">
+                    <label for="wc-m2m-title">Episode Title</label>
+                    <input type="text" id="wc-m2m-title" required placeholder="Episode title…">
+                </div>
+                <div class="wc-field">
+                    <label for="wc-m2m-subseries">SubSeries</label>
+                    <select id="wc-m2m-subseries"></select>
+                </div>
+                <div class="wc-field">
+                    <label for="wc-m2m-stage">Stage</label>
+                    <select id="wc-m2m-stage"></select>
+                </div>
+            </div>
+
+            <!-- Workspace Tabs -->
+            <div class="wc-m2m-tabs" role="tablist" aria-label="Episode workspace sections">
+                <button type="button" role="tab" class="wc-m2m-tab active" data-m2m-tab="research" aria-selected="true">📚 Research &amp; Notes</button>
+                <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="script" aria-selected="false">✍️ Script Draft</button>
+                <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="production" aria-selected="false">🎬 Graphics, B-Roll &amp; Checklist</button>
+            </div>
+
+            <div class="wc-m2m-panels">
+                <!-- Tab 1: Research & Notes -->
+                <div id="wc-m2m-panel-research" class="wc-m2m-panel">
+                    <div class="wc-m2m-panel-toolbar">
+                        <span id="wc-m2m-research-stats" class="wc-writer-stats">0 words</span>
+                        <div class="wc-segmented" role="group" aria-label="Research view mode">
+                            <button type="button" id="wc-m2m-research-read-btn" class="wc-seg-btn active">Read</button>
+                            <button type="button" id="wc-m2m-research-edit-btn" class="wc-seg-btn">Edit</button>
+                        </div>
+                    </div>
+                    <div id="wc-m2m-research-reader" class="wc-doc-reader"></div>
+                    <textarea id="wc-m2m-research-input" class="wc-doc-editor" hidden placeholder="Paste or write research notes, quotes, references, and ideas…"></textarea>
+                    <div id="wc-m2m-links-preview" class="wc-links-preview" hidden></div>
+                </div>
+
+                <!-- Tab 2: Script Draft -->
+                <div id="wc-m2m-panel-script" class="wc-m2m-panel" hidden>
+                    <div class="wc-m2m-panel-toolbar">
+                        <span id="wc-m2m-script-stats" class="wc-writer-stats">0 words · ~0.0 min spoken (target: 10 min ≈ 1,300 words)</span>
+                    </div>
+                    <textarea id="wc-m2m-script-input" class="wc-doc-editor wc-script-editor" placeholder="Write your narration script draft here…"></textarea>
+                </div>
+
+                <!-- Tab 3: Graphics, B-Roll & Production -->
+                <div id="wc-m2m-panel-production" class="wc-m2m-panel" hidden>
+                    <div class="wc-field">
+                        <label>Production Checklist</label>
+                        <div id="wc-m2m-checklist" class="wc-prod-checklist"></div>
+                    </div>
+                    <div class="wc-field">
+                        <label for="wc-m2m-video-url">Video / Script Doc / Asset Link</label>
+                        <input type="url" id="wc-m2m-video-url" placeholder="https://youtube.com/… or Google Doc / Descript link">
+                    </div>
+                    <div class="wc-field wc-field-grow">
+                        <label for="wc-m2m-graphics-input">Graphics, B-Roll Prompts &amp; Music Notes</label>
+                        <textarea id="wc-m2m-graphics-input" class="wc-doc-editor" placeholder="List stock B-roll shots, AI visual prompts per section, thumbnail concept, music mood…"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wc-dialog-footer wc-m2m-footer">
+                <div class="wc-dialog-footer-left">
+                    <button type="button" id="wc-m2m-delete" class="wc-btn wc-btn-danger">Delete</button>
+                    <span id="wc-m2m-meta-info" class="wc-meta-info"></span>
+                </div>
+                <div class="wc-dialog-footer-right">
+                    <button type="button" id="wc-m2m-cancel" class="wc-btn wc-btn-ghost">Cancel</button>
+                    <button type="submit" id="wc-m2m-save" class="wc-btn wc-btn-primary">Save Episode</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
     <!-- Add / Edit Column & Column Manager Modal (Native <dialog>) -->
     <dialog id="wc-column-dialog" class="wc-dialog wc-column-dialog" closedby="any" aria-labelledby="wc-col-dialog-heading">
         <div class="wc-dialog-header">
@@ -328,7 +454,6 @@
             </button>
         </div>
 
-        <!-- Single Column Create/Edit Form -->
         <form id="wc-col-form" class="wc-dialog-body wc-form">
             <div class="wc-field">
                 <label for="wc-col-name-input">Column Name (Project or Realm)</label>
@@ -361,7 +486,6 @@
             </div>
         </form>
 
-        <!-- Column Visibility Manager View -->
         <div id="wc-col-manager-view" class="wc-dialog-body" hidden>
             <p class="wc-manager-desc">Show, hide, or reorder your War Chart columns. Hidden columns keep all their tasks safely in OpenBrain.</p>
             <div id="wc-col-manager-list" class="wc-col-manager-list"></div>
@@ -376,6 +500,6 @@
         </div>
     </dialog>
 
-    <script src="warchart.js?v=134"></script>
+    <script src="warchart.js?v=135"></script>
 </body>
 </html>
