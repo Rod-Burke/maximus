@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v136] - 2026-11-23
+
+### Task: War Chart Phase 1.6 — Task Status, Inbox Dedup & M2M Series War Chart ↔ Kanban Auto-Rotation
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - Added `Task Status` dropdown (`Not Started` / `In Progress` / `Done`) to standard tasks in the War Chart Task Details modal, plus a cyan `▶ In Progress` badge on active in-progress cards (fully compatible with Maximus Tasks Dashboard & Google Tasks sync).
+  - Filtered `metadata.m2m` episodes out of the Life Board `Inbox / Unassigned` column (removing 44 duplicate M2M items) and added a one-click **"🎥 Move to M2M Studio →"** SubSeries selector + transfer button inside Task Details.
+  - Added **M2M Studio Dual View** (`⚔️ Series War Chart` ↔ `📋 Production Kanban`) right in the top bar:
+    - **Series War Chart**: 8 draggable SubSeries columns (`#1`–`#8` rotation order persisted in `warchart_config.m2mSeriesOrder`), vertical priority dragging (`Cycle 1 · Front Line`, `Cycle 2`, …), cross-SubSeries dragging, stage filter (`Unpublished` / `Queued` / `Ideas` / `All`), and inline `+` episode creation per SubSeries.
+    - **Production Kanban Auto-Rotation (`🔄`)**: Row-by-row round-robin interleaving on `🎯 Queued Next` and `💡 Ideas` (persisted in `warchart_config.m2mAutoRotate`), automatically generating `C1 · #1`, `C1 · #2`, …, `C2 · #9` cadence order straight from the Series War Chart.
+
+---
+
 ## [v135] - 2026-11-21
 
 ### Task: War Chart Phase 1.5 — Front Line Polish, M2M Studio Board Switcher & Quick Delete

@@ -924,6 +924,12 @@ html, body {
     background: rgba(59, 130, 246, 0.18);
 }
 
+.wc-pill-in-progress {
+    color: #67e8f9;
+    background: rgba(6, 182, 212, 0.18);
+    border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
 .wc-pill-priority-high {
     color: #fca5a5;
     background: rgba(239, 68, 68, 0.2);
@@ -1037,6 +1043,10 @@ dialog.wc-dialog::backdrop {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+}
+
+.wc-field[hidden] {
+    display: none;
 }
 
 .wc-field label {
@@ -1753,4 +1763,78 @@ dialog.wc-m2m-dialog {
     .wc-m2m-bar-hint {
         display: none;
     }
+}
+
+
+/* --- M2M SERIES WAR CHART & ROTATION BADGES --- */
+.wc-rot-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 18px;
+    padding: 0 0.3rem;
+    border-radius: 5px;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: var(--wc-gold);
+    font-size: 0.68rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.wc-pill-cycle {
+    color: var(--wc-gold);
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    font-weight: 600;
+}
+
+.wc-pill-stage {
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.wc-col-btn.is-rotate-active {
+    color: var(--wc-gold);
+    background: var(--wc-gold-soft);
+}
+
+/* Move to M2M Transfer Box in Life Task Detail Modal */
+.wc-m2m-transfer-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(236, 72, 153, 0.08);
+    border: 1px solid rgba(236, 72, 153, 0.28);
+    flex-wrap: wrap;
+}
+
+.wc-m2m-transfer-box[hidden] {
+    display: none;
+}
+
+.wc-m2m-transfer-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #f9a8d4;
+}
+
+.wc-m2m-transfer-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.wc-m2m-transfer-controls select {
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--wc-border-strong);
+    background: rgba(11, 17, 32, 0.9);
+    color: var(--wc-text);
+    font-family: inherit;
+    font-size: 0.78rem;
 }

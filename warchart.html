@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=135">
+    <link rel="stylesheet" href="warchart.css?v=136">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -81,6 +81,21 @@
                         <button type="button" class="wc-seg-btn" data-status="completed" title="Completed tasks">
                             <span class="wc-dot wc-dot-green" aria-hidden="true"></span>Done
                         </button>
+                    </div>
+                </div>
+
+                <!-- M2M Studio Top Controls (visible only in M2M Studio mode) -->
+                <div id="wc-m2m-controls" class="wc-filter-group" hidden>
+                    <div class="wc-segmented" role="tablist" aria-label="M2M view mode">
+                        <button type="button" role="tab" class="wc-seg-btn active" data-m2m-view="warchart" aria-selected="true" title="Columns by SubSeries in rotation order">⚔️ Series War Chart</button>
+                        <button type="button" role="tab" class="wc-seg-btn" data-m2m-view="kanban" aria-selected="false" title="Columns by Production Stage">📋 Production Kanban</button>
+                    </div>
+
+                    <div id="wc-m2m-wc-stage-filter" class="wc-segmented" role="group" aria-label="Filter episodes by stage">
+                        <button type="button" class="wc-seg-btn active" data-m2m-stage-filter="unpublished">Unpublished</button>
+                        <button type="button" class="wc-seg-btn" data-m2m-stage-filter="queued">Queued</button>
+                        <button type="button" class="wc-seg-btn" data-m2m-stage-filter="idea">Ideas</button>
+                        <button type="button" class="wc-seg-btn" data-m2m-stage-filter="all">All</button>
                     </div>
                 </div>
 
@@ -237,7 +252,7 @@
                 <textarea id="wc-detail-content" rows="3" placeholder="Full details…"></textarea>
             </div>
 
-            <div class="wc-form-grid-2">
+            <div class="wc-form-grid-3">
                 <div class="wc-field">
                     <label for="wc-detail-column">Column (Project / Realm)</label>
                     <select id="wc-detail-column"></select>
@@ -248,6 +263,14 @@
                         <option value="task">Task</option>
                         <option value="event">Event</option>
                         <option value="coding_task">Coding Task</option>
+                    </select>
+                </div>
+                <div id="wc-detail-task-status-field" class="wc-field">
+                    <label for="wc-detail-task-status">Task Status</label>
+                    <select id="wc-detail-task-status">
+                        <option value="pending">Not Started</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Done</option>
                     </select>
                 </div>
             </div>
@@ -334,6 +357,16 @@
                 <label for="wc-detail-notes">Notes &amp; Links</label>
                 <textarea id="wc-detail-notes" rows="4" placeholder="Add notes, links, people, or context…"></textarea>
                 <div id="wc-detail-links-preview" class="wc-links-preview" hidden></div>
+            </div>
+
+            <div id="wc-detail-m2m-transfer" class="wc-m2m-transfer-box">
+                <div class="wc-m2m-transfer-label">
+                    <span>🎥 Belongs in Mary to the Moon?</span>
+                </div>
+                <div class="wc-m2m-transfer-controls">
+                    <select id="wc-detail-m2m-subseries" aria-label="Target M2M SubSeries"></select>
+                    <button type="button" id="wc-detail-move-to-m2m" class="wc-btn wc-btn-ghost wc-btn-xs">Move to M2M Studio →</button>
+                </div>
             </div>
 
             <div id="wc-detail-meta-info" class="wc-meta-info"></div>
@@ -500,6 +533,6 @@
         </div>
     </dialog>
 
-    <script src="warchart.js?v=135"></script>
+    <script src="warchart.js?v=136"></script>
 </body>
 </html>

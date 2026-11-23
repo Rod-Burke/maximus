@@ -90,15 +90,19 @@ const state = {
         compactMode: false,
         inboxCollapsed: false,
         fillInSeeded: false,
-        quickDeleteMode: true
+        quickDeleteMode: true,
+        m2mViewMode: 'warchart',   // 'warchart' | 'kanban'
+        m2mSeriesOrder: M2M_SUBSERIES.map(s => s.key),
+        m2mAutoRotate: true
     },
     lastDeleted: null,
     undoTimer: null,
     subprojectToParent: {},    // Maps coding subproject keys -> parent project key
     scopeFilter: 'all',        // 'all' | 'general' | 'coding'
     statusFilter: 'all_active',// 'all_active' | 'unscheduled' | 'scheduled' | 'completed'
-    m2mSubseriesFilter: 'all', // 'all' | subseries name
-    m2mExpandedStages: new Set(),
+    m2mSubseriesFilter: 'all', // 'all' | subseries name (Kanban mode)
+    m2mWcStageFilter: 'unpublished', // 'unpublished' | 'queued' | 'idea' | 'all' (War Chart mode)
+    m2mExpandedCols: new Set(),
     searchQuery: '',
     weekStart: getSundayOfWeek(new Date()),
     editingTaskId: null,
@@ -125,6 +129,8 @@ const dom = {
     boardM2mTab: document.getElementById('wc-board-m2m'),
     m2mBadge: document.getElementById('wc-m2m-badge'),
     lifeFilters: document.getElementById('wc-life-filters'),
+    m2mControls: document.getElementById('wc-m2m-controls'),
+    m2mWcStageFilter: document.getElementById('wc-m2m-wc-stage-filter'),
     searchInput: document.getElementById('wc-search-input'),
     toggleCalBtn: document.getElementById('wc-toggle-cal-btn'),
     compactBtn: document.getElementById('wc-compact-btn'),
@@ -171,6 +177,8 @@ const dom = {
     detailContent: document.getElementById('wc-detail-content'),
     detailColumn: document.getElementById('wc-detail-column'),
     detailType: document.getElementById('wc-detail-type'),
+    detailTaskStatusField: document.getElementById('wc-detail-task-status-field'),
+    detailTaskStatus: document.getElementById('wc-detail-task-status'),
     detailDueDate: document.getElementById('wc-detail-due-date'),
     detailClearDate: document.getElementById('wc-detail-clear-date'),
     detailPriority: document.getElementById('wc-detail-priority'),
@@ -185,6 +193,9 @@ const dom = {
     detailCtUrl: document.getElementById('wc-detail-ct-url'),
     detailNotes: document.getElementById('wc-detail-notes'),
     detailLinksPreview: document.getElementById('wc-detail-links-preview'),
+    detailM2mTransfer: document.getElementById('wc-detail-m2m-transfer'),
+    detailM2mSubseries: document.getElementById('wc-detail-m2m-subseries'),
+    detailMoveToM2m: document.getElementById('wc-detail-move-to-m2m'),
     detailMetaInfo: document.getElementById('wc-detail-meta-info'),
     detailToggleComplete: document.getElementById('wc-detail-toggle-complete'),
     detailDelete: document.getElementById('wc-detail-delete'),
@@ -355,6 +366,67 @@ function renderSimpleMarkdown(rawText) {
 function getSubseriesColor(name) {
     const found = M2M_SUBSERIES.find(s => s.key.toLowerCase() === (name || '').toLowerCase());
     return found ? found.color : '#94a3b8';
+}
+
+function getStageMeta(stageKey) {
+    return M2M_STAGES.find(s => s.key === stageKey) || M2M_STAGES[0];
+}
+
+function normalizeM2mSeriesOrder(saved) {
+    const defaults = M2M_SUBSERIES.map(s => s.key);
+    if (!Array.isArray(saved) || saved.length === 0) return defaults;
+    const validSet = new Set(defaults);
+    const ordered = saved.filter(k => validSet.has(k));
+    defaults.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
+    return ordered;
+}
+
+function getOrderedM2mSeries() {
+    const order = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
+    return order.map(key => ({ key, color: getSubseriesColor(key) }));
+}
+
+function interleaveBySeriesRotation(episodes) {
+    const seriesKeys = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
+    const buckets = new Map();
+    seriesKeys.forEach(k => buckets.set(k, []));
+    const otherBucket = [];
+
+    for (const ep of episodes) {
+        const ss = ep.metadata?.m2m?.subseries || 'Other';
+        if (buckets.has(ss)) buckets.get(ss).push(ep);
+        else otherBucket.push(ep);
+    }
+
+    const sortedKeys = [...seriesKeys];
+    if (otherBucket.length) {
+        buckets.set('Other', otherBucket);
+        sortedKeys.push('Other');
+    }
+
+    let maxDepth = 0;
+    for (const k of sortedKeys) {
+        const sorted = sortColumnTasks(buckets.get(k) || [], 'manual');
+        buckets.set(k, sorted);
+        if (sorted.length > maxDepth) maxDepth = sorted.length;
+    }
+
+    const interleaved = [];
+    let pos = 0;
+    for (let row = 0; row < maxDepth; row++) {
+        for (const k of sortedKeys) {
+            const list = buckets.get(k);
+            if (row < list.length) {
+                pos++;
+                interleaved.push({
+                    episode: list[row],
+                    cycle: row + 1,
+                    pos
+                });
+            }
+        }
+    }
+    return interleaved;
 }
 
 // --- STATUS INDICATOR ---
@@ -536,6 +608,11 @@ async function loadAllData() {
                 fillInSeeded: Boolean(wcConfigThought.metadata.fillInSeeded),
                 quickDeleteMode: wcConfigThought.metadata.quickDeleteMode !== undefined
                     ? Boolean(wcConfigThought.metadata.quickDeleteMode)
+                    : true,
+                m2mViewMode: wcConfigThought.metadata.m2mViewMode === 'kanban' ? 'kanban' : 'warchart',
+                m2mSeriesOrder: normalizeM2mSeriesOrder(wcConfigThought.metadata.m2mSeriesOrder),
+                m2mAutoRotate: wcConfigThought.metadata.m2mAutoRotate !== undefined
+                    ? Boolean(wcConfigThought.metadata.m2mAutoRotate)
                     : true
             };
             const existingKeys = new Set(state.boardConfig.columns.map(c => c.key));
@@ -575,7 +652,10 @@ async function loadAllData() {
                 compactMode: false,
                 inboxCollapsed: false,
                 fillInSeeded: true,
-                quickDeleteMode: true
+                quickDeleteMode: true,
+                m2mViewMode: 'warchart',
+                m2mSeriesOrder: M2M_SUBSERIES.map(s => s.key),
+                m2mAutoRotate: true
             };
             await saveBoardConfig();
         }
@@ -605,7 +685,10 @@ async function saveBoardConfig() {
         compactMode: state.boardConfig.compactMode,
         inboxCollapsed: state.boardConfig.inboxCollapsed,
         fillInSeeded: state.boardConfig.fillInSeeded,
-        quickDeleteMode: state.boardConfig.quickDeleteMode
+        quickDeleteMode: state.boardConfig.quickDeleteMode,
+        m2mViewMode: state.boardConfig.m2mViewMode,
+        m2mSeriesOrder: state.boardConfig.m2mSeriesOrder,
+        m2mAutoRotate: state.boardConfig.m2mAutoRotate
     };
 
     const req = state.configThoughtId
@@ -678,6 +761,8 @@ function getTaskOrderValue(t, fallbackIndex = 0) {
 function matchesLifeFilters(t) {
     const type = getTaskType(t);
     if (type === 'event') return false;
+    // Keep M2M Studio episodes out of Life Board Inbox (unless explicitly filed under M2M Workflow)
+    if (t.metadata?.m2m && t.metadata?.project !== 'm2m_workflow') return false;
 
     if (state.scopeFilter === 'general' && type !== 'task') return false;
     if (state.scopeFilter === 'coding' && type !== 'coding_task') return false;
@@ -745,6 +830,7 @@ function sortColumnTasks(tasks, sortMode) {
 // --- BOARD MODE & LAYOUT TOGGLES ---
 function applyBoardModeUI() {
     const isM2m = state.activeBoard === 'm2m';
+    const isM2mWarChart = isM2m && state.boardConfig.m2mViewMode === 'warchart';
 
     dom.boardLifeTab.classList.toggle('active', !isM2m);
     dom.boardLifeTab.setAttribute('aria-selected', String(!isM2m));
@@ -752,11 +838,19 @@ function applyBoardModeUI() {
     dom.boardM2mTab.setAttribute('aria-selected', String(isM2m));
 
     dom.lifeFilters.hidden = isM2m;
-    dom.m2mSubseriesBar.hidden = !isM2m;
+    dom.m2mControls.hidden = !isM2m;
+    dom.m2mWcStageFilter.hidden = !isM2mWarChart;
+    dom.m2mSubseriesBar.hidden = !isM2m || isM2mWarChart;
     dom.toggleCalBtn.hidden = isM2m;
     dom.manageColsBtn.hidden = isM2m;
     dom.addColBtn.hidden = isM2m;
     dom.addEpisodeBtn.hidden = !isM2m;
+
+    document.querySelectorAll('[data-m2m-view]').forEach(btn => {
+        const active = btn.dataset.m2mView === state.boardConfig.m2mViewMode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', String(active));
+    });
 
     dom.searchInput.placeholder = isM2m ? 'Search episodes & research…' : 'Search tasks…';
 
@@ -773,8 +867,12 @@ function applyBoardModeUI() {
 function renderAll() {
     dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
     if (state.activeBoard === 'm2m') {
-        renderM2mSubseriesBar();
-        renderM2mBoard();
+        if (state.boardConfig.m2mViewMode === 'warchart') {
+            renderM2mSeriesWarChart();
+        } else {
+            renderM2mSubseriesBar();
+            renderM2mKanban();
+        }
     } else {
         renderCalendar();
         renderLifeBoard();
@@ -1168,6 +1266,9 @@ function createLifeCardElement(task, colKey, idx, isFrontLine) {
         const timeText = m.start_time ? ` ${format12HourTime(m.start_time)}` : '';
         pills.push(`<span class="wc-pill wc-pill-date${isOverdue ? ' is-overdue' : ''}">📅 ${escapeHtml(formatShortDate(m.due_date))}${escapeHtml(timeText)}</span>`);
     }
+    if (type === 'task' && m.status === 'in_progress') {
+        pills.push(`<span class="wc-pill wc-pill-in-progress">▶ In Progress</span>`);
+    }
     if (type === 'coding_task') {
         const ctStatus = m.coding_task?.status || 'draft';
         const label = CODING_STATUS_LABELS[ctStatus] || ctStatus;
@@ -1267,7 +1368,7 @@ function renderM2mSubseriesBar() {
     });
     dom.subseriesPills.appendChild(allBtn);
 
-    M2M_SUBSERIES.forEach(ss => {
+    getOrderedM2mSeries().forEach(ss => {
         const c = counts.get(ss.key) || 0;
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1282,7 +1383,299 @@ function renderM2mSubseriesBar() {
     });
 }
 
-function renderM2mBoard() {
+// --- M2M SERIES WAR CHART MODE (Columns = 8 SubSeries in Rotation Order) ---
+function matchesM2mWarChartFilters(ep) {
+    const m2m = ep.metadata?.m2m || {};
+    const stage = m2m.stage || 'idea';
+    if (state.m2mWcStageFilter === 'unpublished' && stage === 'published') return false;
+    if (state.m2mWcStageFilter === 'queued' && stage !== 'queued') return false;
+    if (state.m2mWcStageFilter === 'idea' && stage !== 'idea') return false;
+
+    if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        const hay = [
+            ep.metadata?.summary,
+            ep.content,
+            m2m.subseries,
+            m2m.research_doc,
+            m2m.script_draft,
+            m2m.graphics_notes
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+    }
+    return true;
+}
+
+function renderM2mSeriesWarChart() {
+    const orderedSeries = getOrderedM2mSeries();
+    const validKeys = new Set(orderedSeries.map(s => s.key));
+    const grouped = new Map();
+    orderedSeries.forEach(s => grouped.set(s.key, []));
+    const otherList = [];
+
+    for (const ep of state.m2mEpisodes) {
+        if (!matchesM2mWarChartFilters(ep)) continue;
+        const ss = ep.metadata?.m2m?.subseries || 'Other';
+        if (validKeys.has(ss)) grouped.get(ss).push(ep);
+        else otherList.push(ep);
+    }
+
+    const scrollLeft = dom.boardViewport.scrollLeft;
+    dom.boardTrack.innerHTML = '';
+
+    orderedSeries.forEach((series, rotIdx) => {
+        const episodes = sortColumnTasks(grouped.get(series.key) || [], 'manual');
+        dom.boardTrack.appendChild(createM2mSeriesColumn(series, episodes, rotIdx + 1, false));
+    });
+
+    if (otherList.length > 0) {
+        const sortedOther = sortColumnTasks(otherList, 'manual');
+        dom.boardTrack.appendChild(createM2mSeriesColumn({ key: 'Other', color: '#94a3b8' }, sortedOther, null, true));
+    }
+
+    dom.boardViewport.scrollLeft = scrollLeft;
+}
+
+function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
+    const colEl = document.createElement('section');
+    colEl.className = 'wc-column';
+    colEl.dataset.seriesKey = series.key;
+    colEl.style.setProperty('--col-accent', series.color);
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'wc-col-header';
+    if (!isOther) {
+        headerEl.draggable = true;
+        headerEl.title = 'Drag header left or right to change SubSeries rotation order';
+    }
+
+    const rotBadge = rotNumber ? `<span class="wc-rot-num" title="Rotation position #${rotNumber}">#${rotNumber}</span>` : '';
+    const gripSvg = !isOther
+        ? `<svg class="wc-col-grip" viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+               <circle cx="5" cy="3.5" r="1.2"></circle><circle cx="11" cy="3.5" r="1.2"></circle>
+               <circle cx="5" cy="8" r="1.2"></circle><circle cx="11" cy="8" r="1.2"></circle>
+               <circle cx="5" cy="12.5" r="1.2"></circle><circle cx="11" cy="12.5" r="1.2"></circle>
+           </svg>`
+        : '';
+
+    headerEl.innerHTML = `
+        <div class="wc-col-title-wrap">
+            ${gripSvg}
+            ${rotBadge}
+            <h2 class="wc-col-title">${escapeHtml(series.key)}</h2>
+            <span class="wc-col-count">${episodes.length}</span>
+        </div>
+        <div class="wc-col-actions">
+            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(series.key)}" aria-label="Add episode">+</button>
+        </div>
+    `;
+
+    const quickAddEl = document.createElement('div');
+    quickAddEl.className = 'wc-col-quick-add';
+    quickAddEl.hidden = true;
+    quickAddEl.innerHTML = `
+        <input type="text" class="wc-quick-add-input" placeholder="New ${escapeHtml(series.key)} episode… (Enter)">
+        <div class="wc-quick-add-hint"><span>Enter to save · Esc to close</span></div>
+    `;
+    const quickInput = quickAddEl.querySelector('.wc-quick-add-input');
+
+    headerEl.querySelector('.wc-col-quickadd-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickAddEl.hidden = !quickAddEl.hidden;
+        if (!quickAddEl.hidden) {
+            quickInput.value = '';
+            quickInput.focus();
+        }
+    });
+
+    quickInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape') { quickAddEl.hidden = true; return; }
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            const title = quickInput.value.trim();
+            if (!title) return;
+            quickInput.disabled = true;
+            try {
+                const defaultStage = state.m2mWcStageFilter === 'queued' ? 'queued' : 'idea';
+                await createQuickM2mEpisode(defaultStage, title, series.key);
+                quickInput.value = '';
+                quickInput.disabled = false;
+                quickInput.focus();
+            } catch {
+                quickInput.disabled = false;
+            }
+        }
+    });
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'wc-col-body';
+    bodyEl.dataset.seriesKey = series.key;
+
+    if (episodes.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'wc-col-empty';
+        emptyEl.textContent = 'Drop episodes here or click +';
+        bodyEl.appendChild(emptyEl);
+    } else {
+        const expandKey = `ss:${series.key}`;
+        const isExpanded = state.m2mExpandedCols.has(expandKey) || Boolean(state.searchQuery);
+        const visibleEps = isExpanded ? episodes : episodes.slice(0, M2M_COLUMN_RENDER_CAP);
+
+        visibleEps.forEach((ep, idx) => {
+            bodyEl.appendChild(createM2mSeriesCardElement(ep, series, idx));
+        });
+
+        if (!isExpanded && episodes.length > M2M_COLUMN_RENDER_CAP) {
+            const moreBtn = document.createElement('button');
+            moreBtn.type = 'button';
+            moreBtn.className = 'wc-btn wc-btn-ghost wc-btn-xs';
+            moreBtn.style.marginTop = '0.25rem';
+            moreBtn.textContent = `Show all ${episodes.length} episodes (+${episodes.length - M2M_COLUMN_RENDER_CAP})`;
+            moreBtn.addEventListener('click', () => {
+                state.m2mExpandedCols.add(expandKey);
+                renderM2mSeriesWarChart();
+            });
+            bodyEl.appendChild(moreBtn);
+        }
+    }
+
+    // SubSeries column drag left/right to set rotation order
+    if (!isOther) {
+        headerEl.addEventListener('dragstart', (e) => {
+            if (e.target.closest('button')) { e.preventDefault(); return; }
+            state.drag = { mode: 'm2m-series-col', id: series.key, sourceColKey: series.key };
+            colEl.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', `series:${series.key}`);
+        });
+        headerEl.addEventListener('dragend', clearDragState);
+    }
+
+    colEl.addEventListener('dragover', (e) => {
+        updateAutoScroll(e.clientX);
+        if (state.drag.mode === 'm2m-series-col' && !isOther && state.drag.id !== series.key) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = colEl.getBoundingClientRect();
+            const before = e.clientX < rect.left + rect.width / 2;
+            colEl.classList.toggle('col-drop-before', before);
+            colEl.classList.toggle('col-drop-after', !before);
+            return;
+        }
+        if (state.drag.mode === 'm2m-series-card') {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            colEl.classList.add('card-drop-hover');
+            positionCardDropIndicator(bodyEl, e.clientY);
+        }
+    });
+
+    colEl.addEventListener('dragleave', (e) => {
+        if (!colEl.contains(e.relatedTarget)) {
+            colEl.classList.remove('col-drop-before', 'col-drop-after', 'card-drop-hover');
+            if (dropIndicator.parentElement === bodyEl) dropIndicator.remove();
+        }
+    });
+
+    colEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const wasBefore = colEl.classList.contains('col-drop-before');
+        colEl.classList.remove('col-drop-before', 'col-drop-after', 'card-drop-hover');
+
+        if (state.drag.mode === 'm2m-series-col' && !isOther && state.drag.id && state.drag.id !== series.key) {
+            reorderM2mSeriesColumns(state.drag.id, series.key, wasBefore);
+            clearDragState();
+            return;
+        }
+        if (state.drag.mode === 'm2m-series-card' && state.drag.id) {
+            const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
+            moveM2mEpisodeToSubseries(state.drag.id, series.key, insertIdx);
+            clearDragState();
+        }
+    });
+
+    colEl.appendChild(headerEl);
+    colEl.appendChild(quickAddEl);
+    colEl.appendChild(bodyEl);
+    return colEl;
+}
+
+function createM2mSeriesCardElement(ep, series, idx) {
+    const card = document.createElement('article');
+    const m2m = ep.metadata?.m2m || {};
+    const stageMeta = getStageMeta(m2m.stage || 'idea');
+    const isFrontLine = idx === 0;
+
+    card.className = `wc-card${isFrontLine ? ' is-front-line' : ''}`;
+    card.style.borderLeftColor = stageMeta.color;
+    card.draggable = true;
+    card.dataset.taskId = ep.id;
+    card.dataset.seriesKey = series.key;
+
+    const pills = [
+        `<span class="wc-pill wc-pill-cycle" title="Rotation row ${idx + 1} in ${escapeHtml(series.key)}">Cycle ${idx + 1}</span>`,
+        `<span class="wc-pill wc-pill-stage" style="color:${stageMeta.color}; background:${stageMeta.color}1f">${escapeHtml(stageMeta.name)}</span>`
+    ];
+
+    const docLen = (m2m.research_doc || '').trim().length;
+    if (docLen > 80) {
+        const label = docLen >= 1000 ? `${(docLen / 1000).toFixed(1)}k` : `${docLen}c`;
+        pills.push(`<span class="wc-pill wc-pill-doc" title="Has full research document">📚 ${label}</span>`);
+    }
+    const scriptWords = countWords(m2m.script_draft || '');
+    if (scriptWords > 20) {
+        pills.push(`<span class="wc-pill wc-pill-script" title="Has script draft">✍️ ${scriptWords}w</span>`);
+    }
+
+    const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Cycle 1 · Front Line</div>` : '';
+    const topBtnHtml = idx > 0
+        ? `<button type="button" class="wc-card-top-btn" title="Move to Row #1 (Cycle 1)" aria-label="Move to top">⬆</button>`
+        : '';
+    const delBtnHtml = state.boardConfig.quickDeleteMode
+        ? `<button type="button" class="wc-card-del-btn" title="Delete episode permanently" aria-label="Delete episode">🗑</button>`
+        : '';
+    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
+        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
+        : '';
+
+    card.innerHTML = `
+        ${actionsClusterHtml}
+        ${frontLineHtml}
+        <div class="wc-card-main">
+            <div class="wc-card-title">${escapeHtml(getTaskTitle(ep))}</div>
+        </div>
+        <div class="wc-card-meta" style="padding-left: 0;">${pills.join('')}</div>
+    `;
+
+    card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moveM2mEpisodeToSubseries(ep.id, series.key, 0);
+    });
+
+    card.querySelector('.wc-card-del-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickDeleteItem(ep.id);
+    });
+
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('.wc-card-actions')) return;
+        openM2mWorkspaceDialog(ep.id);
+    });
+
+    card.addEventListener('dragstart', (e) => {
+        if (e.target.closest('.wc-card-actions')) { e.preventDefault(); return; }
+        state.drag = { mode: 'm2m-series-card', id: ep.id, sourceColKey: series.key };
+        card.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ep.id);
+    });
+
+    card.addEventListener('dragend', clearDragState);
+    return card;
+}
+
+// --- M2M PRODUCTION KANBAN MODE (Columns = 7 Stages, with Auto-Rotate from Series War Chart) ---
+function renderM2mKanban() {
     const grouped = new Map();
     M2M_STAGES.forEach(s => grouped.set(s.key, []));
 
@@ -1297,30 +1690,47 @@ function renderM2mBoard() {
     dom.boardTrack.innerHTML = '';
 
     for (const stage of M2M_STAGES) {
-        const episodes = sortColumnTasks(grouped.get(stage.key) || [], 'manual');
-        dom.boardTrack.appendChild(createM2mStageColumn(stage, episodes));
+        const rawList = grouped.get(stage.key) || [];
+        const supportsRotate = stage.key === 'queued' || stage.key === 'idea';
+        const useRotate = supportsRotate && state.boardConfig.m2mAutoRotate && state.m2mSubseriesFilter === 'all';
+        const items = useRotate
+            ? interleaveBySeriesRotation(rawList)
+            : sortColumnTasks(rawList, 'manual').map(ep => ({ episode: ep, cycle: null, pos: null }));
+        dom.boardTrack.appendChild(createM2mStageColumn(stage, items, supportsRotate, useRotate));
     }
 
     dom.boardViewport.scrollLeft = scrollLeft;
 }
 
-function createM2mStageColumn(stage, episodes) {
+function createM2mStageColumn(stage, items, supportsRotate, isRotated) {
     const colEl = document.createElement('section');
     colEl.className = 'wc-column';
     colEl.dataset.stageKey = stage.key;
     colEl.style.setProperty('--col-accent', stage.color);
+
+    const rotateBtnHtml = supportsRotate
+        ? `<button type="button" class="wc-col-btn wc-col-rotate-btn${state.boardConfig.m2mAutoRotate ? ' is-rotate-active' : ''}" title="${state.boardConfig.m2mAutoRotate ? 'Auto-rotating row-by-row from Series War Chart (click for manual order)' : 'Manual order (click to auto-rotate from Series War Chart)'}" aria-label="Toggle auto-rotation">🔄</button>`
+        : '';
 
     const headerEl = document.createElement('div');
     headerEl.className = 'wc-col-header';
     headerEl.innerHTML = `
         <div class="wc-col-title-wrap">
             <h2 class="wc-col-title">${escapeHtml(stage.name)}</h2>
-            <span class="wc-col-count">${episodes.length}</span>
+            <span class="wc-col-count">${items.length}</span>
         </div>
         <div class="wc-col-actions">
+            ${rotateBtnHtml}
             <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(stage.name)}" aria-label="Add episode">+</button>
         </div>
     `;
+
+    headerEl.querySelector('.wc-col-rotate-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.boardConfig.m2mAutoRotate = !state.boardConfig.m2mAutoRotate;
+        renderM2mKanban();
+        saveBoardConfig();
+    });
 
     const quickAddEl = document.createElement('div');
     quickAddEl.className = 'wc-col-quick-add';
@@ -1365,28 +1775,29 @@ function createM2mStageColumn(stage, episodes) {
     bodyEl.className = 'wc-col-body';
     bodyEl.dataset.stageKey = stage.key;
 
-    if (episodes.length === 0) {
+    if (items.length === 0) {
         const emptyEl = document.createElement('div');
         emptyEl.className = 'wc-col-empty';
         emptyEl.textContent = 'Drag an episode here or click +';
         bodyEl.appendChild(emptyEl);
     } else {
-        const isExpanded = state.m2mExpandedStages.has(stage.key) || Boolean(state.searchQuery) || state.m2mSubseriesFilter !== 'all';
-        const visibleEps = isExpanded ? episodes : episodes.slice(0, M2M_COLUMN_RENDER_CAP);
+        const expandKey = `stg:${stage.key}`;
+        const isExpanded = state.m2mExpandedCols.has(expandKey) || Boolean(state.searchQuery) || state.m2mSubseriesFilter !== 'all';
+        const visibleItems = isExpanded ? items : items.slice(0, M2M_COLUMN_RENDER_CAP);
 
-        visibleEps.forEach((ep, idx) => {
-            bodyEl.appendChild(createM2mCardElement(ep, stage, idx, stage.frontLine && idx === 0));
+        visibleItems.forEach((entry, idx) => {
+            bodyEl.appendChild(createM2mCardElement(entry.episode, stage, idx, stage.frontLine && idx === 0, entry.cycle, entry.pos, isRotated));
         });
 
-        if (!isExpanded && episodes.length > M2M_COLUMN_RENDER_CAP) {
+        if (!isExpanded && items.length > M2M_COLUMN_RENDER_CAP) {
             const moreBtn = document.createElement('button');
             moreBtn.type = 'button';
             moreBtn.className = 'wc-btn wc-btn-ghost wc-btn-xs';
             moreBtn.style.marginTop = '0.25rem';
-            moreBtn.textContent = `Show all ${episodes.length} episodes (+${episodes.length - M2M_COLUMN_RENDER_CAP})`;
+            moreBtn.textContent = `Show all ${items.length} episodes (+${items.length - M2M_COLUMN_RENDER_CAP})`;
             moreBtn.addEventListener('click', () => {
-                state.m2mExpandedStages.add(stage.key);
-                renderM2mBoard();
+                state.m2mExpandedCols.add(expandKey);
+                renderM2mKanban();
             });
             bodyEl.appendChild(moreBtn);
         }
@@ -1413,7 +1824,7 @@ function createM2mStageColumn(stage, episodes) {
         colEl.classList.remove('card-drop-hover');
         if (state.drag.mode === 'm2m-card' && state.drag.id) {
             const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
-            moveM2mEpisodeToStage(state.drag.id, stage.key, insertIdx);
+            moveM2mEpisodeToStage(state.drag.id, stage.key, insertIdx, state.drag.sourceColKey);
             clearDragState();
         }
     });
@@ -1424,7 +1835,7 @@ function createM2mStageColumn(stage, episodes) {
     return colEl;
 }
 
-function createM2mCardElement(ep, stage, idx, isFrontLine) {
+function createM2mCardElement(ep, stage, idx, isFrontLine, rotCycle = null, rotPos = null, isRotated = false) {
     const card = document.createElement('article');
     const m2m = ep.metadata?.m2m || {};
     const ss = m2m.subseries || 'Unassigned';
@@ -1436,9 +1847,11 @@ function createM2mCardElement(ep, stage, idx, isFrontLine) {
     card.dataset.taskId = ep.id;
     card.dataset.stageKey = stage.key;
 
-    const pills = [
-        `<span class="wc-pill wc-pill-subseries" style="color:${ssColor}; background:${ssColor}1f">${escapeHtml(ss)}</span>`
-    ];
+    const pills = [];
+    if (isRotated && rotCycle != null) {
+        pills.push(`<span class="wc-pill wc-pill-cycle" title="Auto-rotated from Series War Chart (Cycle ${rotCycle}, #${rotPos})">C${rotCycle} · #${rotPos}</span>`);
+    }
+    pills.push(`<span class="wc-pill wc-pill-subseries" style="color:${ssColor}; background:${ssColor}1f">${escapeHtml(ss)}</span>`);
 
     const docLen = (m2m.research_doc || '').trim().length;
     if (docLen > 80) {
@@ -1478,7 +1891,7 @@ function createM2mCardElement(ep, stage, idx, isFrontLine) {
 
     card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        moveM2mEpisodeToStage(ep.id, stage.key, 0);
+        moveM2mEpisodeToStage(ep.id, stage.key, 0, stage.key);
     });
 
     card.querySelector('.wc-card-del-btn')?.addEventListener('click', (e) => {
@@ -1779,9 +2192,66 @@ async function createQuickLifeTask(col, title) {
 }
 
 // --- M2M STUDIO MUTATIONS ---
-async function moveM2mEpisodeToStage(epId, targetStageKey, insertIdx) {
+function reorderM2mSeriesColumns(sourceKey, targetKey, insertBefore) {
+    const order = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
+    const srcIdx = order.indexOf(sourceKey);
+    if (srcIdx === -1) return;
+
+    const [moved] = order.splice(srcIdx, 1);
+    let dstIdx = order.indexOf(targetKey);
+    if (dstIdx === -1) order.push(moved);
+    else {
+        if (!insertBefore) dstIdx += 1;
+        order.splice(dstIdx, 0, moved);
+    }
+
+    state.boardConfig.m2mSeriesOrder = order;
+    renderAll();
+    saveBoardConfig();
+}
+
+async function moveM2mEpisodeToSubseries(epId, targetSeriesKey, insertIdx) {
     const ep = state.m2mEpisodes.find(e => e.id === epId);
     if (!ep) return;
+
+    const siblings = sortColumnTasks(
+        state.m2mEpisodes.filter(e => {
+            if (e.id === epId || !matchesM2mWarChartFilters(e)) return false;
+            const ss = e.metadata?.m2m?.subseries || 'Other';
+            return ss === targetSeriesKey;
+        }),
+        'manual'
+    );
+    const { newOrder, respace } = computeNewOrder(siblings, insertIdx, ep);
+
+    const newM2m = {
+        ...(ep.metadata?.m2m || {}),
+        subseries: targetSeriesKey
+    };
+    const metaPatch = {
+        warchart_order: newOrder,
+        m2m: newM2m
+    };
+
+    ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+    renderAll();
+
+    const ops = [trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }))];
+    respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
+    await Promise.all(ops);
+}
+
+async function moveM2mEpisodeToStage(epId, targetStageKey, insertIdx, sourceStageKey = null) {
+    const ep = state.m2mEpisodes.find(e => e.id === epId);
+    if (!ep) return;
+
+    const supportsRotate = targetStageKey === 'queued' || targetStageKey === 'idea';
+    let configChanged = false;
+    // If manually reordering inside an auto-rotated stage, switch off auto-rotate so manual order sticks
+    if (supportsRotate && sourceStageKey === targetStageKey && state.boardConfig.m2mAutoRotate && state.m2mSubseriesFilter === 'all') {
+        state.boardConfig.m2mAutoRotate = false;
+        configChanged = true;
+    }
 
     const siblings = sortColumnTasks(
         state.m2mEpisodes.filter(e => e.id !== epId && matchesM2mFilters(e) && (e.metadata?.m2m?.stage || 'idea') === targetStageKey),
@@ -1802,14 +2272,20 @@ async function moveM2mEpisodeToStage(epId, targetStageKey, insertIdx) {
     renderAll();
 
     const ops = [trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }))];
+    if (configChanged) ops.push(saveBoardConfig());
     respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
     await Promise.all(ops);
 }
 
-async function createQuickM2mEpisode(stageKey, title) {
-    const subseries = state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : 'Peace to the Moon';
+async function createQuickM2mEpisode(stageKey, title, explicitSubseries = null) {
+    const subseries = explicitSubseries || (state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : 'Peace to the Moon');
     const existing = sortColumnTasks(
-        state.m2mEpisodes.filter(e => matchesM2mFilters(e) && (e.metadata?.m2m?.stage || 'idea') === stageKey),
+        state.m2mEpisodes.filter(e => {
+            if (state.boardConfig.m2mViewMode === 'warchart') {
+                return matchesM2mWarChartFilters(e) && (e.metadata?.m2m?.subseries || 'Other') === subseries;
+            }
+            return matchesM2mFilters(e) && (e.metadata?.m2m?.stage || 'idea') === stageKey;
+        }),
         'manual'
     );
     const topOrder = existing.length > 0 ? getTaskOrderValue(existing[0], 0) - 1000 : 1000;
@@ -1918,6 +2394,11 @@ function openTaskDetailDialog(taskId) {
     dom.detailContent.value = task.content || '';
     populateColumnSelect(getTaskColumnKey(task));
     dom.detailType.value = type;
+    const normTaskStatus = m.status === 'completed'
+        ? 'completed'
+        : m.status === 'in_progress' ? 'in_progress' : 'pending';
+    dom.detailTaskStatus.value = normTaskStatus;
+    dom.detailTaskStatusField.hidden = type !== 'task';
     dom.detailDueDate.value = m.due_date || '';
     dom.detailPriority.value = m.priority || 'normal';
     dom.detailRecurrence.value = m.recurrence || '';
@@ -1937,6 +2418,7 @@ function openTaskDetailDialog(taskId) {
 
     dom.detailToggleComplete.hidden = type === 'event';
     dom.detailToggleComplete.textContent = completed ? 'Reopen Task' : 'Mark Done';
+    dom.detailM2mTransfer.hidden = type === 'coding_task' || Boolean(m.m2m);
 
     const created = task.created_at ? new Date(task.created_at).toLocaleString() : '—';
     const people = Array.isArray(m.people) && m.people.length ? ` · People: ${m.people.join(', ')}` : '';
@@ -1946,9 +2428,18 @@ function openTaskDetailDialog(taskId) {
 }
 
 dom.detailType.addEventListener('change', () => {
-    const isCoding = dom.detailType.value === 'coding_task';
-    dom.detailCodingSection.hidden = !isCoding;
-    dom.detailToggleComplete.hidden = dom.detailType.value === 'event';
+    const val = dom.detailType.value;
+    dom.detailTaskStatusField.hidden = val !== 'task';
+    dom.detailCodingSection.hidden = val !== 'coding_task';
+    dom.detailToggleComplete.hidden = val === 'event';
+});
+
+dom.detailTaskStatus.addEventListener('change', () => {
+    const isDone = dom.detailTaskStatus.value === 'completed';
+    dom.detailStatusDot.className = 'wc-dot ' + (
+        isDone ? 'wc-dot-green' : dom.detailDueDate.value ? 'wc-dot-amber' : 'wc-dot-red'
+    );
+    dom.detailToggleComplete.textContent = isDone ? 'Reopen Task' : 'Mark Done';
 });
 
 dom.detailNotes.addEventListener('input', () => {
@@ -1985,7 +2476,9 @@ dom.detailForm.addEventListener('submit', async (e) => {
         project: assignedProject
     };
 
-    if (type === 'coding_task') {
+    if (type === 'task') {
+        metaPatch.status = dom.detailTaskStatus.value;
+    } else if (type === 'coding_task') {
         metaPatch.coding_task = {
             ...(task.metadata?.coding_task || {}),
             project: assignedProject || 'uncategorized',
@@ -1993,7 +2486,7 @@ dom.detailForm.addEventListener('submit', async (e) => {
             complexity: dom.detailCtComplexity.value,
             verification_url: dom.detailCtUrl.value.trim() || null
         };
-        if (dom.detailCtStatus.value === 'done') metaPatch.status = 'completed';
+        metaPatch.status = dom.detailCtStatus.value === 'done' ? 'completed' : 'pending';
     }
 
     const contentChanged = content !== (task.content || '').trim();
@@ -2028,14 +2521,48 @@ dom.detailDelete.addEventListener('click', async () => {
     await trackSave(apiCall({ action: 'delete', id: taskId }));
 });
 
+dom.detailMoveToM2m.addEventListener('click', async () => {
+    const taskId = state.editingTaskId;
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+
+    const subseries = dom.detailM2mSubseries.value || 'Peace to the Moon';
+    const title = dom.detailSummary.value.trim() || getTaskTitle(task);
+    const existingResearch = [dom.detailContent.value.trim(), dom.detailNotes.value.trim()].filter(Boolean).join('\n\n');
+
+    const metaPatch = {
+        type: 'idea',
+        summary: title,
+        project: null,
+        m2m: {
+            subseries,
+            stage: 'idea',
+            research_doc: existingResearch,
+            script_draft: '',
+            graphics_notes: '',
+            checklist: {}
+        }
+    };
+
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    if (!state.m2mEpisodes.some(e => e.id === task.id)) {
+        state.m2mEpisodes.unshift(task);
+    }
+    dom.detailDialog.close();
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+});
+
 // --- M2M EPISODE WORKSPACE MODAL ---
 function populateM2mDropdowns() {
     dom.m2mSubseries.innerHTML = '';
+    dom.detailM2mSubseries.innerHTML = '';
     M2M_SUBSERIES.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.key;
         opt.textContent = s.key;
         dom.m2mSubseries.appendChild(opt);
+        dom.detailM2mSubseries.appendChild(opt.cloneNode(true));
     });
     const otherOpt = document.createElement('option');
     otherOpt.value = 'Other';
@@ -2387,6 +2914,24 @@ document.querySelectorAll('[data-board]').forEach(btn => {
         state.activeBoard = btn.dataset.board;
         dom.boardViewport.scrollLeft = 0;
         applyBoardModeUI();
+        renderAll();
+    });
+});
+
+document.querySelectorAll('[data-m2m-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        state.boardConfig.m2mViewMode = btn.dataset.m2mView === 'kanban' ? 'kanban' : 'warchart';
+        dom.boardViewport.scrollLeft = 0;
+        applyBoardModeUI();
+        renderAll();
+        saveBoardConfig();
+    });
+});
+
+document.querySelectorAll('[data-m2m-stage-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        state.m2mWcStageFilter = btn.dataset.m2mStageFilter;
+        document.querySelectorAll('[data-m2m-stage-filter]').forEach(b => b.classList.toggle('active', b === btn));
         renderAll();
     });
 });
