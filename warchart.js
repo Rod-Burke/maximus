@@ -198,6 +198,7 @@ const dom = {
     detailMoveToM2m: document.getElementById('wc-detail-move-to-m2m'),
     detailMetaInfo: document.getElementById('wc-detail-meta-info'),
     detailToggleComplete: document.getElementById('wc-detail-toggle-complete'),
+    detailToRef: document.getElementById('wc-detail-to-ref'),
     detailDelete: document.getElementById('wc-detail-delete'),
     detailCancel: document.getElementById('wc-detail-cancel'),
     detailSave: document.getElementById('wc-detail-save'),
@@ -1012,6 +1013,28 @@ function renderCalendar() {
     }
 }
 
+// --- COLUMN SCROLL POSITION PRESERVATION ---
+function captureColumnScrollPositions() {
+    const map = new Map();
+    dom.boardTrack.querySelectorAll('.wc-col-body').forEach(el => {
+        const key = el.dataset.colKey || el.dataset.seriesKey || el.dataset.stageKey;
+        if (key && el.scrollTop > 0) {
+            map.set(key, el.scrollTop);
+        }
+    });
+    return map;
+}
+
+function restoreColumnScrollPositions(map) {
+    if (!map || map.size === 0) return;
+    dom.boardTrack.querySelectorAll('.wc-col-body').forEach(el => {
+        const key = el.dataset.colKey || el.dataset.seriesKey || el.dataset.stageKey;
+        if (key && map.has(key)) {
+            el.scrollTop = map.get(key);
+        }
+    });
+}
+
 // --- LIFE WAR CHART BOARD ---
 function getVisibleLifeColumns() {
     return state.boardConfig.columns.filter((col) => {
@@ -1034,6 +1057,7 @@ function renderLifeBoard() {
     }
 
     const scrollLeft = dom.boardViewport.scrollLeft;
+    const colScrolls = captureColumnScrollPositions();
     dom.boardTrack.innerHTML = '';
 
     const inboxTasks = sortColumnTasks(grouped.get(INBOX_KEY) || [], 'manual');
@@ -1052,6 +1076,7 @@ function renderLifeBoard() {
     }
 
     dom.boardViewport.scrollLeft = scrollLeft;
+    restoreColumnScrollPositions(colScrolls);
 }
 
 function createLifeColumnElement(col, tasks, isInbox) {
@@ -1421,6 +1446,7 @@ function renderM2mSeriesWarChart() {
     }
 
     const scrollLeft = dom.boardViewport.scrollLeft;
+    const colScrolls = captureColumnScrollPositions();
     dom.boardTrack.innerHTML = '';
 
     orderedSeries.forEach((series, rotIdx) => {
@@ -1434,6 +1460,7 @@ function renderM2mSeriesWarChart() {
     }
 
     dom.boardViewport.scrollLeft = scrollLeft;
+    restoreColumnScrollPositions(colScrolls);
 }
 
 function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
@@ -1687,6 +1714,7 @@ function renderM2mKanban() {
     }
 
     const scrollLeft = dom.boardViewport.scrollLeft;
+    const colScrolls = captureColumnScrollPositions();
     dom.boardTrack.innerHTML = '';
 
     for (const stage of M2M_STAGES) {
@@ -1700,6 +1728,7 @@ function renderM2mKanban() {
     }
 
     dom.boardViewport.scrollLeft = scrollLeft;
+    restoreColumnScrollPositions(colScrolls);
 }
 
 function createM2mStageColumn(stage, items, supportsRotate, isRotated) {
@@ -2418,6 +2447,7 @@ function openTaskDetailDialog(taskId) {
 
     dom.detailToggleComplete.hidden = type === 'event';
     dom.detailToggleComplete.textContent = completed ? 'Reopen Task' : 'Mark Done';
+    dom.detailToRef.hidden = type === 'reference';
     dom.detailM2mTransfer.hidden = type === 'coding_task' || Boolean(m.m2m);
 
     const created = task.created_at ? new Date(task.created_at).toLocaleString() : '—';
@@ -2431,7 +2461,8 @@ dom.detailType.addEventListener('change', () => {
     const val = dom.detailType.value;
     dom.detailTaskStatusField.hidden = val !== 'task';
     dom.detailCodingSection.hidden = val !== 'coding_task';
-    dom.detailToggleComplete.hidden = val === 'event';
+    dom.detailToggleComplete.hidden = val !== 'task' && val !== 'coding_task';
+    dom.detailToRef.hidden = val === 'reference';
 });
 
 dom.detailTaskStatus.addEventListener('change', () => {
@@ -2489,10 +2520,48 @@ dom.detailForm.addEventListener('submit', async (e) => {
         metaPatch.status = dom.detailCtStatus.value === 'done' ? 'completed' : 'pending';
     }
 
+    const isNonTaskThought = !['task', 'event', 'coding_task'].includes(type);
+    if (isNonTaskThought) {
+        metaPatch.status = null;
+        metaPatch.due_date = null;
+    }
+
     const contentChanged = content !== (task.content || '').trim();
     task.content = content;
     task.metadata = { ...(task.metadata || {}), ...metaPatch };
 
+    if (isNonTaskThought) {
+        // Reclassified as Reference/Procedure, Idea, Observation, or Person Note: remove from War Chart tasks list
+        state.thoughts = state.thoughts.filter(t => t.id !== taskId);
+    }
+
+    dom.detailDialog.close();
+    renderAll();
+
+    const payload = { action: 'update', id: taskId, metadata: metaPatch };
+    if (contentChanged) payload.content = content;
+    await trackSave(apiCall(payload));
+});
+
+dom.detailToRef.addEventListener('click', async () => {
+    const taskId = state.editingTaskId;
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+
+    const summary = dom.detailSummary.value.trim() || getTaskTitle(task);
+    const content = dom.detailContent.value.trim() || summary;
+    const notes = dom.detailNotes.value.trim() || null;
+
+    const metaPatch = {
+        type: 'reference',
+        summary,
+        notes,
+        status: null,
+        due_date: null
+    };
+
+    const contentChanged = content !== (task.content || '').trim();
+    state.thoughts = state.thoughts.filter(t => t.id !== taskId);
     dom.detailDialog.close();
     renderAll();
 

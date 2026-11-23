@@ -6,6 +6,17 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v137] - 2026-11-23
+
+### Task: War Chart Polish — Column Vertical Scroll Preservation & Full Type Reclassification
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - Added `captureColumnScrollPositions()` and `restoreColumnScrollPositions()` across Life Board, M2M Series War Chart, and M2M Production Kanban so deleting, editing, checking off, or dragging items partway down a column keeps every column locked at its exact vertical scroll offset.
+  - Expanded the **Type** selector in War Chart Task Details to include all 7 canonical OpenBrain types (`Task`, `⚡ Coding Task`, `📅 Event`, `📖 Reference / Procedure`, `💡 Idea`, `📝 Observation / Thought`, `👤 Person Note`).
+  - Added a one-click **`📖 Procedure / Ref`** button in the Task Details footer; reclassifying a task to `reference`, `idea`, `observation`, or `person_note` cleanly removes it from the War Chart and Google Tasks while keeping it searchable in OpenBrain for Saint Max briefings.
+
+---
+
 ## [v136] - 2026-11-23
 
 ### Task: War Chart Phase 1.6 — Task Status, Inbox Dedup & M2M Series War Chart ↔ Kanban Auto-Rotation
