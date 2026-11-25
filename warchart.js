@@ -8,6 +8,46 @@ const CONFIG = {
 const INBOX_KEY = '__inbox__';
 const M2M_COLUMN_RENDER_CAP = 60;
 
+const AIRMARIA_SCOPE_KEYWORDS = [
+    'airmaria', 'air maria', 'chatops', 'chat ops', 'chat-ops', 'chat_ops',
+    'chat_processor', 'chat-ops-bridge', 'quote_manager', 'quote manager',
+    'chat_quotes', 'eucharistic quote', 'liturgy_explorer', 'liturgy explorer',
+    'liturgy filler', 'homily_pipeline', 'homily', 'homilies', 'vid_update',
+    'stream_management', 'backups_devops', 'backups_dashboard', 'runcloud',
+    'wordpress', 'wp-admin', 'am-admin', 'franciscanfriars', 'youtube live',
+    'vmix', 'samp_db', 'perpetual intention', 'long-term intention'
+];
+
+const OPENBRAIN_SCOPE_KEYWORDS = [
+    'openbrain', 'open brain', 'open_brain', 'maximus', 'saint max',
+    'warchart', 'war chart', 'm2m studio', 'mary to the moon', 'm2m_workflow',
+    'manage-thoughts', 'voice-gateway', 'ingest-thought', 'sync-google',
+    'google tasks', 'supabase', 'tasks.py', 'list_ready_tasks', 'antigravity'
+];
+
+const AIRMARIA_PROJECTS_SET = new Set([
+    'chatops', 'chatops_participants', 'chatops_intentions',
+    'chatops_today_enrichment', 'chatops_external_integrations',
+    'quote_manager', 'liturgy_explorer', 'homily_pipeline',
+    'stream_management', 'stream_scheduling_automation',
+    'backups_devops', 'system_backups'
+]);
+
+function detectWorkspaceScope(content = '', summary = '', projectKey = '') {
+    const proj = String(projectKey || '').trim().toLowerCase();
+    if (AIRMARIA_PROJECTS_SET.has(proj)) return 'airmaria';
+    const combined = `${summary || ''} ${content || ''}`.toLowerCase();
+    let airScore = 0;
+    let obScore = 0;
+    for (const kw of AIRMARIA_SCOPE_KEYWORDS) {
+        if (combined.includes(kw)) airScore++;
+    }
+    for (const kw of OPENBRAIN_SCOPE_KEYWORDS) {
+        if (combined.includes(kw)) obScore++;
+    }
+    return airScore > obScore ? 'airmaria' : 'openbrain';
+}
+
 const COLOR_PALETTE = [
     '#22c55e', // Green
     '#f97316', // Orange
@@ -92,9 +132,14 @@ const state = {
         fillInSeeded: false,
         quickDeleteMode: true,
         m2mViewMode: 'warchart',   // 'warchart' | 'kanban'
+        m2mSeries: M2M_SUBSERIES.map(s => ({ ...s })),
         m2mSeriesOrder: M2M_SUBSERIES.map(s => s.key),
         m2mAutoRotate: true
     },
+    triageMode: false,
+    triageLastDropped: new Map(), // tileKey -> { taskId, title, kind, prevMeta }
+    editingM2mSeriesKey: null,
+    selectedM2mSeriesColor: '#38bdf8',
     lastDeleted: null,
     undoTimer: null,
     subprojectToParent: {},    // Maps coding subproject keys -> parent project key
@@ -132,7 +177,9 @@ const dom = {
     lifeFilters: document.getElementById('wc-life-filters'),
     m2mControls: document.getElementById('wc-m2m-controls'),
     m2mWcStageFilter: document.getElementById('wc-m2m-wc-stage-filter'),
+    addSubseriesBtn: document.getElementById('wc-add-subseries-btn'),
     searchInput: document.getElementById('wc-search-input'),
+    triageBtn: document.getElementById('wc-triage-btn'),
     toggleCalBtn: document.getElementById('wc-toggle-cal-btn'),
     compactBtn: document.getElementById('wc-compact-btn'),
     quickDeleteBtn: document.getElementById('wc-quick-delete-btn'),
@@ -246,7 +293,19 @@ const dom = {
     colManagerView: document.getElementById('wc-col-manager-view'),
     colManagerList: document.getElementById('wc-col-manager-list'),
     colManagerAddBtn: document.getElementById('wc-col-manager-add-btn'),
-    colManagerDoneBtn: document.getElementById('wc-col-manager-done-btn')
+    colManagerDoneBtn: document.getElementById('wc-col-manager-done-btn'),
+
+    // M2M SubSeries Dialog
+    m2mSeriesDialog: document.getElementById('wc-m2m-series-dialog'),
+    m2mSeriesHeading: document.getElementById('wc-m2m-series-heading'),
+    m2mSeriesClose: document.getElementById('wc-m2m-series-close'),
+    m2mSeriesForm: document.getElementById('wc-m2m-series-form'),
+    m2mSeriesNameInput: document.getElementById('wc-m2m-series-name-input'),
+    m2mSeriesSwatches: document.getElementById('wc-m2m-series-swatches'),
+    m2mSeriesHint: document.getElementById('wc-m2m-series-hint'),
+    m2mSeriesDeleteBtn: document.getElementById('wc-m2m-series-delete-btn'),
+    m2mSeriesCancelBtn: document.getElementById('wc-m2m-series-cancel-btn'),
+    m2mSeriesSaveBtn: document.getElementById('wc-m2m-series-save-btn')
 };
 
 // Floating drop indicator element for cards
@@ -365,9 +424,31 @@ function renderSimpleMarkdown(rawText) {
     return html;
 }
 
+function normalizeM2mSeries(savedSeries, savedOrder) {
+    if (Array.isArray(savedSeries) && savedSeries.length > 0) {
+        const seen = new Set();
+        const cleaned = [];
+        for (const item of savedSeries) {
+            const key = String(item?.key || '').trim();
+            if (!key || seen.has(key.toLowerCase())) continue;
+            seen.add(key.toLowerCase());
+            cleaned.push({ key, color: item.color || '#38bdf8' });
+        }
+        if (cleaned.length > 0) return cleaned;
+    }
+    const order = normalizeM2mSeriesOrder(savedOrder);
+    return order.map(key => {
+        const def = M2M_SUBSERIES.find(s => s.key.toLowerCase() === key.toLowerCase());
+        return { key, color: def ? def.color : '#38bdf8' };
+    });
+}
+
 function getSubseriesColor(name) {
-    const found = M2M_SUBSERIES.find(s => s.key.toLowerCase() === (name || '').toLowerCase());
-    return found ? found.color : '#94a3b8';
+    const list = getOrderedM2mSeries();
+    const found = list.find(s => s.key.toLowerCase() === (name || '').toLowerCase());
+    if (found) return found.color;
+    const def = M2M_SUBSERIES.find(s => s.key.toLowerCase() === (name || '').toLowerCase());
+    return def ? def.color : '#94a3b8';
 }
 
 function getStageMeta(stageKey) {
@@ -384,12 +465,14 @@ function normalizeM2mSeriesOrder(saved) {
 }
 
 function getOrderedM2mSeries() {
-    const order = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
-    return order.map(key => ({ key, color: getSubseriesColor(key) }));
+    if (Array.isArray(state.boardConfig.m2mSeries) && state.boardConfig.m2mSeries.length > 0) {
+        return state.boardConfig.m2mSeries;
+    }
+    return M2M_SUBSERIES.map(s => ({ ...s }));
 }
 
 function interleaveBySeriesRotation(episodes) {
-    const seriesKeys = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
+    const seriesKeys = getOrderedM2mSeries().map(s => s.key);
     const buckets = new Map();
     seriesKeys.forEach(k => buckets.set(k, []));
     const otherBucket = [];
@@ -612,7 +695,8 @@ async function loadAllData() {
                     ? Boolean(wcConfigThought.metadata.quickDeleteMode)
                     : true,
                 m2mViewMode: wcConfigThought.metadata.m2mViewMode === 'kanban' ? 'kanban' : 'warchart',
-                m2mSeriesOrder: normalizeM2mSeriesOrder(wcConfigThought.metadata.m2mSeriesOrder),
+                m2mSeries: normalizeM2mSeries(wcConfigThought.metadata.m2mSeries, wcConfigThought.metadata.m2mSeriesOrder),
+                m2mSeriesOrder: normalizeM2mSeries(wcConfigThought.metadata.m2mSeries, wcConfigThought.metadata.m2mSeriesOrder).map(s => s.key),
                 m2mAutoRotate: wcConfigThought.metadata.m2mAutoRotate !== undefined
                     ? Boolean(wcConfigThought.metadata.m2mAutoRotate)
                     : true
@@ -656,6 +740,7 @@ async function loadAllData() {
                 fillInSeeded: true,
                 quickDeleteMode: true,
                 m2mViewMode: 'warchart',
+                m2mSeries: M2M_SUBSERIES.map(s => ({ ...s })),
                 m2mSeriesOrder: M2M_SUBSERIES.map(s => s.key),
                 m2mAutoRotate: true
             };
@@ -667,6 +752,7 @@ async function loadAllData() {
         state.m2mEpisodes = Array.isArray(m2mRes.thoughts) ? m2mRes.thoughts : [];
         dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
 
+        populateM2mDropdowns();
         applyBoardModeUI();
         renderAll();
         setSaveStatus('saved', `Synced (${state.thoughts.length + state.m2mEpisodes.length})`);
@@ -689,7 +775,8 @@ async function saveBoardConfig() {
         fillInSeeded: state.boardConfig.fillInSeeded,
         quickDeleteMode: state.boardConfig.quickDeleteMode,
         m2mViewMode: state.boardConfig.m2mViewMode,
-        m2mSeriesOrder: state.boardConfig.m2mSeriesOrder,
+        m2mSeries: state.boardConfig.m2mSeries,
+        m2mSeriesOrder: (state.boardConfig.m2mSeries || M2M_SUBSERIES).map(s => s.key),
         m2mAutoRotate: state.boardConfig.m2mAutoRotate
     };
 
@@ -851,7 +938,10 @@ function applyBoardModeUI() {
     dom.lifeFilters.hidden = isM2m;
     dom.m2mControls.hidden = !isM2m;
     dom.m2mWcStageFilter.hidden = !isM2mWarChart;
+    dom.addSubseriesBtn.hidden = !isM2m;
     dom.m2mSubseriesBar.hidden = !isM2m || isM2mWarChart;
+    dom.triageBtn.hidden = isM2m;
+    dom.triageBtn.classList.toggle('active', !isM2m && state.triageMode);
     dom.toggleCalBtn.hidden = isM2m;
     dom.manageColsBtn.hidden = isM2m;
     dom.addColBtn.hidden = isM2m;
@@ -878,6 +968,7 @@ function applyBoardModeUI() {
 function renderAll() {
     dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
     if (state.activeBoard === 'm2m') {
+        dom.boardTrack.classList.remove('is-triage');
         if (state.boardConfig.m2mViewMode === 'warchart') {
             renderM2mSeriesWarChart();
         } else {
@@ -1078,6 +1169,14 @@ function renderLifeBoard() {
         kind: 'inbox',
         sortMode: 'manual'
     };
+
+    if (state.triageMode) {
+        renderInboxTriageBoard(inboxCol, inboxTasks, grouped);
+        restoreColumnScrollPositions(colScrolls);
+        return;
+    }
+
+    dom.boardTrack.classList.remove('is-triage');
     dom.boardTrack.appendChild(createLifeColumnElement(inboxCol, inboxTasks, true));
 
     for (const col of getVisibleLifeColumns()) {
@@ -1087,6 +1186,262 @@ function renderLifeBoard() {
 
     dom.boardViewport.scrollLeft = scrollLeft;
     restoreColumnScrollPositions(colScrolls);
+}
+
+// --- INBOX TRIAGE / BULK SORT MODE ---
+function renderInboxTriageBoard(inboxCol, inboxTasks, grouped) {
+    dom.boardTrack.classList.add('is-triage');
+
+    // Left: Scrollable Inbox column (always expanded in Triage Mode)
+    const wasCollapsed = state.boardConfig.inboxCollapsed;
+    state.boardConfig.inboxCollapsed = false;
+    const inboxEl = createLifeColumnElement(inboxCol, inboxTasks, true);
+    state.boardConfig.inboxCollapsed = wasCollapsed;
+    inboxEl.classList.add('wc-triage-inbox');
+    dom.boardTrack.appendChild(inboxEl);
+
+    // Right: Responsive grid of Project Drop Tiles + Special Action Tiles
+    const pane = document.createElement('div');
+    pane.className = 'wc-triage-tiles-pane';
+    pane.innerHTML = `
+        <div class="wc-triage-header">
+            <div>
+                <h2>📥 Inbox Triage — Drag cards onto a project tile</h2>
+                <p>The last dropped card stays visible in each tile until you drop another one there.</p>
+            </div>
+            <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" id="wc-triage-exit-btn">Exit Triage</button>
+        </div>
+    `;
+    pane.querySelector('#wc-triage-exit-btn')?.addEventListener('click', () => {
+        state.triageMode = false;
+        applyBoardModeUI();
+        renderAll();
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'wc-triage-grid';
+
+    // All visible Life & Coding project columns as drop tiles
+    for (const col of getVisibleLifeColumns()) {
+        const count = (grouped.get(col.key) || []).length;
+        grid.appendChild(createTriageTile({
+            key: col.key,
+            title: col.name,
+            accent: col.color || '#fbbf24',
+            count,
+            isSpecial: false,
+            onDrop: (taskId) => handleTriageDropToProject(taskId, col)
+        }));
+    }
+
+    // Special Action Tiles
+    const defaultSs = getOrderedM2mSeries()[0]?.key || 'Peace to the Moon';
+    grid.appendChild(createTriageTile({
+        key: '__m2m__',
+        title: `🎥 Move to M2M Studio`,
+        accent: '#a78bfa',
+        count: state.m2mEpisodes.length,
+        isSpecial: true,
+        emptyHint: `Drop to send to M2M (${defaultSs})`,
+        onDrop: (taskId) => handleTriageDropToM2m(taskId, defaultSs)
+    }));
+
+    grid.appendChild(createTriageTile({
+        key: '__ref__',
+        title: '📖 Procedure / Reference',
+        accent: '#38bdf8',
+        count: null,
+        isSpecial: true,
+        emptyHint: 'Drop to save as Briefing Ref (leaves War Chart)',
+        onDrop: (taskId) => handleTriageDropToRef(taskId)
+    }));
+
+    grid.appendChild(createTriageTile({
+        key: '__delete__',
+        title: '🗑 Delete Permanently',
+        accent: '#ef4444',
+        count: null,
+        isSpecial: true,
+        emptyHint: 'Drop to delete (Undo toast available)',
+        onDrop: (taskId) => {
+            const task = state.thoughts.find(t => t.id === taskId);
+            if (!task) return;
+            state.triageLastDropped.set('__delete__', {
+                taskId,
+                title: getTaskTitle(task),
+                label: 'Deleted',
+                canUndo: false
+            });
+            quickDeleteItem('life', taskId);
+        }
+    }));
+
+    pane.appendChild(grid);
+    dom.boardTrack.appendChild(pane);
+}
+
+function createTriageTile({ key, title, accent, count, isSpecial, emptyHint, onDrop }) {
+    const tile = document.createElement('div');
+    tile.className = `wc-triage-tile${isSpecial ? ' is-special' : ''}`;
+    tile.style.setProperty('--tile-accent', accent);
+    tile.dataset.tileKey = key;
+
+    const head = document.createElement('div');
+    head.className = 'wc-triage-tile-head';
+    head.innerHTML = `
+        <span class="wc-triage-tile-title">${escapeHtml(title)}</span>
+        ${count !== null && count !== undefined ? `<span class="wc-col-count">${count}</span>` : ''}
+    `;
+    tile.appendChild(head);
+
+    const slot = document.createElement('div');
+    slot.className = 'wc-triage-drop-slot';
+    const last = state.triageLastDropped.get(key);
+    if (last) {
+        const card = document.createElement('div');
+        card.className = 'wc-triage-last-card';
+        card.innerHTML = `
+            <div class="wc-triage-last-title">${escapeHtml(last.title)}</div>
+            <div class="wc-triage-last-foot">
+                <span>✓ ${escapeHtml(last.label || 'Moved here')}</span>
+                ${last.canUndo ? '<button type="button" class="wc-triage-undo-btn">↩ Undo</button>' : ''}
+            </div>
+        `;
+        card.querySelector('.wc-triage-undo-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleTriageUndo(key);
+        });
+        slot.appendChild(card);
+    } else {
+        slot.innerHTML = `<span class="wc-triage-empty-hint">${escapeHtml(emptyHint || 'Drop task here')}</span>`;
+    }
+    tile.appendChild(slot);
+
+    tile.addEventListener('dragover', (e) => {
+        if (state.drag.mode !== 'card') return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        tile.classList.add('is-drop-target');
+    });
+
+    tile.addEventListener('dragleave', (e) => {
+        if (!tile.contains(e.relatedTarget)) {
+            tile.classList.remove('is-drop-target');
+        }
+    });
+
+    tile.addEventListener('drop', (e) => {
+        e.preventDefault();
+        tile.classList.remove('is-drop-target');
+        const taskId = state.drag.id || e.dataTransfer.getData('text/plain');
+        if (taskId && state.drag.mode === 'card') {
+            onDrop(taskId);
+        }
+        clearDragState();
+    });
+
+    return tile;
+}
+
+async function handleTriageDropToProject(taskId, col) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+    const prevMeta = JSON.parse(JSON.stringify(task.metadata || {}));
+
+    // Place at top of target column
+    const colTasks = state.thoughts.filter(t => t.id !== taskId && getTaskColumnKey(t) === col.key);
+    let minOrder = 100000;
+    for (const ct of colTasks) {
+        const o = getTaskOrderValue(ct);
+        if (o < minOrder) minOrder = o;
+    }
+    const newOrder = minOrder - 1000;
+
+    const metaPatch = { warchart_order: newOrder };
+    if (getTaskType(task) === 'coding_task') {
+        metaPatch.coding_task = { ...(task.metadata?.coding_task || {}), project: col.key };
+    } else {
+        metaPatch.project = col.key;
+    }
+
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    state.triageLastDropped.set(col.key, {
+        taskId,
+        title: getTaskTitle(task),
+        label: `Moved to ${col.name}`,
+        kind: 'project',
+        prevMeta,
+        canUndo: true
+    });
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+}
+
+async function handleTriageDropToM2m(taskId, subseries) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+    const prevMeta = JSON.parse(JSON.stringify(task.metadata || {}));
+    const metaPatch = {
+        m2m: {
+            ...(task.metadata?.m2m || {}),
+            subseries,
+            stage: task.metadata?.m2m?.stage || 'idea',
+            research_doc: task.metadata?.m2m?.research_doc || task.content || ''
+        }
+    };
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    if (!state.m2mEpisodes.some(e => e.id === task.id)) {
+        state.m2mEpisodes.unshift(task);
+    }
+    state.triageLastDropped.set('__m2m__', {
+        taskId,
+        title: getTaskTitle(task),
+        label: `Sent to M2M (${subseries})`,
+        kind: 'm2m',
+        prevMeta,
+        canUndo: true
+    });
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+}
+
+async function handleTriageDropToRef(taskId) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+    const prevMeta = JSON.parse(JSON.stringify(task.metadata || {}));
+    const metaPatch = { type: 'reference', status: null };
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    state.thoughts = state.thoughts.filter(t => t.id !== taskId);
+    state.triageLastDropped.set('__ref__', {
+        taskId,
+        taskSnapshot: task,
+        title: getTaskTitle(task),
+        label: 'Saved as Reference',
+        kind: 'ref',
+        prevMeta,
+        canUndo: true
+    });
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+}
+
+async function handleTriageUndo(tileKey) {
+    const entry = state.triageLastDropped.get(tileKey);
+    if (!entry || !entry.canUndo) return;
+    state.triageLastDropped.delete(tileKey);
+
+    if (entry.kind === 'ref' && entry.taskSnapshot) {
+        entry.taskSnapshot.metadata = entry.prevMeta;
+        state.thoughts.unshift(entry.taskSnapshot);
+    } else {
+        const task = state.thoughts.find(t => t.id === entry.taskId);
+        if (task) task.metadata = entry.prevMeta;
+        if (entry.kind === 'm2m') {
+            state.m2mEpisodes = state.m2mEpisodes.filter(e => e.id !== entry.taskId);
+        }
+    }
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: entry.taskId, metadata: entry.prevMeta }));
 }
 
 function createLifeColumnElement(col, tasks, isInbox) {
@@ -1325,15 +1680,11 @@ function createLifeCardElement(task, colKey, idx, isFrontLine) {
 
     const metaHtml = pills.length ? `<div class="wc-card-meta">${pills.join('')}</div>` : '';
     const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Front Line</div>` : '';
-    const topBtnHtml = idx > 0
-        ? `<button type="button" class="wc-card-top-btn" title="Move to Top (Front Line)" aria-label="Move to top">⬆</button>`
-        : '';
+    const topBtnHtml = `<button type="button" class="wc-card-top-btn${idx === 0 ? ' is-at-top' : ''}" title="To Top (set priority #1 in column)" aria-label="Move to top">⬆</button>`;
     const delBtnHtml = state.boardConfig.quickDeleteMode
         ? `<button type="button" class="wc-card-del-btn" title="Delete permanently (does not mark done)" aria-label="Delete task">🗑</button>`
         : '';
-    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
-        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
-        : '';
+    const actionsClusterHtml = `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`;
 
     card.innerHTML = `
         ${actionsClusterHtml}
@@ -1357,7 +1708,7 @@ function createLifeCardElement(task, colKey, idx, isFrontLine) {
 
     card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        moveLifeCardToColumn(task.id, colKey, 0);
+        moveCardToTopOfColumn(task.id, colKey);
     });
 
     card.querySelector('.wc-card-del-btn')?.addEventListener('click', (e) => {
@@ -1507,9 +1858,15 @@ function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
             <span class="wc-col-count">${episodes.length}</span>
         </div>
         <div class="wc-col-actions">
+            ${!isOther ? `<button type="button" class="wc-col-btn wc-col-edit-btn" title="Rename or recolor ${escapeHtml(series.key)}" aria-label="Edit SubSeries">✎</button>` : ''}
             <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(series.key)}" aria-label="Add episode">+</button>
         </div>
     `;
+
+    headerEl.querySelector('.wc-col-edit-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditM2mSeriesModal(series.key);
+    });
 
     const quickAddEl = document.createElement('div');
     quickAddEl.className = 'wc-col-quick-add';
@@ -1669,15 +2026,11 @@ function createM2mSeriesCardElement(ep, series, idx) {
     }
 
     const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Cycle 1 · Front Line</div>` : '';
-    const topBtnHtml = idx > 0
-        ? `<button type="button" class="wc-card-top-btn" title="Move to Row #1 (Cycle 1)" aria-label="Move to top">⬆</button>`
-        : '';
+    const topBtnHtml = `<button type="button" class="wc-card-top-btn${idx === 0 ? ' is-at-top' : ''}" title="To Top (Move to Row #1 / Cycle 1)" aria-label="Move to top">⬆</button>`;
     const delBtnHtml = state.boardConfig.quickDeleteMode
         ? `<button type="button" class="wc-card-del-btn" title="Delete episode permanently" aria-label="Delete episode">🗑</button>`
         : '';
-    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
-        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
-        : '';
+    const actionsClusterHtml = `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`;
 
     card.innerHTML = `
         ${actionsClusterHtml}
@@ -1913,15 +2266,11 @@ function createM2mCardElement(ep, stage, idx, isFrontLine, rotCycle = null, rotP
     }
 
     const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Next Up</div>` : '';
-    const topBtnHtml = idx > 0
-        ? `<button type="button" class="wc-card-top-btn" title="Move to Top of Stage" aria-label="Move to top">⬆</button>`
-        : '';
+    const topBtnHtml = `<button type="button" class="wc-card-top-btn${idx === 0 ? ' is-at-top' : ''}" title="To Top of Stage" aria-label="Move to top">⬆</button>`;
     const delBtnHtml = state.boardConfig.quickDeleteMode
         ? `<button type="button" class="wc-card-del-btn" title="Delete episode permanently" aria-label="Delete episode">🗑</button>`
         : '';
-    const actionsClusterHtml = (topBtnHtml || delBtnHtml)
-        ? `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`
-        : '';
+    const actionsClusterHtml = `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`;
 
     card.innerHTML = `
         ${actionsClusterHtml}
@@ -2072,6 +2421,36 @@ function reorderColumns(sourceKey, targetKey, insertBefore) {
     saveBoardConfig();
 }
 
+async function moveCardToTopOfColumn(taskId, colKey) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+
+    const targetCol = state.boardConfig.columns.find(c => c.key === colKey);
+    let configChanged = false;
+    if (targetCol && targetCol.sortMode === 'date') {
+        targetCol.sortMode = 'manual';
+        configChanged = true;
+    }
+
+    const colTasks = sortColumnTasks(
+        state.thoughts.filter(t => getTaskColumnKey(t) === colKey && !isTaskCompleted(t)),
+        'manual'
+    );
+    const otherOrders = colTasks
+        .filter(t => t.id !== taskId)
+        .map((t, i) => getTaskOrderValue(t, i));
+    const minOrderInColumn = otherOrders.length > 0 ? Math.min(...otherOrders) : 1000;
+    const newOrder = minOrderInColumn - 1000;
+
+    const metaPatch = { warchart_order: newOrder };
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    renderAll();
+
+    const ops = [trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }))];
+    if (configChanged) ops.push(saveBoardConfig());
+    await Promise.all(ops);
+}
+
 async function moveLifeCardToColumn(taskId, targetColKey, insertIdx) {
     const task = state.thoughts.find(t => t.id === taskId);
     if (!task) return;
@@ -2208,6 +2587,7 @@ async function createQuickLifeTask(col, title) {
         'manual'
     );
     const topOrder = existing.length > 0 ? getTaskOrderValue(existing[0], 0) - 1000 : 1000;
+    const workspaceScope = detectWorkspaceScope(title, title, isInbox ? '' : col.key);
 
     const metadata = isCoding
         ? {
@@ -2215,14 +2595,16 @@ async function createQuickLifeTask(col, title) {
             summary: title,
             status: 'pending',
             priority: 'normal',
+            workspace_scope: workspaceScope,
             warchart_order: topOrder,
-            coding_task: { project: col.key, status: 'draft', priority: 'medium', complexity: 'moderate' }
+            coding_task: { project: col.key, workspace: workspaceScope, workspace_scope: workspaceScope, status: 'draft', priority: 'medium', complexity: 'moderate' }
         }
         : {
             type: 'task',
             summary: title,
             status: 'pending',
             priority: 'normal',
+            workspace_scope: workspaceScope,
             project: isInbox ? null : col.key,
             warchart_order: topOrder
         };
@@ -2236,19 +2618,20 @@ async function createQuickLifeTask(col, title) {
 
 // --- M2M STUDIO MUTATIONS ---
 function reorderM2mSeriesColumns(sourceKey, targetKey, insertBefore) {
-    const order = normalizeM2mSeriesOrder(state.boardConfig.m2mSeriesOrder);
-    const srcIdx = order.indexOf(sourceKey);
+    const list = getOrderedM2mSeries().slice();
+    const srcIdx = list.findIndex(s => s.key === sourceKey);
     if (srcIdx === -1) return;
 
-    const [moved] = order.splice(srcIdx, 1);
-    let dstIdx = order.indexOf(targetKey);
-    if (dstIdx === -1) order.push(moved);
+    const [moved] = list.splice(srcIdx, 1);
+    let dstIdx = list.findIndex(s => s.key === targetKey);
+    if (dstIdx === -1) list.push(moved);
     else {
         if (!insertBefore) dstIdx += 1;
-        order.splice(dstIdx, 0, moved);
+        list.splice(dstIdx, 0, moved);
     }
 
-    state.boardConfig.m2mSeriesOrder = order;
+    state.boardConfig.m2mSeries = list;
+    state.boardConfig.m2mSeriesOrder = list.map(s => s.key);
     renderAll();
     saveBoardConfig();
 }
@@ -2506,10 +2889,12 @@ dom.detailForm.addEventListener('submit', async (e) => {
     const type = dom.detailType.value;
     const colKey = dom.detailColumn.value;
     const assignedProject = colKey === INBOX_KEY ? null : colKey;
+    const workspaceScope = detectWorkspaceScope(content, summary, assignedProject || '');
 
     const metaPatch = {
         type,
         summary,
+        workspace_scope: workspaceScope,
         due_date: dom.detailDueDate.value || null,
         priority: dom.detailPriority.value,
         recurrence: dom.detailRecurrence.value || null,
@@ -2527,6 +2912,8 @@ dom.detailForm.addEventListener('submit', async (e) => {
         metaPatch.coding_task = {
             ...(task.metadata?.coding_task || {}),
             project: assignedProject || 'uncategorized',
+            workspace: workspaceScope,
+            workspace_scope: workspaceScope,
             status: dom.detailCtStatus.value,
             complexity: dom.detailCtComplexity.value,
             verification_url: dom.detailCtUrl.value.trim() || null
@@ -2640,7 +3027,7 @@ dom.detailMoveToM2m.addEventListener('click', async () => {
 function populateM2mDropdowns() {
     dom.m2mSubseries.innerHTML = '';
     dom.detailM2mSubseries.innerHTML = '';
-    M2M_SUBSERIES.forEach(s => {
+    getOrderedM2mSeries().forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.key;
         opt.textContent = s.key;
@@ -2705,8 +3092,9 @@ function openM2mWorkspaceDialog(epId) {
     dom.m2mHeading.textContent = ep ? 'Episode Workspace' : 'New M2M Episode';
     dom.m2mTitle.value = ep ? getTaskTitle(ep) : '';
 
-    const defaultSs = m2m.subseries || (state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : 'Peace to the Moon');
-    dom.m2mSubseries.value = M2M_SUBSERIES.some(s => s.key === defaultSs) ? defaultSs : 'Other';
+    const seriesList = getOrderedM2mSeries();
+    const defaultSs = m2m.subseries || (state.m2mSubseriesFilter !== 'all' ? state.m2mSubseriesFilter : (seriesList[0]?.key || 'Peace to the Moon'));
+    dom.m2mSubseries.value = seriesList.some(s => s.key === defaultSs) ? defaultSs : 'Other';
     dom.m2mStage.value = m2m.stage || 'idea';
 
     const researchText = m2m.research_doc || (ep?.content || '');
@@ -3052,6 +3440,161 @@ document.querySelectorAll('[data-status]').forEach(btn => {
 dom.searchInput.addEventListener('input', () => {
     state.searchQuery = dom.searchInput.value.trim();
     renderAll();
+});
+
+dom.triageBtn.addEventListener('click', () => {
+    state.triageMode = !state.triageMode;
+    applyBoardModeUI();
+    renderAll();
+});
+
+dom.addSubseriesBtn.addEventListener('click', openAddM2mSeriesModal);
+
+// --- M2M SUBSERIES ADD / RENAME / RECOLOR MODAL ---
+function renderM2mSeriesSwatches(selectedColor) {
+    state.selectedM2mSeriesColor = selectedColor || COLOR_PALETTE[0];
+    dom.m2mSeriesSwatches.innerHTML = '';
+    for (const color of COLOR_PALETTE) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `wc-swatch${color === state.selectedM2mSeriesColor ? ' is-selected' : ''}`;
+        btn.style.background = color;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', String(color === state.selectedM2mSeriesColor));
+        btn.setAttribute('aria-label', `Color ${color}`);
+        btn.addEventListener('click', () => {
+            state.selectedM2mSeriesColor = color;
+            dom.m2mSeriesSwatches.querySelectorAll('.wc-swatch').forEach(s => {
+                const sel = s === btn;
+                s.classList.toggle('is-selected', sel);
+                s.setAttribute('aria-checked', String(sel));
+            });
+        });
+        dom.m2mSeriesSwatches.appendChild(btn);
+    }
+}
+
+function openAddM2mSeriesModal() {
+    state.editingM2mSeriesKey = null;
+    dom.m2mSeriesHeading.textContent = 'Add M2M SubSeries';
+    dom.m2mSeriesNameInput.value = '';
+    const nextColor = COLOR_PALETTE[getOrderedM2mSeries().length % COLOR_PALETTE.length];
+    renderM2mSeriesSwatches(nextColor);
+    dom.m2mSeriesHint.textContent = 'New SubSeries is added to your Series War Chart rotation order.';
+    dom.m2mSeriesDeleteBtn.hidden = true;
+    dom.m2mSeriesSaveBtn.textContent = 'Create SubSeries';
+    dom.m2mSeriesDialog.showModal();
+    dom.m2mSeriesNameInput.focus();
+}
+
+function openEditM2mSeriesModal(seriesKey) {
+    const list = getOrderedM2mSeries();
+    const series = list.find(s => s.key === seriesKey);
+    if (!series) return;
+    state.editingM2mSeriesKey = series.key;
+    const epCount = state.m2mEpisodes.filter(e => (e.metadata?.m2m?.subseries || '') === series.key).length;
+    dom.m2mSeriesHeading.textContent = `Edit SubSeries`;
+    dom.m2mSeriesNameInput.value = series.key;
+    renderM2mSeriesSwatches(series.color);
+    dom.m2mSeriesHint.textContent = epCount > 0
+        ? `Renaming automatically updates ${epCount} episode${epCount === 1 ? '' : 's'} in OpenBrain.`
+        : 'Rename or change the accent color for this SubSeries.';
+    dom.m2mSeriesDeleteBtn.hidden = false;
+    dom.m2mSeriesSaveBtn.textContent = 'Save SubSeries';
+    dom.m2mSeriesDialog.showModal();
+    dom.m2mSeriesNameInput.focus();
+    dom.m2mSeriesNameInput.select();
+}
+
+async function batchUpdateEpisodeSubseries(episodes, newSubseries) {
+    if (!episodes.length) return;
+    const CHUNK = 8;
+    for (let i = 0; i < episodes.length; i += CHUNK) {
+        const slice = episodes.slice(i, i + CHUNK);
+        setSaveStatus('saving', `Updating episodes (${Math.min(i + CHUNK, episodes.length)}/${episodes.length})…`);
+        await Promise.all(slice.map(ep => {
+            const metaPatch = {
+                m2m: { ...(ep.metadata?.m2m || {}), subseries: newSubseries }
+            };
+            ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+            return apiCall({ action: 'update', id: ep.id, metadata: metaPatch });
+        }));
+    }
+    setSaveStatus('saved', 'Saved');
+}
+
+dom.m2mSeriesClose.addEventListener('click', () => dom.m2mSeriesDialog.close());
+dom.m2mSeriesCancelBtn.addEventListener('click', () => dom.m2mSeriesDialog.close());
+
+dom.m2mSeriesForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newName = dom.m2mSeriesNameInput.value.trim();
+    if (!newName) return;
+
+    const list = getOrderedM2mSeries().slice();
+    const oldKey = state.editingM2mSeriesKey;
+    const duplicate = list.find(s => s.key.toLowerCase() === newName.toLowerCase() && s.key !== oldKey);
+    if (duplicate) {
+        alert(`A SubSeries named "${duplicate.key}" already exists.`);
+        return;
+    }
+
+    let affectedEpisodes = [];
+    if (oldKey) {
+        const item = list.find(s => s.key === oldKey);
+        if (item) {
+            item.key = newName;
+            item.color = state.selectedM2mSeriesColor;
+        }
+        if (oldKey !== newName) {
+            affectedEpisodes = state.m2mEpisodes.filter(ep => (ep.metadata?.m2m?.subseries || '') === oldKey);
+            affectedEpisodes.forEach(ep => {
+                ep.metadata = { ...(ep.metadata || {}), m2m: { ...(ep.metadata?.m2m || {}), subseries: newName } };
+            });
+            if (state.m2mSubseriesFilter === oldKey) state.m2mSubseriesFilter = newName;
+        }
+    } else {
+        list.push({ key: newName, color: state.selectedM2mSeriesColor });
+    }
+
+    state.boardConfig.m2mSeries = list;
+    state.boardConfig.m2mSeriesOrder = list.map(s => s.key);
+    dom.m2mSeriesDialog.close();
+    populateM2mDropdowns();
+    renderAll();
+
+    await saveBoardConfig();
+    if (affectedEpisodes.length > 0) {
+        await batchUpdateEpisodeSubseries(affectedEpisodes, newName);
+    }
+});
+
+dom.m2mSeriesDeleteBtn.addEventListener('click', async () => {
+    const oldKey = state.editingM2mSeriesKey;
+    if (!oldKey) return;
+    const affected = state.m2mEpisodes.filter(ep => (ep.metadata?.m2m?.subseries || '') === oldKey);
+    const msg = affected.length > 0
+        ? `Remove SubSeries "${oldKey}"? Its ${affected.length} episode${affected.length === 1 ? '' : 's'} will be moved to "Other" (nothing is deleted).`
+        : `Remove SubSeries "${oldKey}"?`;
+    if (!confirm(msg)) return;
+
+    const list = getOrderedM2mSeries().filter(s => s.key !== oldKey);
+    state.boardConfig.m2mSeries = list;
+    state.boardConfig.m2mSeriesOrder = list.map(s => s.key);
+    if (state.m2mSubseriesFilter === oldKey) state.m2mSubseriesFilter = 'all';
+
+    affected.forEach(ep => {
+        ep.metadata = { ...(ep.metadata || {}), m2m: { ...(ep.metadata?.m2m || {}), subseries: 'Other' } };
+    });
+
+    dom.m2mSeriesDialog.close();
+    populateM2mDropdowns();
+    renderAll();
+
+    await saveBoardConfig();
+    if (affected.length > 0) {
+        await batchUpdateEpisodeSubseries(affected, 'Other');
+    }
 });
 
 dom.toggleCalBtn.addEventListener('click', () => {

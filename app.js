@@ -2798,6 +2798,12 @@ dom.modalSave.addEventListener('click', async () => {
             }
         }
 
+        const detectedScope = detectWorkspaceScopeFromText(
+            newContent,
+            dom.modalSummary.value.trim() || newContent,
+            dom.modalType.value === 'coding_task' ? dom.modalCtProject.value : (modalThoughtMeta?.project || '')
+        );
+
         const updatePayload = {
             action: 'update',
             id,
@@ -2810,6 +2816,7 @@ dom.modalSave.addEventListener('click', async () => {
                 recurrence_end: dom.customEndDate.value || null,
                 summary: dom.modalSummary.value.trim() || null,
                 notes: dom.modalNotes.value.trim() || null,
+                workspace_scope: detectedScope,
                 // Event-specific fields
                 all_day: dom.modalType.value === 'event' ? dom.modalAllDay.checked : null,
                 start_time: dom.modalType.value === 'event' && !dom.modalAllDay.checked ? dom.modalStartTime.value || null : null,
@@ -2823,7 +2830,8 @@ dom.modalSave.addEventListener('click', async () => {
                         complexity: dom.modalCtComplexity.value,
                         status: dom.modalCtStatus.value,
                         priority: dom.modalPriority.value === 'high' ? 'high' : dom.modalPriority.value === 'low' ? 'low' : 'medium',
-                        workspace: getWorkspaceForProjectKey(dom.modalCtProject.value),
+                        workspace: detectedScope,
+                        workspace_scope: detectedScope,
                         workstream: null,
                         verification_url: dom.modalCtVerificationUrl ? (dom.modalCtVerificationUrl.value.trim() || null) : (modalThoughtMeta?.coding_task?.verification_url || null)
                     }
@@ -3697,6 +3705,41 @@ function getWorkspaceForProjectKey(key) {
     return 'openbrain';
 }
 
+const AIRMARIA_SCOPE_KEYWORDS = [
+    'airmaria', 'air maria', 'chatops', 'chat ops', 'chat-ops', 'chat_ops',
+    'chat_processor', 'chat-ops-bridge', 'quote_manager', 'quote manager',
+    'chat_quotes', 'eucharistic quote', 'liturgy_explorer', 'liturgy explorer',
+    'liturgy filler', 'homily_pipeline', 'homily', 'homilies', 'vid_update',
+    'stream_management', 'backups_devops', 'backups_dashboard', 'runcloud',
+    'wordpress', 'wp-admin', 'am-admin', 'franciscanfriars', 'youtube live',
+    'vmix', 'samp_db', 'perpetual intention', 'long-term intention'
+];
+
+const OPENBRAIN_SCOPE_KEYWORDS = [
+    'openbrain', 'open brain', 'open_brain', 'maximus', 'saint max',
+    'warchart', 'war chart', 'm2m studio', 'mary to the moon', 'm2m_workflow',
+    'manage-thoughts', 'voice-gateway', 'ingest-thought', 'sync-google',
+    'google tasks', 'supabase', 'tasks.py', 'list_ready_tasks', 'antigravity'
+];
+
+function detectWorkspaceScopeFromText(content = '', summary = '', projectKey = '') {
+    const projWorkspace = projectKey ? getWorkspaceForProjectKey(projectKey) : '';
+    if (projWorkspace === 'airmaria') return 'airmaria';
+
+    const combined = `${summary || ''} ${content || ''}`.toLowerCase();
+    let airScore = 0;
+    let obScore = 0;
+    for (const kw of AIRMARIA_SCOPE_KEYWORDS) {
+        if (combined.includes(kw)) airScore++;
+    }
+    for (const kw of OPENBRAIN_SCOPE_KEYWORDS) {
+        if (combined.includes(kw)) obScore++;
+    }
+    if (airScore > obScore) return 'airmaria';
+    if (obScore > airScore) return 'openbrain';
+    return projWorkspace || 'openbrain';
+}
+
 async function loadProjectsConfig() {
     try {
         const res = await fetch(CONFIG.MANAGE_ENDPOINT, {
@@ -4035,10 +4078,20 @@ async function loadCodingTasks() {
 
         let tasks = data.thoughts;
         
-        // Resolve project key with legacy workstream fallback for each task
+        // Resolve project key with legacy workstream fallback & auto-detected workspace_scope for each task
         tasks.forEach(t => {
-            if (t.metadata && t.metadata.coding_task) {
-                t.metadata.coding_task.resolvedProject = t.metadata.coding_task.workstream || t.metadata.coding_task.project || 'uncategorized';
+            if (t.metadata) {
+                const ct = t.metadata.coding_task || {};
+                const resolvedProj = ct.workstream || ct.project || 'uncategorized';
+                const detectedScope = t.metadata.workspace_scope
+                    || ct.workspace_scope
+                    || detectWorkspaceScopeFromText(t.content || '', t.metadata.summary || '', resolvedProj);
+                t.metadata.workspace_scope = detectedScope;
+                if (t.metadata.coding_task) {
+                    t.metadata.coding_task.resolvedProject = resolvedProj;
+                    t.metadata.coding_task.workspace_scope = detectedScope;
+                    t.metadata.coding_task.workspace = t.metadata.coding_task.workspace || detectedScope;
+                }
             }
         });
 
@@ -4259,7 +4312,7 @@ function resolveFeatureVerificationUrl(t) {
 
     // Tier 3: Heuristic Intelligence ("Figure It Out")
     const project = (ct.resolvedProject || ct.workstream || ct.project || '').toLowerCase();
-    const workspace = (ct.workspace || (typeof getWorkspaceForProjectKey === 'function' ? getWorkspaceForProjectKey(ct.project) : '') || '').toLowerCase();
+    const workspace = (meta.workspace_scope || ct.workspace_scope || ct.workspace || detectWorkspaceScopeFromText(t.content || '', meta.summary || '', project) || '').toLowerCase();
     const summary = (meta.summary || '').toLowerCase();
     const content = (t.content || '').toLowerCase();
     const allText = `${project} ${workspace} ${summary} ${content} ${items.map(i => (typeof i === 'object' && i !== null ? (i.label || '') : String(i))).join(' ')}`.toLowerCase();
@@ -4375,6 +4428,8 @@ function renderCodingTaskCard(t) {
     const project = ct.resolvedProject || ct.workstream || ct.project || 'uncategorized';
     const complexity = ct.complexity || 'moderate';
     const summary = meta.summary || t.content.substring(0, 80);
+    const workspaceScope = meta.workspace_scope || ct.workspace_scope || detectWorkspaceScopeFromText(t.content || '', summary, project);
+    const workspaceBadgeLabel = workspaceScope === 'airmaria' ? '⛪ AirMaria' : '🧠 OpenBrain';
 
     el.innerHTML = `
         <div class="ct-card-header">
@@ -4384,6 +4439,7 @@ function renderCodingTaskCard(t) {
                 <div class="ct-meta-row">
                     <span class="ct-badge status-${status}">${STATUS_LABELS[status] || status}</span>
                     <span class="ct-badge project">${PROJECT_LABELS[project] || project}</span>
+                    <span class="ct-badge workspace-scope" title="Workspace scope: ${escapeHtml(workspaceScope)}">${workspaceBadgeLabel}</span>
                     <span class="ct-badge priority-badge priority-${priority}">${priority === 'high' ? '🔴 High' : priority === 'low' ? '🟢 Low' : '🟡 Medium'}</span>
                     <span class="ct-badge complexity">⚙️ ${complexity}</span>
                 </div>
@@ -4481,7 +4537,10 @@ function renderCodingTaskCard(t) {
         const newProject = this.value;
         ct.project = newProject;
         ct.workstream = null;
-        ct.workspace = getWorkspaceForProjectKey(newProject);
+        const detectedScope = detectWorkspaceScopeFromText(t.content || '', meta.summary || '', newProject);
+        ct.workspace = detectedScope;
+        ct.workspace_scope = detectedScope;
+        meta.workspace_scope = detectedScope;
         await updateCodingTaskMeta(t.id, meta);
         loadCodingTasks();
     });
@@ -5586,6 +5645,7 @@ ctDom.addSubmit.addEventListener('click', async () => {
     ctDom.addSubmit.disabled = true;
 
     try {
+        const workspaceScope = detectWorkspaceScopeFromText(content, content, ctDom.addProject.value);
         await fetch(CONFIG.MANAGE_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-brain-key': CONFIG.KEY },
@@ -5593,6 +5653,8 @@ ctDom.addSubmit.addEventListener('click', async () => {
                 action: 'add_coding_task',
                 content,
                 project: ctDom.addProject.value,
+                workspace: workspaceScope,
+                workspace_scope: workspaceScope,
                 priority: ctDom.addPriority.value,
                 complexity: ctDom.addComplexity.value,
                 status: ctDom.addStatus.value
@@ -5747,7 +5809,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v138';
+let versionStr = 'v139';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');

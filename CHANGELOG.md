@@ -6,6 +6,37 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [Unreleased - Pending Verification] - 2026-11-24
+
+### Task: War Chart "To Top" Priority Button on Every Card
+- **ID**: `5310a984-e30c-49e8-bf08-7c6b24a06a75`
+- **Changes**:
+  - Updated `warchart.js` and `warchart.css` so every task card on the Maximus War Chart (Life Board, M2M Series War Chart, and M2M Production Kanban) always displays the 1-click **`⬆` To Top** button without requiring hover.
+  - Added `moveCardToTopOfColumn(taskId, colKey)` in `warchart.js`, which immediately sets `metadata.warchart_order = minOrderInColumn - 1000` (switching the column to `manual` sort if it was in `date` sort) and persists via `manage-thoughts` in a single API call.
+
+### Task: Add `workspace_scope` to Task Metadata with Keyword Auto-Detection
+- **ID**: `2876637b-91be-4a3c-abc4-b8cad5e176ab`
+- **Changes**:
+  - Implemented `detectWorkspaceScope()` in `supabase/functions/_shared/ai.ts`, `supabase/functions/manage-thoughts/index.ts`, `maximus-pwa/app.js`, `maximus-pwa/warchart.js`, and `tasks.py`.
+  - Automatically populates `metadata.workspace_scope` (and `metadata.coding_task.workspace_scope` / `workspace`) as `'airmaria'` or `'openbrain'` based on title/summary and content keywords (`chat_ops`, `homily`, `liturgy`, `runcloud`, etc. vs `maximus`, `warchart`, `supabase`, `saint max`, etc.) and project keys.
+  - Added a workspace scope badge (`⛪ AirMaria` / `🧠 OpenBrain`) to coding task cards in `maximus-pwa/app.js` and updated `list_ready_tasks.ps1` to display `workspace_scope`.
+
+### Task: MS Tasks List to OpenBrain Maximus Audit & Transfer Utility
+- **ID**: `2c8bb341-8841-462e-b565-beeddeff411a`
+- **Changes**:
+  - Audited all 2,222 OpenBrain thoughts against the local Outlook MAPI Tasks store (`fra_roderic@outlook.com`, `olFolderTasks = 13`): confirmed **709 total MS Tasks** (`601` completed, `108` incomplete), of which **97 incomplete tasks** have not yet been transferred (`0` thoughts with `source: 'ms-tasks-transfer'`).
+  - Added `ms-tasks` subcommand to `transfer_tool.py` (`python transfer_tool.py ms-tasks [--import] [--include-completed] [--since YYYY-MM-DD] [--limit N]`) with dry-run audit reporting, title deduplication against OpenBrain, and automatic War Chart project realm classification.
+
+---
+
+## [v139] - 2026-11-25
+
+### Task: War Chart Editable M2M SubSeries & Life Board Inbox Triage Mode
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - **Editable M2M SubSeries**: Persisted SubSeries list (`m2mSeries`) in `warchart_config`, added `✎` Rename/Recolor/Remove controls on every M2M Series War Chart column header plus `+ SubSeries` in the M2M top bar (`#wc-m2m-series-dialog`). Renaming a SubSeries automatically batch-updates `metadata.m2m.subseries` on all episodes in that column.
+  - **Life Board `📥 Triage` Bulk-Sort Mode**: Added a one-click `📥 Triage` toggle showing a full-height scrollable Inbox on the left and a responsive CSS Grid of Project Drop Tiles on the right (plus special drop tiles for `🎥 Move to M2M Studio`, `📖 Procedure / Reference`, and `🗑 Delete Permanently`). Each tile keeps the last dropped card visible with an `↩ Undo` button until replaced by the next drop, while preserving Inbox vertical scroll position.
+
 ## [v138] - 2026-11-24
 
 ### Task: War Chart Coding Status Filter, Version Badge & Overnight Queue Sort
