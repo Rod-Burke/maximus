@@ -29,6 +29,14 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
+## [v140] - 2026-11-25
+
+### Task: Permanent M2M Workflow Column in M2M Studio Series War Chart
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - Added a pinned leftmost **`⚙️ M2M Workflow`** column to the **M2M Studio → Series War Chart** (`warchart.js`) displaying active `m2m_workflow` tasks with `+` quick-add capture.
+  - Enabled bidirectional drag-and-drop: dragging a card from `⚙️ M2M Workflow` into any SubSeries column converts it into an M2M Studio episode (`stage: 'idea'`, exact drop order) and clears `metadata.project`; dragging an episode left into `⚙️ M2M Workflow` converts it back into a workflow task.
+
 ## [v139] - 2026-11-25
 
 ### Task: War Chart Editable M2M SubSeries & Life Board Inbox Triage Mode

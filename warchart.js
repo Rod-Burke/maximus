@@ -1814,6 +1814,22 @@ function renderM2mSeriesWarChart() {
     const colScrolls = captureColumnScrollPositions();
     dom.boardTrack.innerHTML = '';
 
+    // Pinned leftmost M2M Workflow column (pulling active m2m_workflow tasks from Life Board)
+    const q = state.searchQuery.toLowerCase();
+    const wfTasks = sortColumnTasks(
+        state.thoughts.filter(t => {
+            if (isTaskCompleted(t) || getTaskType(t) === 'event') return false;
+            if (getTaskColumnKey(t) !== 'm2m_workflow') return false;
+            if (q) {
+                const hay = `${t.metadata?.summary || ''} ${t.content || ''} ${t.metadata?.notes || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        }),
+        'manual'
+    );
+    dom.boardTrack.appendChild(createM2mWorkflowColumn(wfTasks));
+
     orderedSeries.forEach((series, rotIdx) => {
         const episodes = sortColumnTasks(grouped.get(series.key) || [], 'manual');
         dom.boardTrack.appendChild(createM2mSeriesColumn(series, episodes, rotIdx + 1, false));
@@ -1826,6 +1842,122 @@ function renderM2mSeriesWarChart() {
 
     dom.boardViewport.scrollLeft = scrollLeft;
     restoreColumnScrollPositions(colScrolls);
+}
+
+function createM2mWorkflowColumn(tasks) {
+    const wfCol = state.boardConfig.columns.find(c => c.key === 'm2m_workflow') || {
+        key: 'm2m_workflow',
+        name: 'M2M Workflow',
+        color: '#a855f7',
+        kind: 'realm',
+        sortMode: 'manual'
+    };
+
+    const colEl = document.createElement('section');
+    colEl.className = 'wc-column is-inbox';
+    colEl.dataset.colKey = 'm2m_workflow';
+    colEl.style.setProperty('--col-accent', wfCol.color || '#a855f7');
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'wc-col-header';
+    headerEl.title = 'M2M Workflow tasks — drag episode ideas right into any SubSeries column, or click + to add a workflow idea';
+    headerEl.innerHTML = `
+        <div class="wc-col-title-wrap">
+            <span aria-hidden="true">⚙️</span>
+            <h2 class="wc-col-title">${escapeHtml(wfCol.name)}</h2>
+            <span class="wc-col-count">${tasks.length}</span>
+        </div>
+        <div class="wc-col-actions">
+            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add M2M workflow task" aria-label="Add workflow task">+</button>
+        </div>
+    `;
+
+    const quickAddEl = document.createElement('div');
+    quickAddEl.className = 'wc-col-quick-add';
+    quickAddEl.hidden = true;
+    quickAddEl.innerHTML = `
+        <input type="text" class="wc-quick-add-input" placeholder="New M2M workflow task… (Enter)">
+        <div class="wc-quick-add-hint"><span>Enter to save · Esc to close</span></div>
+    `;
+    const quickInput = quickAddEl.querySelector('.wc-quick-add-input');
+
+    headerEl.querySelector('.wc-col-quickadd-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickAddEl.hidden = !quickAddEl.hidden;
+        if (!quickAddEl.hidden) {
+            quickInput.value = '';
+            quickInput.focus();
+        }
+    });
+
+    quickInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape') { quickAddEl.hidden = true; return; }
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            const title = quickInput.value.trim();
+            if (!title) return;
+            quickInput.disabled = true;
+            try {
+                await createQuickTask(wfCol, title);
+                quickInput.value = '';
+                quickInput.disabled = false;
+                quickInput.focus();
+            } catch {
+                quickInput.disabled = false;
+            }
+        }
+    });
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'wc-col-body';
+    bodyEl.dataset.colKey = 'm2m_workflow';
+
+    if (tasks.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'wc-col-empty';
+        emptyEl.textContent = 'No M2M workflow tasks — click + to capture one, or drop episodes here';
+        bodyEl.appendChild(emptyEl);
+    } else {
+        tasks.forEach((task, idx) => {
+            bodyEl.appendChild(createLifeCardElement(task, wfCol, idx));
+        });
+    }
+
+    colEl.addEventListener('dragover', (e) => {
+        updateAutoScroll(e.clientX);
+        if (state.drag.mode === 'card' || state.drag.mode === 'm2m-series-card') {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            colEl.classList.add('card-drop-hover');
+            positionCardDropIndicator(bodyEl, e.clientY);
+        }
+    });
+
+    colEl.addEventListener('dragleave', (e) => {
+        if (!colEl.contains(e.relatedTarget)) {
+            colEl.classList.remove('card-drop-hover');
+            if (dropIndicator.parentElement === bodyEl) dropIndicator.remove();
+        }
+    });
+
+    colEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        colEl.classList.remove('card-drop-hover');
+        const id = state.drag.id;
+        if (!id) { clearDragState(); return; }
+        const insertIdx = computeDropIndex(bodyEl, e.clientY, id);
+        if (state.drag.mode === 'card') {
+            moveCardToColumn(id, 'm2m_workflow', insertIdx);
+        } else if (state.drag.mode === 'm2m-series-card') {
+            moveM2mEpisodeToWorkflow(id, insertIdx);
+        }
+        clearDragState();
+    });
+
+    colEl.appendChild(headerEl);
+    colEl.appendChild(quickAddEl);
+    colEl.appendChild(bodyEl);
+    return colEl;
 }
 
 function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
@@ -1960,7 +2092,7 @@ function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
             colEl.classList.toggle('col-drop-after', !before);
             return;
         }
-        if (state.drag.mode === 'm2m-series-card') {
+        if (state.drag.mode === 'm2m-series-card' || state.drag.mode === 'card') {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             colEl.classList.add('card-drop-hover');
@@ -1988,6 +2120,12 @@ function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
         if (state.drag.mode === 'm2m-series-card' && state.drag.id) {
             const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
             moveM2mEpisodeToSubseries(state.drag.id, series.key, insertIdx);
+            clearDragState();
+            return;
+        }
+        if (state.drag.mode === 'card' && state.drag.id) {
+            const insertIdx = computeDropIndex(bodyEl, e.clientY, state.drag.id);
+            convertWorkflowTaskToM2mEpisode(state.drag.id, series.key, insertIdx);
             clearDragState();
         }
     });
@@ -2660,6 +2798,72 @@ async function moveM2mEpisodeToSubseries(epId, targetSeriesKey, insertIdx) {
     };
 
     ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+    renderAll();
+
+    const ops = [trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }))];
+    respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
+    await Promise.all(ops);
+}
+
+async function convertWorkflowTaskToM2mEpisode(taskId, targetSeriesKey, insertIdx) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+
+    const siblings = sortColumnTasks(
+        state.m2mEpisodes.filter(e => {
+            if (e.id === taskId || !matchesM2mWarChartFilters(e)) return false;
+            const ss = e.metadata?.m2m?.subseries || 'Other';
+            return ss === targetSeriesKey;
+        }),
+        'manual'
+    );
+    const { newOrder, respace } = computeNewOrder(siblings, insertIdx, task);
+
+    const metaPatch = {
+        project: null,
+        warchart_order: newOrder,
+        m2m: {
+            ...(task.metadata?.m2m || {}),
+            subseries: targetSeriesKey,
+            stage: task.metadata?.m2m?.stage || 'idea',
+            research_doc: task.metadata?.m2m?.research_doc || task.content || ''
+        }
+    };
+
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    if (!state.m2mEpisodes.some(e => e.id === task.id)) {
+        state.m2mEpisodes.unshift(task);
+    }
+    renderAll();
+
+    const ops = [trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }))];
+    respace.forEach(r => ops.push(apiCall({ action: 'update', id: r.id, metadata: { warchart_order: r.order } }).catch(() => {})));
+    await Promise.all(ops);
+}
+
+async function moveM2mEpisodeToWorkflow(epId, insertIdx) {
+    const ep = state.m2mEpisodes.find(e => e.id === epId);
+    if (!ep) return;
+
+    const siblings = sortColumnTasks(
+        state.thoughts.filter(t => t.id !== epId && !isTaskCompleted(t) && getTaskColumnKey(t) === 'm2m_workflow'),
+        'manual'
+    );
+    const { newOrder, respace } = computeNewOrder(siblings, insertIdx, ep);
+
+    const metaPatch = {
+        type: 'task',
+        status: ep.metadata?.status === 'completed' ? 'pending' : (ep.metadata?.status || 'pending'),
+        project: 'm2m_workflow',
+        warchart_order: newOrder,
+        m2m: null
+    };
+
+    ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+    state.m2mEpisodes = state.m2mEpisodes.filter(e => e.id !== epId);
+    if (!state.thoughts.some(t => t.id === epId)) {
+        state.thoughts.unshift(ep);
+    }
     renderAll();
 
     const ops = [trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }))];
