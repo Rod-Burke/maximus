@@ -69,6 +69,7 @@ if ($targetVerNum) {
         $wcContent = Get-Content $warchartHtmlFile -Raw -Encoding utf8
         $wcContent = $wcContent -replace 'warchart\.css\?v=\d+', "warchart.css?v=$targetVerNum"
         $wcContent = $wcContent -replace 'warchart\.js\?v=\d+', "warchart.js?v=$targetVerNum"
+        $wcContent = $wcContent -replace '(id="wc-version-badge"[^>]*>)v\d+(</span>)', "`${1}v$targetVerNum`$2"
         [System.IO.File]::WriteAllText($warchartHtmlFile, $wcContent, [System.Text.Encoding]::UTF8)
         Write-Host "  [OK] Updated warchart.html (warchart.css?v=$targetVerNum, warchart.js?v=$targetVerNum)" -ForegroundColor Green
     }

@@ -112,6 +112,18 @@ html, body {
     white-space: nowrap;
 }
 
+.wc-version-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--wc-text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--wc-border);
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
 .wc-save-status {
     font-size: 0.74rem;
     padding: 0.15rem 0.5rem;
@@ -922,6 +934,19 @@ html, body {
 .wc-pill-coding {
     color: #93c5fd;
     background: rgba(59, 130, 246, 0.18);
+}
+
+.wc-pill-coding-ready {
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.22);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    font-weight: 700;
+}
+
+.wc-pill-coding-verify {
+    color: #fcd34d;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 .wc-pill-in-progress {

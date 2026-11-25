@@ -99,6 +99,7 @@ const state = {
     undoTimer: null,
     subprojectToParent: {},    // Maps coding subproject keys -> parent project key
     scopeFilter: 'all',        // 'all' | 'general' | 'coding'
+    codingStatusFilter: 'all', // 'all' | 'ready' | 'verify' | 'clarify' | 'draft'
     statusFilter: 'all_active',// 'all_active' | 'unscheduled' | 'scheduled' | 'completed'
     m2mSubseriesFilter: 'all', // 'all' | subseries name (Kanban mode)
     m2mWcStageFilter: 'unpublished', // 'unpublished' | 'queued' | 'idea' | 'all' (War Chart mode)
@@ -768,6 +769,15 @@ function matchesLifeFilters(t) {
     if (state.scopeFilter === 'general' && type !== 'task') return false;
     if (state.scopeFilter === 'coding' && type !== 'coding_task') return false;
 
+    if (state.codingStatusFilter !== 'all') {
+        if (type !== 'coding_task') return false;
+        const ctStatus = t.metadata?.coding_task?.status || 'draft';
+        if (state.codingStatusFilter === 'ready' && !['ready_for_antigravity', 'rework_in_antigravity'].includes(ctStatus)) return false;
+        if (state.codingStatusFilter === 'verify' && !['needs_verification', 'needs_logging'].includes(ctStatus)) return false;
+        if (state.codingStatusFilter === 'clarify' && !['needs_clarification', 'needs_plan', 'needs_plan_approval', 'in_progress'].includes(ctStatus)) return false;
+        if (state.codingStatusFilter === 'draft' && ctStatus !== 'draft') return false;
+    }
+
     const completed = isTaskCompleted(t);
     const scheduled = Boolean(t.metadata?.due_date);
 
@@ -1297,7 +1307,11 @@ function createLifeCardElement(task, colKey, idx, isFrontLine) {
     if (type === 'coding_task') {
         const ctStatus = m.coding_task?.status || 'draft';
         const label = CODING_STATUS_LABELS[ctStatus] || ctStatus;
-        pills.push(`<span class="wc-pill wc-pill-coding">⚡ ${escapeHtml(label)}</span>`);
+        const isReady = ctStatus === 'ready_for_antigravity' || ctStatus === 'rework_in_antigravity';
+        const isVerify = ctStatus === 'needs_verification' || ctStatus === 'needs_logging';
+        const pillCls = isReady ? 'wc-pill-coding-ready' : isVerify ? 'wc-pill-coding-verify' : 'wc-pill-coding';
+        const icon = isReady ? '🚀' : '⚡';
+        pills.push(`<span class="wc-pill ${pillCls}">${icon} ${escapeHtml(label)}</span>`);
     }
     if (m.priority === 'high' || m.coding_task?.priority === 'high') {
         pills.push(`<span class="wc-pill wc-pill-priority-high">High</span>`);
@@ -3009,6 +3023,20 @@ document.querySelectorAll('[data-scope]').forEach(btn => {
     btn.addEventListener('click', () => {
         state.scopeFilter = btn.dataset.scope;
         document.querySelectorAll('[data-scope]').forEach(b => b.classList.toggle('active', b === btn));
+        const ctFilterWrap = document.getElementById('wc-coding-status-filter');
+        if (ctFilterWrap) ctFilterWrap.hidden = state.scopeFilter === 'general';
+        if (state.scopeFilter === 'general' && state.codingStatusFilter !== 'all') {
+            state.codingStatusFilter = 'all';
+            document.querySelectorAll('[data-coding-status]').forEach(b => b.classList.toggle('active', b.dataset.codingStatus === 'all'));
+        }
+        renderAll();
+    });
+});
+
+document.querySelectorAll('[data-coding-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        state.codingStatusFilter = btn.dataset.codingStatus;
+        document.querySelectorAll('[data-coding-status]').forEach(b => b.classList.toggle('active', b === btn));
         renderAll();
     });
 });

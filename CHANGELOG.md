@@ -6,6 +6,16 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v138] - 2026-11-24
+
+### Task: War Chart Coding Status Filter, Version Badge & Overnight Queue Sort
+- **IDs**: `6a687d70-a623-4871-ba11-0affed66e917`, `dd3cd32a-22fd-42c0-8591-3e3e7b653874`
+- **Changes**:
+  - Added a **Coding Status filter bar** (`All` / `🚀 Ready` / `Verify` / `Active` / `Draft`) to the War Chart top bar (`warchart.html`, `warchart.js`) so the overnight `ready_for_antigravity` / `rework_in_antigravity` queue can be isolated in one click.
+  - Added distinct green **`🚀 Ready`** and amber **`⚡ Verify`** pill highlights (`warchart.css`) on coding task cards.
+  - Added a **`v138` version badge** (`#wc-version-badge`) next to the War Chart title and wired `deploy.ps1 -Bump` to auto-increment it on every release.
+  - Updated `list_ready_tasks.ps1` to sort ready tasks by `metadata.warchart_order` ascending (falling back to `priority` → `created_at`) so overnight `/goal` runs execute in exact War Chart column order.
+
 ## [v137] - 2026-11-23
 
 ### Task: War Chart Polish — Column Vertical Scroll Preservation & Full Type Reclassification

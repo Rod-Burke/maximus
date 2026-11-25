@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=137">
+    <link rel="stylesheet" href="warchart.css?v=138">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,6 +48,7 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
+                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v138</span>
                 </div>
 
                 <!-- Board Switcher: Life War Chart <-> M2M Studio -->
@@ -68,6 +69,14 @@
                         <button type="button" class="wc-seg-btn active" data-scope="all">All</button>
                         <button type="button" class="wc-seg-btn" data-scope="general">General</button>
                         <button type="button" class="wc-seg-btn" data-scope="coding">Coding</button>
+                    </div>
+
+                    <div id="wc-coding-status-filter" class="wc-segmented" role="group" aria-label="Coding status filter">
+                        <button type="button" class="wc-seg-btn active" data-coding-status="all" title="Show all coding statuses">All</button>
+                        <button type="button" class="wc-seg-btn" data-coding-status="ready" title="Ready for Antigravity &amp; Rework (overnight queue)">🚀 Ready</button>
+                        <button type="button" class="wc-seg-btn" data-coding-status="verify" title="Needs Verification or Needs Logging">Verify</button>
+                        <button type="button" class="wc-seg-btn" data-coding-status="clarify" title="Needs Clarification, Needs Plan, Plan Approval, or In Progress">Active</button>
+                        <button type="button" class="wc-seg-btn" data-coding-status="draft" title="Draft coding tasks">Draft</button>
                     </div>
 
                     <div class="wc-segmented" role="group" aria-label="Task status filter">
@@ -538,6 +547,6 @@
         </div>
     </dialog>
 
-    <script src="warchart.js?v=137"></script>
+    <script src="warchart.js?v=138"></script>
 </body>
 </html>
