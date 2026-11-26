@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=140">
+    <link rel="stylesheet" href="warchart.css?v=141">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,7 +48,7 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
-                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v140</span>
+                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v141</span>
                 </div>
 
                 <!-- Board Switcher: Life War Chart <-> M2M Studio -->
@@ -488,6 +488,7 @@
             <div class="wc-dialog-footer wc-m2m-footer">
                 <div class="wc-dialog-footer-left">
                     <button type="button" id="wc-m2m-delete" class="wc-btn wc-btn-danger">Delete</button>
+                    <button type="button" id="wc-m2m-to-inbox" class="wc-btn wc-btn-ghost" title="Remove from M2M Studio and move to Life Board Inbox">📥 Send to Life Inbox</button>
                     <span id="wc-m2m-meta-info" class="wc-meta-info"></span>
                 </div>
                 <div class="wc-dialog-footer-right">
@@ -593,6 +594,6 @@
         </form>
     </dialog>
 
-    <script src="warchart.js?v=140"></script>
+    <script src="warchart.js?v=141"></script>
 </body>
 </html>

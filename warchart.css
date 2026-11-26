@@ -628,6 +628,8 @@ html, body {
 }
 
 .wc-column.is-inbox.is-collapsed .wc-col-header {
+    flex-direction: row;
+    align-items: center;
     writing-mode: vertical-rl;
     text-orientation: mixed;
     height: 100%;
@@ -635,6 +637,14 @@ html, body {
     padding: 0.85rem 0.4rem;
     gap: 0.6rem;
     border-bottom: none;
+}
+
+.wc-column.is-inbox.is-collapsed .wc-col-title-wrap {
+    align-items: center;
+}
+
+.wc-column.is-inbox.is-collapsed .wc-col-title {
+    white-space: nowrap;
 }
 
 .wc-column.is-dragging {
@@ -655,14 +665,14 @@ html, body {
     background: rgba(24, 34, 58, 0.95);
 }
 
-/* Column Header (Drag Handle) */
+/* Column Header (2-Row Layout: Row 1 Full Title + Count, Row 2 Action Strip) */
 .wc-col-header {
     flex-shrink: 0;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.35rem;
-    padding: 0.6rem 0.6rem 0.55rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.32rem;
+    padding: 0.5rem 0.55rem 0.42rem;
     border-bottom: 1px solid var(--wc-border);
     background: rgba(255, 255, 255, 0.025);
     user-select: none;
@@ -678,25 +688,28 @@ html, body {
 
 .wc-col-title-wrap {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.35rem;
     min-width: 0;
-    flex: 1;
+    width: 100%;
 }
 
 .wc-col-grip {
     color: var(--wc-text-dim);
     flex-shrink: 0;
     opacity: 0.7;
+    margin-top: 2px;
 }
 
 .wc-col-title {
-    font-size: 0.9rem;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.88rem;
     font-weight: 600;
+    line-height: 1.25;
     color: var(--wc-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
 .wc-col-count {
@@ -707,38 +720,48 @@ html, body {
     background: rgba(255, 255, 255, 0.08);
     color: var(--wc-text-muted);
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .wc-col-actions {
     display: flex;
     align-items: center;
-    gap: 2px;
-    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-top: 0.22rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .wc-col-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    border: none;
-    background: transparent;
+    gap: 0.2rem;
+    min-width: 24px;
+    height: 22px;
+    padding: 0 0.4rem;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--wc-text-muted);
     cursor: pointer;
-    font-size: 0.78rem;
-    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+    font-size: 0.71rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
 .wc-col-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
     color: var(--wc-text);
 }
 
 .wc-col-btn.is-date-sort {
     color: var(--wc-gold);
     background: var(--wc-gold-soft);
+    border-color: rgba(251, 191, 36, 0.35);
 }
 
 /* Quick Add Task Form inside Column */

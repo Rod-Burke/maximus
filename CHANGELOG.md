@@ -29,6 +29,14 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
+## [v141] - 2026-11-26
+
+### Task: War Chart 2-Row Column Headers & M2M "Send to Life Inbox" Transfer
+- **ID**: `6a687d70-a623-4871-ba11-0affed66e917`
+- **Changes**:
+  - **2-Row Column Headers** (`warchart.css`, `warchart.js`): Upgraded column headers across Life Board and M2M Studio so Row 1 gives full width to wrapped column titles + count badge (especially helpful in Compact mode) and Row 2 surfaces clear labeled actions (`+ Add`, `↕ Manual`/`📅 Date`, `✎ Edit`, `Hide` on Life Board; `+ Episode`, `✎ Edit` on M2M SubSeries; `+ Task` on `⚙️ M2M Workflow`).
+  - **Send to Life Inbox from M2M Studio** (`warchart.html`, `warchart.js`): Added `📥 Send to Life Inbox` button in the M2M Episode Workspace modal footer and a 1-click `📥` hover button on `Other` column cards so misplaced M2M items can be cleared out of M2M Studio straight into the Life Board Inbox for Triage Mode sorting.
+
 ## [v140] - 2026-11-25
 
 ### Task: Permanent M2M Workflow Column in M2M Studio Series War Chart

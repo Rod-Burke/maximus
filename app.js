@@ -5809,7 +5809,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v140';
+let versionStr = 'v141';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');

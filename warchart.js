@@ -274,6 +274,7 @@ const dom = {
     m2mVideoUrl: document.getElementById('wc-m2m-video-url'),
     m2mGraphicsInput: document.getElementById('wc-m2m-graphics-input'),
     m2mDelete: document.getElementById('wc-m2m-delete'),
+    m2mToInbox: document.getElementById('wc-m2m-to-inbox'),
     m2mMetaInfo: document.getElementById('wc-m2m-meta-info'),
     m2mCancel: document.getElementById('wc-m2m-cancel'),
     m2mSave: document.getElementById('wc-m2m-save'),
@@ -1470,11 +1471,12 @@ function createLifeColumnElement(col, tasks, isInbox) {
            </svg>`;
 
     const actionsHtml = isInbox
-        ? `<button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Quick add unassigned task" aria-label="Add task">+</button>
-           <button type="button" class="wc-col-btn wc-inbox-collapse-btn" title="Collapse Inbox rail" aria-label="Collapse Inbox">«</button>`
-        : `<button type="button" class="wc-col-btn wc-col-sort-btn${col.sortMode === 'date' ? ' is-date-sort' : ''}" title="${col.sortMode === 'date' ? 'Sorted by Date (click for Manual drag order)' : 'Manual Drag Order (click to sort by Date)'}" aria-label="Toggle sort order">${col.sortMode === 'date' ? '📅' : '↕'}</button>
-           <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add task to ${escapeHtml(col.name)}" aria-label="Add task">+</button>
-           <button type="button" class="wc-col-btn wc-col-edit-btn" title="Edit or hide column" aria-label="Edit column">⋯</button>`;
+        ? `<button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Quick add unassigned task" aria-label="Add task">+ Add</button>
+           <button type="button" class="wc-col-btn wc-inbox-collapse-btn" title="Collapse Inbox rail" aria-label="Collapse Inbox">« Collapse</button>`
+        : `<button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add task to ${escapeHtml(col.name)}" aria-label="Add task">+ Add</button>
+           <button type="button" class="wc-col-btn wc-col-sort-btn${col.sortMode === 'date' ? ' is-date-sort' : ''}" title="${col.sortMode === 'date' ? 'Sorted by Date (click for Manual drag order)' : 'Manual Drag Order (click to sort by Date)'}" aria-label="Toggle sort order">${col.sortMode === 'date' ? '📅 Date' : '↕ Manual'}</button>
+           <button type="button" class="wc-col-btn wc-col-edit-btn" title="Rename, recolor, or delete column" aria-label="Edit column">✎ Edit</button>
+           <button type="button" class="wc-col-btn wc-col-hide-inline-btn" title="Hide column (keeps tasks safe in OpenBrain)" aria-label="Hide column">Hide</button>`;
 
     headerEl.innerHTML = `
         <div class="wc-col-title-wrap">
@@ -1510,6 +1512,12 @@ function createLifeColumnElement(col, tasks, isInbox) {
         headerEl.querySelector('.wc-col-edit-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             openColumnEditDialog(col.key);
+        });
+        headerEl.querySelector('.wc-col-hide-inline-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            col.hidden = true;
+            renderLifeBoard();
+            saveBoardConfig();
         });
     }
 
@@ -1868,7 +1876,7 @@ function createM2mWorkflowColumn(tasks) {
             <span class="wc-col-count">${tasks.length}</span>
         </div>
         <div class="wc-col-actions">
-            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add M2M workflow task" aria-label="Add workflow task">+</button>
+            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add M2M workflow task" aria-label="Add workflow task">+ Task</button>
         </div>
     `;
 
@@ -1990,8 +1998,8 @@ function createM2mSeriesColumn(series, episodes, rotNumber, isOther) {
             <span class="wc-col-count">${episodes.length}</span>
         </div>
         <div class="wc-col-actions">
-            ${!isOther ? `<button type="button" class="wc-col-btn wc-col-edit-btn" title="Rename or recolor ${escapeHtml(series.key)}" aria-label="Edit SubSeries">✎</button>` : ''}
-            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(series.key)}" aria-label="Add episode">+</button>
+            <button type="button" class="wc-col-btn wc-col-quickadd-btn" title="Add episode to ${escapeHtml(series.key)}" aria-label="Add episode">+ Episode</button>
+            ${!isOther ? `<button type="button" class="wc-col-btn wc-col-edit-btn" title="Rename or recolor ${escapeHtml(series.key)}" aria-label="Edit SubSeries">✎ Edit</button>` : ''}
         </div>
     `;
 
@@ -2164,11 +2172,14 @@ function createM2mSeriesCardElement(ep, series, idx) {
     }
 
     const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Cycle 1 · Front Line</div>` : '';
+    const inboxBtnHtml = series.key === 'Other'
+        ? `<button type="button" class="wc-card-top-btn wc-card-to-inbox-btn" title="Send out of M2M Studio to Life Board Inbox" aria-label="Send to Life Inbox">📥</button>`
+        : '';
     const topBtnHtml = `<button type="button" class="wc-card-top-btn${idx === 0 ? ' is-at-top' : ''}" title="To Top (Move to Row #1 / Cycle 1)" aria-label="Move to top">⬆</button>`;
     const delBtnHtml = state.boardConfig.quickDeleteMode
         ? `<button type="button" class="wc-card-del-btn" title="Delete episode permanently" aria-label="Delete episode">🗑</button>`
         : '';
-    const actionsClusterHtml = `<div class="wc-card-actions">${topBtnHtml}${delBtnHtml}</div>`;
+    const actionsClusterHtml = `<div class="wc-card-actions">${inboxBtnHtml}${topBtnHtml}${delBtnHtml}</div>`;
 
     card.innerHTML = `
         ${actionsClusterHtml}
@@ -2179,7 +2190,12 @@ function createM2mSeriesCardElement(ep, series, idx) {
         <div class="wc-card-meta" style="padding-left: 0;">${pills.join('')}</div>
     `;
 
-    card.querySelector('.wc-card-top-btn')?.addEventListener('click', (e) => {
+    card.querySelector('.wc-card-to-inbox-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sendM2mEpisodeToLifeInbox(ep.id);
+    });
+
+    card.querySelector('.wc-card-top-btn:not(.wc-card-to-inbox-btn)')?.addEventListener('click', (e) => {
         e.stopPropagation();
         moveM2mEpisodeToSubseries(ep.id, series.key, 0);
     });
@@ -3324,6 +3340,7 @@ function openM2mWorkspaceDialog(epId) {
     });
 
     dom.m2mDelete.hidden = !ep;
+    dom.m2mToInbox.hidden = !ep;
     dom.m2mMetaInfo.textContent = ep?.created_at
         ? `Added ${new Date(ep.created_at).toLocaleDateString()}`
         : 'New episode';
@@ -3398,6 +3415,33 @@ dom.m2mForm.addEventListener('submit', async (e) => {
             renderAll();
         }
     }
+});
+
+async function sendM2mEpisodeToLifeInbox(epId) {
+    const ep = state.m2mEpisodes.find(e => e.id === epId);
+    if (!ep) return;
+
+    const metaPatch = {
+        type: 'task',
+        status: ep.metadata?.status === 'completed' ? 'pending' : (ep.metadata?.status || 'pending'),
+        project: null,
+        m2m: null
+    };
+
+    ep.metadata = { ...(ep.metadata || {}), ...metaPatch };
+    state.m2mEpisodes = state.m2mEpisodes.filter(e => e.id !== epId);
+    if (!state.thoughts.some(t => t.id === epId)) {
+        state.thoughts.unshift(ep);
+    }
+    if (dom.m2mDialog.open && state.editingM2mId === epId) {
+        dom.m2mDialog.close();
+    }
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: epId, metadata: metaPatch }));
+}
+
+dom.m2mToInbox.addEventListener('click', () => {
+    if (state.editingM2mId) sendM2mEpisodeToLifeInbox(state.editingM2mId);
 });
 
 dom.m2mDelete.addEventListener('click', async () => {
