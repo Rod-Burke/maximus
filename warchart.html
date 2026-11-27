@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=143">
+    <link rel="stylesheet" href="warchart.css?v=144">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,7 +48,7 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
-                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v143</span>
+                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v144</span>
                 </div>
 
                 <!-- Board Switcher: Life War Chart <-> M2M Studio -->
@@ -530,6 +530,21 @@
                         <label for="wc-m2m-video-url">Video / Script Doc / Asset Link</label>
                         <input type="url" id="wc-m2m-video-url" placeholder="https://youtube.com/… or Google Doc / Descript link">
                     </div>
+                    <div class="wc-field wc-m2m-media-section" id="wc-m2m-media-section">
+                        <div class="wc-m2m-media-header">
+                            <label>🖼️ Episode Visuals &amp; Reference Images <span class="wc-media-badge-s3">Private S3</span></label>
+                            <div class="wc-m2m-media-actions">
+                                <label class="wc-m2m-ocr-toggle" title="Automatically append Gemini OCR / visual notes into the Research tab">
+                                    <input type="checkbox" id="wc-m2m-append-ocr" checked>
+                                    <span>Append OCR to Research</span>
+                                </label>
+                                <input type="file" id="wc-m2m-media-input" accept="image/*" multiple hidden>
+                                <button type="button" id="wc-m2m-media-upload-btn" class="wc-btn wc-btn-ghost wc-btn-xs">+ Upload / Paste Image</button>
+                            </div>
+                        </div>
+                        <div id="wc-m2m-media-status" class="wc-media-status"></div>
+                        <div id="wc-m2m-media-grid" class="wc-m2m-media-grid"></div>
+                    </div>
                     <div class="wc-field wc-field-grow">
                         <label for="wc-m2m-graphics-input">Graphics, B-Roll Prompts &amp; Music Notes</label>
                         <textarea id="wc-m2m-graphics-input" class="wc-doc-editor" placeholder="List stock B-roll shots, AI visual prompts per section, thumbnail concept, music mood…"></textarea>
@@ -646,6 +661,7 @@
         </form>
     </dialog>
 
-    <script src="warchart.js?v=143"></script>
+    <script src="media-capture.js?v=144"></script>
+    <script src="warchart.js?v=144"></script>
 </body>
 </html>

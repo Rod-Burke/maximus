@@ -2652,3 +2652,134 @@ dialog.wc-m2m-dialog {
     border-color: var(--wc-gold);
     color: var(--wc-gold);
 }
+
+
+/* ============================================================
+   M2M STUDIO — EPISODE VISUALS & PRIVATE S3 GALLERY
+   ============================================================ */
+.wc-pill-media {
+    background: rgba(56, 189, 248, 0.16);
+    color: #7dd3fc;
+}
+
+.wc-m2m-media-section {
+    border: 1px dashed rgba(148, 163, 184, 0.28);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.35);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wc-m2m-media-section.is-dragover {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.wc-m2m-media-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.wc-media-badge-s3 {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.wc-m2m-media-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.wc-m2m-ocr-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--wc-text-dim, #94a3b8);
+    cursor: pointer;
+}
+
+.wc-media-status {
+    font-size: 0.78rem;
+    color: #7dd3fc;
+    min-height: 16px;
+    margin-bottom: 6px;
+}
+
+.wc-m2m-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.wc-media-empty {
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    color: var(--wc-text-dim, #94a3b8);
+    font-style: italic;
+    padding: 8px 2px;
+}
+
+.wc-m2m-media-card {
+    background: rgba(30, 41, 59, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.wc-m2m-media-thumb-wrap {
+    height: 104px;
+    background: #090c14;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-in;
+    overflow: hidden;
+}
+
+.wc-m2m-media-thumb-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.wc-m2m-media-meta {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.wc-m2m-media-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wc-m2m-media-sub {
+    font-size: 0.7rem;
+    color: var(--wc-text-dim, #94a3b8);
+}
+
+.wc-m2m-media-card-btns {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}

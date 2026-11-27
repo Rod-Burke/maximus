@@ -2386,6 +2386,7 @@ function openTaskModal(id, content, meta) {
     dom.modalSummary.value = meta.summary || content;
     dom.modalNotes.value = meta.notes || '';
     renderNotesLinks(meta.notes);
+    renderModalAttachments(id, meta);
     
     dom.modalType.value = meta.type || 'task';
     dom.modalPriority.value = meta.priority || 'normal';
@@ -5809,7 +5810,7 @@ document.getElementById('install-close-btn')?.addEventListener('click', () => {
 
 // --- DYNAMIC VERSION ---
 const appScript = document.querySelector('script[src*="app.js"]');
-let versionStr = 'v143';
+let versionStr = 'v144';
 if (appScript) {
     const srcAttr = appScript.getAttribute('src') || appScript.src || '';
     const parts = srcAttr.split('?');
@@ -6008,3 +6009,183 @@ initViewportHandler();
 loadProjectsConfig();
 
 
+
+
+// ============================================================
+// PHOTO / DOCUMENT OCR CAPTURE & PRIVATE S3 ATTACHMENTS
+// ============================================================
+async function renderModalAttachments(thoughtId, meta) {
+    const container = document.getElementById('modal-attachments');
+    if (!container) return;
+    const attachments = Array.isArray(meta?.attachments) ? meta.attachments : [];
+    if (attachments.length === 0) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+
+    container.classList.remove('hidden');
+    container.innerHTML = '<div style="font-size:0.8rem;opacity:0.7;">Loading private S3 attachments…</div>';
+
+    let urlMap = {};
+    try {
+        if (window.MaximusMedia) {
+            urlMap = await window.MaximusMedia.resolveSignedUrls(attachments);
+        }
+    } catch (err) {
+        console.error('Failed to sign attachment URLs:', err);
+    }
+
+    container.innerHTML = '<label class="modal-label" style="margin-bottom:6px;">🖼️ Attached Images (Private S3)</label><div class="modal-att-grid"></div>';
+    const grid = container.querySelector('.modal-att-grid');
+
+    attachments.forEach((att) => {
+        const scope = att.bucket === 'm2m' ? 'm2m' : 'maximus';
+        const thumbUrl = urlMap[`${scope}:${att.thumb_key}`] || urlMap[`${scope}:${att.s3_key}`] || '';
+        const origUrl = urlMap[`${scope}:${att.s3_key}`] || thumbUrl;
+
+        const item = document.createElement('div');
+        item.className = 'modal-att-card';
+        const safeTitle = (att.summary || att.filename || 'Image').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        item.innerHTML = `
+            <img src="${thumbUrl}" alt="${safeTitle}" loading="lazy">
+            <div class="modal-att-caption" title="${safeTitle}">${safeTitle}</div>
+            <button type="button" class="modal-att-del" title="Delete from S3">✕</button>
+        `;
+        item.querySelector('img')?.addEventListener('click', () => {
+            if (window.MaximusMedia && origUrl) {
+                window.MaximusMedia.openLightbox({
+                    origUrl,
+                    title: att.summary || att.filename,
+                    description: att.visual_description || '',
+                    ocrText: att.ocr_text || '',
+                    filename: att.filename || ''
+                });
+            }
+        });
+        item.querySelector('.modal-att-del')?.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm(`Delete "${att.summary || att.filename}" from S3?`)) return;
+            try {
+                await window.MaximusMedia.deleteAttachment(thoughtId, att.id);
+                meta.attachments = (meta.attachments || []).filter(a => a.id !== att.id);
+                renderModalAttachments(thoughtId, meta);
+            } catch (err) {
+                alert(`Delete failed: ${err.message}`);
+            }
+        });
+        grid.appendChild(item);
+    });
+}
+
+function initPhotoCaptureUI() {
+    const modal = document.getElementById('media-capture-modal');
+    if (!modal) return;
+    const openBtns = [document.getElementById('photo-capture-btn'), document.getElementById('tray-photo-btn')].filter(Boolean);
+    const closeBtn = document.getElementById('media-modal-close');
+    const cancelBtn = document.getElementById('media-cancel-btn');
+    const takePhotoBtn = document.getElementById('media-take-photo-btn');
+    const chooseFileBtn = document.getElementById('media-choose-file-btn');
+    const fileInput = document.getElementById('media-file-input');
+    const cameraInput = document.getElementById('media-camera-input');
+    const dropZone = document.getElementById('media-drop-zone');
+    const previewImg = document.getElementById('media-preview-img');
+    const fileInfo = document.getElementById('media-file-info');
+    const noteInput = document.getElementById('media-note-input');
+    const bucketSelect = document.getElementById('media-bucket-select');
+    const textOnlyCb = document.getElementById('media-text-only-cb');
+    const statusEl = document.getElementById('media-capture-status');
+    const uploadBtn = document.getElementById('media-upload-btn');
+
+    let selectedFile = null;
+    let previewUrl = null;
+
+    function resetModal() {
+        selectedFile = null;
+        if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+        previewImg.classList.add('hidden');
+        previewImg.src = '';
+        fileInfo.textContent = '';
+        noteInput.value = '';
+        statusEl.textContent = '';
+        uploadBtn.disabled = true;
+        fileInput.value = '';
+        cameraInput.value = '';
+    }
+
+    function openModal() {
+        resetModal();
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        resetModal();
+    }
+
+    function selectFile(file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            statusEl.textContent = 'Please select an image file.';
+            return;
+        }
+        selectedFile = file;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        previewImg.src = previewUrl;
+        previewImg.classList.remove('hidden');
+        const kb = Math.round((file.size || 0) / 1024);
+        fileInfo.textContent = `${file.name || 'Captured photo'} (${kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB'})`;
+        statusEl.textContent = '';
+        uploadBtn.disabled = false;
+    }
+
+    openBtns.forEach(b => b.addEventListener('click', openModal));
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+    takePhotoBtn?.addEventListener('click', () => cameraInput?.click());
+    chooseFileBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', () => { if (fileInput.files?.[0]) selectFile(fileInput.files[0]); });
+    cameraInput?.addEventListener('change', () => { if (cameraInput.files?.[0]) selectFile(cameraInput.files[0]); });
+
+    dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('is-dragover'); });
+    dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('is-dragover'));
+    dropZone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('is-dragover');
+        if (e.dataTransfer?.files?.[0]) selectFile(e.dataTransfer.files[0]);
+    });
+
+    document.addEventListener('paste', (e) => {
+        if (modal.classList.contains('hidden')) return;
+        const imgItem = Array.from(e.clipboardData?.items || []).find(it => it.type && it.type.startsWith('image/'));
+        if (imgItem) {
+            const f = imgItem.getAsFile();
+            if (f) { e.preventDefault(); selectFile(f); }
+        }
+    });
+
+    uploadBtn?.addEventListener('click', async () => {
+        if (!selectedFile || !window.MaximusMedia) return;
+        uploadBtn.disabled = true;
+        try {
+            const res = await window.MaximusMedia.uploadAndAnalyzeMedia({
+                file: selectedFile,
+                bucket: bucketSelect?.value || 'maximus',
+                userNote: noteInput?.value || '',
+                textOnly: Boolean(textOnlyCb?.checked),
+                onStatus: (msg) => { statusEl.textContent = msg; }
+            });
+            const summary = res.analysis?.summary || 'Captured Image';
+            const modeLabel = res.text_only ? 'OCR text-only saved' : `Saved to private ${bucketSelect?.value === 'm2m' ? 'M2M' : 'Maximus'} S3 + OpenBrain`;
+            if (typeof addMessage === 'function') {
+                addMessage(`📷 ${summary} — ${modeLabel}${res.analysis?.ocr_text ? '\n\n' + res.analysis.ocr_text.slice(0, 320) + (res.analysis.ocr_text.length > 320 ? '…' : '') : ''}`, 'ai');
+            }
+            closeModal();
+        } catch (err) {
+            console.error('Photo capture failed:', err);
+            statusEl.textContent = `❌ ${err.message}`;
+            uploadBtn.disabled = false;
+        }
+    });
+}
+initPhotoCaptureUI();

@@ -6,6 +6,19 @@
 
 This file contains the persistent record of all completed tasks, architectural updates, and styling changes made to the Maximus PWA.
 
+## [v144] - 2026-11-27
+
+### Feature: Dual-Bucket Private AWS S3 + Gemini Vision OCR Ingestion (Saint Max & M2M Studio)
+- **Changes**:
+  - Provisioned dedicated private AWS S3 buckets (`roderic-maximus-media` for personal Maximus scans/photos and `mary2moon-studio-media` for M2M episode visuals) with private presigned URLs via new zero-dependency Deno SigV4 helper (`supabase/functions/_shared/s3.ts`).
+  - Added `analyzeImageWithGemini()` in `supabase/functions/_shared/ai.ts` (and upgraded Gemini calls from deprecated `gemini-2.0-flash` to `gemini-3.8-flash`) for verbatim Markdown OCR, searchable visual descriptions, and auto-tagging.
+  - Deployed new `media-ingest` Supabase Edge Function (`presign_upload`, `analyze_and_save`, `sign_urls`, `delete_attachment`) and redeployed `manage-thoughts` and `voice-gateway`.
+  - Built shared `media-capture.js` (client-side 480px WebP thumbnailer, 1600px Gemini OCR resizer, direct-to-S3 upload, signed GET URL cache, fullscreen lightbox).
+  - Added **📷 Photo & Document OCR** modal to Saint Max PWA (`index.html`, `app.js`, `style.css`) with camera capture, file picker, drag-drop, `Ctrl+V` paste, bucket selector, **"OCR text-only (discard image)"** mode, and private S3 attachment thumbnails in thought detail modals.
+  - Added **🖼️ Episode Visuals & Reference Images** gallery to M2M Studio (`warchart.html`, `warchart.js`, `warchart.css`) inside Tab 4 (`Graphics, B-Roll & Checklist`) with upload/drag-drop/`Ctrl+V` paste, auto-append OCR to Research, 1-click **"→ Research"** insert, fullscreen lightbox, and `🖼️ N` card badge pills.
+
+---
+
 ## [Unreleased - Pending Verification] - 2026-11-24
 
 ### Task: War Chart "To Top" Priority Button on Every Card

@@ -53,10 +53,11 @@ if ($targetVerNum) {
     # B. Update index.html
     $htmlContent = Get-Content $htmlFile -Raw -Encoding utf8
     $htmlContent = $htmlContent -replace 'style\.css\?v=\d+', "style.css?v=$targetVerNum"
+    $htmlContent = $htmlContent -replace 'media-capture\.js\?v=\d+', "media-capture.js?v=$targetVerNum"
     $htmlContent = $htmlContent -replace 'app\.js\?v=\d+', "app.js?v=$targetVerNum"
     $htmlContent = $htmlContent -replace 'id="update-toast-version">v?\d+<', "id=`"update-toast-version`">v$targetVerNum<"
     [System.IO.File]::WriteAllText($htmlFile, $htmlContent, [System.Text.Encoding]::UTF8)
-    Write-Host "  [OK] Updated index.html (style.css?v=$targetVerNum, app.js?v=$targetVerNum, toast)" -ForegroundColor Green
+    Write-Host "  [OK] Updated index.html (style.css?v=$targetVerNum, media-capture.js?v=$targetVerNum, app.js?v=$targetVerNum, toast)" -ForegroundColor Green
 
     # C. Update app.js
     $appContent = Get-Content $appFile -Raw -Encoding utf8
@@ -68,10 +69,11 @@ if ($targetVerNum) {
     if (Test-Path $warchartHtmlFile) {
         $wcContent = Get-Content $warchartHtmlFile -Raw -Encoding utf8
         $wcContent = $wcContent -replace 'warchart\.css\?v=\d+', "warchart.css?v=$targetVerNum"
+        $wcContent = $wcContent -replace 'media-capture\.js\?v=\d+', "media-capture.js?v=$targetVerNum"
         $wcContent = $wcContent -replace 'warchart\.js\?v=\d+', "warchart.js?v=$targetVerNum"
         $wcContent = $wcContent -replace '(id="wc-version-badge"[^>]*>)v\d+(</span>)', "`${1}v$targetVerNum`$2"
         [System.IO.File]::WriteAllText($warchartHtmlFile, $wcContent, [System.Text.Encoding]::UTF8)
-        Write-Host "  [OK] Updated warchart.html (warchart.css?v=$targetVerNum, warchart.js?v=$targetVerNum)" -ForegroundColor Green
+        Write-Host "  [OK] Updated warchart.html (warchart.css?v=$targetVerNum, media-capture.js?v=$targetVerNum, warchart.js?v=$targetVerNum)" -ForegroundColor Green
     }
     
     $commitVerTag = "v$targetVerNum"

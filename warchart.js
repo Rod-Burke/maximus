@@ -2811,6 +2811,10 @@ function createM2mSeriesCardElement(ep, series, idx) {
     if (scriptWords > 20) {
         pills.push(`<span class="wc-pill wc-pill-script" title="Has script draft">✍️ ${scriptWords}w</span>`);
     }
+    const attCount = Array.isArray(ep.metadata?.attachments) ? ep.metadata.attachments.length : 0;
+    if (attCount > 0) {
+        pills.push(`<span class="wc-pill wc-pill-media" title="${attCount} visual attachment${attCount === 1 ? '' : 's'} in S3">🖼️ ${attCount}</span>`);
+    }
 
     const frontLineHtml = isFrontLine ? `<div class="wc-front-line-tag">★ Cycle 1 · Front Line</div>` : '';
     const inboxBtnHtml = series.key === 'Other'
@@ -3052,6 +3056,10 @@ function createM2mCardElement(ep, stage, idx, isFrontLine, rotCycle = null, rotP
     const scriptWords = countWords(m2m.script_draft || '');
     if (scriptWords > 20) {
         pills.push(`<span class="wc-pill wc-pill-script" title="Has script draft">✍️ ${scriptWords}w</span>`);
+    }
+    const attCount = Array.isArray(ep.metadata?.attachments) ? ep.metadata.attachments.length : 0;
+    if (attCount > 0) {
+        pills.push(`<span class="wc-pill wc-pill-media" title="${attCount} visual attachment${attCount === 1 ? '' : 's'} in S3">🖼️ ${attCount}</span>`);
     }
     if (m2m.checklist && typeof m2m.checklist === 'object') {
         const doneCount = Object.values(m2m.checklist).filter(Boolean).length;
@@ -4175,6 +4183,7 @@ function openM2mWorkspaceDialog(epId) {
     updateM2mWriterStats();
     setM2mTab('research');
     setM2mResearchMode(researchText.trim().length > 60 ? 'read' : 'edit');
+    renderM2mEpisodeAttachments(ep);
     dom.m2mDialog.showModal();
     if (!ep) dom.m2mTitle.focus();
 }
@@ -4803,8 +4812,177 @@ window.addEventListener('dragend', () => {
 });
 
 // --- BOOTSTRAP ---
+initM2mMediaGallery();
 populateM2mDropdowns();
 setupDialogLightDismissFallback();
 if (initAuth()) {
     loadAllData();
+}
+
+// ============================================================
+// M2M STUDIO — EPISODE VISUALS & S3 MEDIA GALLERY
+// ============================================================
+async function renderM2mEpisodeAttachments(ep) {
+    const grid = document.getElementById('wc-m2m-media-grid');
+    const statusEl = document.getElementById('wc-m2m-media-status');
+    const uploadBtn = document.getElementById('wc-m2m-media-upload-btn');
+    if (!grid) return;
+
+    if (!ep) {
+        grid.innerHTML = '<div class="wc-media-empty">Save the episode first, then upload or paste reference images here.</div>';
+        if (uploadBtn) uploadBtn.disabled = true;
+        if (statusEl) statusEl.textContent = '';
+        return;
+    }
+
+    if (uploadBtn) uploadBtn.disabled = false;
+    const attachments = Array.isArray(ep.metadata?.attachments) ? ep.metadata.attachments : [];
+    if (attachments.length === 0) {
+        grid.innerHTML = '<div class="wc-media-empty">No visuals attached yet. Upload, drag &amp; drop, or paste (Ctrl+V) images here — stored full-res in private M2M S3 &amp; indexed with Gemini Vision.</div>';
+        return;
+    }
+
+    grid.innerHTML = '<div class="wc-media-empty">Loading private S3 thumbnails…</div>';
+    let urlMap = {};
+    try {
+        if (window.MaximusMedia) {
+            urlMap = await window.MaximusMedia.resolveSignedUrls(attachments);
+        }
+    } catch (err) {
+        console.error('Failed to sign M2M attachment URLs:', err);
+    }
+
+    grid.innerHTML = '';
+    attachments.forEach((att) => {
+        const scope = att.bucket === 'm2m' ? 'm2m' : 'maximus';
+        const thumbUrl = urlMap[`${scope}:${att.thumb_key}`] || urlMap[`${scope}:${att.s3_key}`] || '';
+        const origUrl = urlMap[`${scope}:${att.s3_key}`] || thumbUrl;
+
+        const card = document.createElement('div');
+        card.className = 'wc-m2m-media-card';
+        card.innerHTML = `
+            <div class="wc-m2m-media-thumb-wrap" title="Click to inspect full resolution">
+                ${thumbUrl ? `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(att.summary || att.filename || 'Visual')}" loading="lazy">` : '<div class="wc-media-empty">No preview</div>'}
+            </div>
+            <div class="wc-m2m-media-meta">
+                <div class="wc-m2m-media-title" title="${escapeHtml(att.summary || att.filename || '')}">${escapeHtml(att.summary || att.filename || 'Image')}</div>
+                <div class="wc-m2m-media-sub">${att.width && att.height ? `${att.width}×${att.height}` : ''}${att.ocr_text ? ' · 📄 OCR' : ''}</div>
+                <div class="wc-m2m-media-card-btns">
+                    ${att.ocr_text ? '<button type="button" class="wc-btn wc-btn-ghost wc-btn-xs wc-media-insert-ocr" title="Append OCR text into Research tab">→ Research</button>' : ''}
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs wc-media-del-btn" title="Delete from S3 &amp; episode">🗑</button>
+                </div>
+            </div>
+        `;
+
+        card.querySelector('.wc-m2m-media-thumb-wrap')?.addEventListener('click', () => {
+            if (window.MaximusMedia && origUrl) {
+                window.MaximusMedia.openLightbox({
+                    origUrl,
+                    title: att.summary || att.filename,
+                    description: att.visual_description || '',
+                    ocrText: att.ocr_text || '',
+                    filename: att.filename || ''
+                });
+            }
+        });
+
+        card.querySelector('.wc-media-insert-ocr')?.addEventListener('click', () => {
+            const snippet = `\n\n### 📷 ${att.summary || att.filename}\n${att.ocr_text}`;
+            dom.m2mResearchInput.value = (dom.m2mResearchInput.value + snippet).trim();
+            dom.m2mResearchReader.innerHTML = renderSimpleMarkdown(dom.m2mResearchInput.value);
+            updateM2mWriterStats();
+            if (statusEl) statusEl.textContent = '✅ Inserted OCR text into Research tab (click Save Episode to persist).';
+        });
+
+        card.querySelector('.wc-media-del-btn')?.addEventListener('click', async () => {
+            if (!confirm(`Delete "${att.summary || att.filename}" from private S3 and this episode?`)) return;
+            try {
+                if (statusEl) statusEl.textContent = 'Deleting from S3…';
+                await window.MaximusMedia.deleteAttachment(ep.id, att.id);
+                ep.metadata.attachments = (ep.metadata.attachments || []).filter(a => a.id !== att.id);
+                if (statusEl) statusEl.textContent = 'Deleted.';
+                renderM2mEpisodeAttachments(ep);
+                renderBoard();
+            } catch (err) {
+                if (statusEl) statusEl.textContent = `Delete failed: ${err.message}`;
+            }
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+function initM2mMediaGallery() {
+    const uploadBtn = document.getElementById('wc-m2m-media-upload-btn');
+    const fileInput = document.getElementById('wc-m2m-media-input');
+    const section = document.getElementById('wc-m2m-media-section');
+    const statusEl = document.getElementById('wc-m2m-media-status');
+    const appendOcrCb = document.getElementById('wc-m2m-append-ocr');
+
+    async function handleFiles(fileList) {
+        if (!state.editingM2mId || !window.MaximusMedia) return;
+        const ep = state.m2mEpisodes.find(e => e.id === state.editingM2mId);
+        if (!ep) return;
+        const files = Array.from(fileList || []).filter(f => f && f.type && f.type.startsWith('image/'));
+        if (!files.length) return;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            try {
+                const res = await window.MaximusMedia.uploadAndAnalyzeMedia({
+                    file,
+                    bucket: 'm2m',
+                    attachToId: ep.id,
+                    appendOcrToResearch: Boolean(appendOcrCb?.checked),
+                    onStatus: (msg) => {
+                        if (statusEl) statusEl.textContent = `[${i + 1}/${files.length}] ${msg}`;
+                    }
+                });
+                if (res.thought?.metadata) {
+                    ep.metadata = res.thought.metadata;
+                    if (appendOcrCb?.checked && res.thought.metadata.m2m?.research_doc) {
+                        dom.m2mResearchInput.value = res.thought.metadata.m2m.research_doc;
+                        dom.m2mResearchReader.innerHTML = renderSimpleMarkdown(dom.m2mResearchInput.value);
+                        updateM2mWriterStats();
+                    }
+                }
+                if (statusEl) statusEl.textContent = `✅ Uploaded "${res.analysis?.summary || file.name}" to private M2M S3.`;
+                await renderM2mEpisodeAttachments(ep);
+                renderBoard();
+            } catch (err) {
+                console.error('M2M media upload failed:', err);
+                if (statusEl) statusEl.textContent = `❌ Upload failed: ${err.message}`;
+            }
+        }
+    }
+
+    uploadBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', () => {
+        if (fileInput.files?.length) handleFiles(fileInput.files);
+        fileInput.value = '';
+    });
+
+    section?.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        section.classList.add('is-dragover');
+    });
+    section?.addEventListener('dragleave', () => section.classList.remove('is-dragover'));
+    section?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        section.classList.remove('is-dragover');
+        if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files);
+    });
+
+    // Support Ctrl+V image paste while M2M Episode dialog is open
+    dom.m2mDialog?.addEventListener('paste', (e) => {
+        const items = Array.from(e.clipboardData?.items || []);
+        const imgFiles = items
+            .filter(it => it.type && it.type.startsWith('image/'))
+            .map(it => it.getAsFile())
+            .filter(Boolean);
+        if (imgFiles.length) {
+            e.preventDefault();
+            handleFiles(imgFiles);
+        }
+    });
 }

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#1a1a2e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=143">
+    <link rel="stylesheet" href="style.css?v=144">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -47,6 +47,12 @@
                 <h1>Saint Max <span class="app-version"></span></h1>
             </div>
             <div class="header-actions">
+                <button id="photo-capture-btn" class="icon-btn" title="Scan Document / Capture Photo" aria-label="Scan Document or Capture Photo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </button>
                 <a id="warchart-btn" href="warchart.html" class="icon-btn" title="War Chart" aria-label="Open War Chart" style="text-decoration: none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="5" height="18" rx="1"/>
@@ -550,6 +556,7 @@
                     <label class="modal-label">Notes / Instructions</label>
                     <textarea id="modal-notes-input" class="modal-input" rows="2" placeholder="Add extra notes..."></textarea>
                     <div id="modal-notes-links" class="modal-notes-links" style="margin-top: -10px; margin-bottom: 15px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px;"></div>
+                    <div id="modal-attachments" class="modal-attachments hidden"></div>
 
                     <div class="modal-row">
                         <div class="modal-field">
@@ -753,6 +760,12 @@
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
                     </svg>
                 </button>
+                <button id="tray-photo-btn" type="button" title="Photo / Document OCR Scan" aria-label="Photo or Document OCR Scan" style="background:none;border:none;color:rgba(255,255,255,0.75);cursor:pointer;padding:6px;display:flex;align-items:center;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </button>
                 <textarea id="text-input" rows="1" placeholder="Type a thought..." autocomplete="off"></textarea>
                 <button id="send-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -765,7 +778,7 @@
 
     <!-- PWA Update Notification Toast -->
     <div id="update-toast" class="update-toast hidden">
-        <span class="update-toast-text">Maximus has been updated (<span id="update-toast-version">v143</span>).</span>
+        <span class="update-toast-text">Maximus has been updated (<span id="update-toast-version">v144</span>).</span>
         <button id="update-toast-btn">Reload</button>
     </div>
 
@@ -778,7 +791,57 @@
         </div>
     </div>
 
-    <script src="app.js?v=143"></script>
+        <!-- Photo / Document OCR Capture Modal -->
+    <div id="media-capture-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2>📷 Photo &amp; Document OCR</h2>
+                <button id="media-modal-close" class="icon-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+                <div id="media-drop-zone" class="media-drop-zone">
+                    <input type="file" id="media-file-input" accept="image/*" hidden>
+                    <input type="file" id="media-camera-input" accept="image/*" capture="environment" hidden>
+                    <div id="media-picker-btns" style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                        <button type="button" id="media-take-photo-btn" class="media-action-btn primary">📷 Camera / Scan Doc</button>
+                        <button type="button" id="media-choose-file-btn" class="media-action-btn">🖼️ Choose Image</button>
+                    </div>
+                    <p style="font-size:0.8rem; opacity:0.65; margin:8px 0 0;">Or drag &amp; drop / paste (Ctrl+V) an image here</p>
+                    <img id="media-preview-img" class="media-preview-img hidden" alt="Selected preview">
+                    <div id="media-file-info" style="font-size:0.78rem; opacity:0.75; margin-top:6px;"></div>
+                </div>
+                <div>
+                    <label class="modal-label" for="media-note-input">Context Note (optional)</label>
+                    <input type="text" id="media-note-input" class="modal-input" placeholder="e.g., Old Franciscan retreat outline, or B-roll idea...">
+                </div>
+                <div class="modal-row" style="align-items:center; gap:12px;">
+                    <div class="modal-field" style="flex:1;">
+                        <label class="modal-label" for="media-bucket-select">Private S3 Bucket</label>
+                        <select id="media-bucket-select" class="modal-select">
+                            <option value="maximus">Maximus (Personal)</option>
+                            <option value="m2m">M2M Studio</option>
+                        </select>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; cursor:pointer; padding-top:16px;">
+                        <input type="checkbox" id="media-text-only-cb">
+                        <span>OCR text-only<br><small style="opacity:0.65;">(discard image)</small></span>
+                    </label>
+                </div>
+                <div id="media-capture-status" style="font-size:0.84rem; color:#93c5fd; min-height:20px;"></div>
+            </div>
+            <div class="modal-footer" style="justify-content:flex-end; gap:10px; padding:0.75rem 1.25rem;">
+                <button type="button" id="media-cancel-btn" class="media-action-btn">Cancel</button>
+                <button type="button" id="media-upload-btn" class="media-action-btn primary" disabled>Scan &amp; Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="media-capture.js?v=144"></script>
+    <script src="app.js?v=144"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
