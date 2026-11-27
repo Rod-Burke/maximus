@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=141">
+    <link rel="stylesheet" href="warchart.css?v=142">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,7 +48,7 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
-                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v141</span>
+                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v142</span>
                 </div>
 
                 <!-- Board Switcher: Life War Chart <-> M2M Studio -->
@@ -441,7 +441,8 @@
             <!-- Workspace Tabs -->
             <div class="wc-m2m-tabs" role="tablist" aria-label="Episode workspace sections">
                 <button type="button" role="tab" class="wc-m2m-tab active" data-m2m-tab="research" aria-selected="true">📚 Research &amp; Notes</button>
-                <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="script" aria-selected="false">✍️ Script Draft</button>
+                <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="script" aria-selected="false">📝 Rough Script</button>
+                <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="refined" aria-selected="false">✨ Refined Script</button>
                 <button type="button" role="tab" class="wc-m2m-tab" data-m2m-tab="production" aria-selected="false">🎬 Graphics, B-Roll &amp; Checklist</button>
             </div>
 
@@ -460,15 +461,38 @@
                     <div id="wc-m2m-links-preview" class="wc-links-preview" hidden></div>
                 </div>
 
-                <!-- Tab 2: Script Draft -->
+                <!-- Tab 2: Rough Script -->
                 <div id="wc-m2m-panel-script" class="wc-m2m-panel" hidden>
                     <div class="wc-m2m-panel-toolbar">
                         <span id="wc-m2m-script-stats" class="wc-writer-stats">0 words · ~0.0 min spoken (target: 10 min ≈ 1,300 words)</span>
                     </div>
-                    <textarea id="wc-m2m-script-input" class="wc-doc-editor wc-script-editor" placeholder="Write your narration script draft here…"></textarea>
+                    <textarea id="wc-m2m-script-input" class="wc-doc-editor wc-script-editor" placeholder="Dictate with Wispr Flow or type your rough ideas, talking points, and brain-dump here…"></textarea>
+                    <div class="wc-script-action-bar">
+                        <span id="wc-m2m-rough-refine-status" class="wc-refine-status" aria-live="polite">Sends your rough draft through the Mary2Moon style prompt → outputs to Refined Script tab.</span>
+                        <button type="button" id="wc-m2m-refine-from-rough-btn" class="wc-btn wc-btn-refine">✨ Refine Script →</button>
+                    </div>
                 </div>
 
-                <!-- Tab 3: Graphics, B-Roll & Production -->
+                <!-- Tab 3: Refined Script -->
+                <div id="wc-m2m-panel-refined" class="wc-m2m-panel" hidden>
+                    <div class="wc-m2m-panel-toolbar">
+                        <span id="wc-m2m-refined-stats" class="wc-writer-stats">0 spoken words · ~0.0 min (target: 10 min ≈ 1,300 words)</span>
+                    </div>
+                    <details id="wc-m2m-pacing-card" class="wc-pacing-card" hidden>
+                        <summary id="wc-m2m-pacing-summary" class="wc-pacing-summary">Pacing &amp; Shorts Report</summary>
+                        <div id="wc-m2m-pacing-body" class="wc-pacing-body"></div>
+                    </details>
+                    <textarea id="wc-m2m-refined-input" class="wc-doc-editor wc-script-editor" placeholder="Your polished, comedian-chunked, animation-ready script will appear here. Make any manual edits you like, then click Refine Edits below to smooth it out…"></textarea>
+                    <div class="wc-script-action-bar">
+                        <span id="wc-m2m-refined-status" class="wc-refine-status" aria-live="polite">Make any rough edits above, then click Refine Edits to smooth &amp; replace in place.</span>
+                        <div class="wc-script-action-btns">
+                            <button type="button" id="wc-m2m-undo-refine-btn" class="wc-btn wc-btn-ghost wc-btn-xs" hidden title="Revert to the script text before the last Refine">↩ Undo Last Refine</button>
+                            <button type="button" id="wc-m2m-refine-edits-btn" class="wc-btn wc-btn-refine">✨ Refine Edits</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Graphics, B-Roll & Production -->
                 <div id="wc-m2m-panel-production" class="wc-m2m-panel" hidden>
                     <div class="wc-field">
                         <label>Production Checklist</label>
@@ -594,6 +618,6 @@
         </form>
     </dialog>
 
-    <script src="warchart.js?v=141"></script>
+    <script src="warchart.js?v=142"></script>
 </body>
 </html>

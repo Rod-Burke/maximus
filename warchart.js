@@ -261,6 +261,7 @@ const dom = {
     m2mStage: document.getElementById('wc-m2m-stage'),
     m2mPanelResearch: document.getElementById('wc-m2m-panel-research'),
     m2mPanelScript: document.getElementById('wc-m2m-panel-script'),
+    m2mPanelRefined: document.getElementById('wc-m2m-panel-refined'),
     m2mPanelProduction: document.getElementById('wc-m2m-panel-production'),
     m2mResearchStats: document.getElementById('wc-m2m-research-stats'),
     m2mResearchReadBtn: document.getElementById('wc-m2m-research-read-btn'),
@@ -270,6 +271,16 @@ const dom = {
     m2mLinksPreview: document.getElementById('wc-m2m-links-preview'),
     m2mScriptStats: document.getElementById('wc-m2m-script-stats'),
     m2mScriptInput: document.getElementById('wc-m2m-script-input'),
+    m2mRoughRefineStatus: document.getElementById('wc-m2m-rough-refine-status'),
+    m2mRefineFromRoughBtn: document.getElementById('wc-m2m-refine-from-rough-btn'),
+    m2mRefinedStats: document.getElementById('wc-m2m-refined-stats'),
+    m2mPacingCard: document.getElementById('wc-m2m-pacing-card'),
+    m2mPacingSummary: document.getElementById('wc-m2m-pacing-summary'),
+    m2mPacingBody: document.getElementById('wc-m2m-pacing-body'),
+    m2mRefinedInput: document.getElementById('wc-m2m-refined-input'),
+    m2mRefinedStatus: document.getElementById('wc-m2m-refined-status'),
+    m2mUndoRefineBtn: document.getElementById('wc-m2m-undo-refine-btn'),
+    m2mRefineEditsBtn: document.getElementById('wc-m2m-refine-edits-btn'),
     m2mChecklist: document.getElementById('wc-m2m-checklist'),
     m2mVideoUrl: document.getElementById('wc-m2m-video-url'),
     m2mGraphicsInput: document.getElementById('wc-m2m-graphics-input'),
@@ -750,7 +761,8 @@ async function loadAllData() {
 
         // 3. Store Life tasks & M2M episodes
         state.thoughts = Array.isArray(itemsRes.thoughts) ? itemsRes.thoughts : [];
-        state.m2mEpisodes = Array.isArray(m2mRes.thoughts) ? m2mRes.thoughts : [];
+        state.m2mEpisodes = (Array.isArray(m2mRes.thoughts) ? m2mRes.thoughts : [])
+            .filter(t => t?.metadata?.m2m && typeof t.metadata.m2m === 'object');
         dom.m2mBadge.textContent = String(state.m2mEpisodes.length);
 
         populateM2mDropdowns();
@@ -3268,6 +3280,9 @@ function populateM2mDropdowns() {
     });
 }
 
+let m2mRefinedUndoText = null;
+let m2mCurrentPacingReport = null;
+
 function setM2mTab(tabName) {
     state.m2mActiveTab = tabName;
     document.querySelectorAll('[data-m2m-tab]').forEach(btn => {
@@ -3277,6 +3292,7 @@ function setM2mTab(tabName) {
     });
     dom.m2mPanelResearch.hidden = tabName !== 'research';
     dom.m2mPanelScript.hidden = tabName !== 'script';
+    dom.m2mPanelRefined.hidden = tabName !== 'refined';
     dom.m2mPanelProduction.hidden = tabName !== 'production';
 }
 
@@ -3293,6 +3309,13 @@ function setM2mResearchMode(mode) {
     }
 }
 
+function countSpokenWords(text) {
+    const cleaned = String(text || '')
+        .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/^#+\s+.*$/gm, ' ');
+    return countWords(cleaned);
+}
+
 function updateM2mWriterStats() {
     const rText = dom.m2mResearchInput.value || '';
     const rWords = countWords(rText);
@@ -3300,8 +3323,139 @@ function updateM2mWriterStats() {
 
     const sText = dom.m2mScriptInput.value || '';
     const sWords = countWords(sText);
-    const mins = (sWords / 130).toFixed(1);
-    dom.m2mScriptStats.textContent = `${sWords.toLocaleString()} words · ~${mins} min spoken (10 min ≈ 1,300 words)`;
+    const sMins = (sWords / 130).toFixed(1);
+    dom.m2mScriptStats.textContent = `${sWords.toLocaleString()} words · ~${sMins} min spoken (10 min ≈ 1,300 words)`;
+
+    const refText = dom.m2mRefinedInput.value || '';
+    const refWords = countSpokenWords(refText);
+    const refMins = (refWords / 130).toFixed(1);
+    const shortCount = (refText.match(/\[SHORT-READY\]/gi) || []).length;
+    const shortBadge = shortCount > 0 ? ` · 🎬 ${shortCount} Short-ready` : '';
+    dom.m2mRefinedStats.textContent = `${refWords.toLocaleString()} spoken words · ~${refMins} min${shortBadge} (target: 10 min ≈ 1,300 words)`;
+}
+
+function renderM2mPacingReport(report) {
+    m2mCurrentPacingReport = report || null;
+    if (!report) {
+        dom.m2mPacingCard.hidden = true;
+        dom.m2mPacingBody.innerHTML = '';
+        return;
+    }
+    const mins = report.est_minutes != null ? report.est_minutes : (report.word_count ? (report.word_count / 130).toFixed(1) : '?');
+    const beats = report.beat_count != null ? `${report.beat_count} beats` : '';
+    const shortsNum = report.short_ready_count != null ? `${report.short_ready_count} Short-ready` : '';
+    const summaryParts = [
+        report.word_count ? `${Number(report.word_count).toLocaleString()} spoken words (~${mins} min)` : null,
+        beats || null,
+        shortsNum || null
+    ].filter(Boolean);
+    dom.m2mPacingSummary.textContent = `📊 Pacing & Shorts Report — ${summaryParts.join(' · ') || 'Ready'}`;
+
+    let bodyHtml = '';
+    if (report.notes) {
+        bodyHtml += `<p>${escapeHtml(report.notes)}</p>`;
+    }
+    if (Array.isArray(report.shorts) && report.shorts.length > 0) {
+        bodyHtml += `<p><strong>Extractable Shorts:</strong></p><ul class="wc-pacing-shorts-list">`;
+        report.shorts.forEach(s => {
+            const beat = s.beat ? `<strong>${escapeHtml(s.beat)}:</strong> ` : '';
+            bodyHtml += `<li>${beat}${escapeHtml(s.title || '')}</li>`;
+        });
+        bodyHtml += `</ul>`;
+    }
+    dom.m2mPacingBody.innerHTML = bodyHtml || '<p>Pacing check complete.</p>';
+    dom.m2mPacingCard.hidden = false;
+}
+
+function setRefineStatus(el, text, stateClass) {
+    el.textContent = text;
+    el.classList.remove('is-working', 'is-error', 'is-done');
+    if (stateClass) el.classList.add(stateClass);
+}
+
+async function runM2mRefineScript(mode) {
+    const isFromRough = mode === 'from_rough';
+    const sourceScript = (isFromRough ? dom.m2mScriptInput.value : dom.m2mRefinedInput.value).trim();
+    const statusEl = isFromRough ? dom.m2mRoughRefineStatus : dom.m2mRefinedStatus;
+
+    if (!sourceScript) {
+        setRefineStatus(
+            statusEl,
+            isFromRough
+                ? 'Add some rough ideas or dictation above first, then click Refine Script.'
+                : 'The Refined Script box is empty — refine from Rough Script first.',
+            'is-error'
+        );
+        return;
+    }
+
+    const prevRefined = dom.m2mRefinedInput.value;
+    dom.m2mRefineFromRoughBtn.disabled = true;
+    dom.m2mRefineEditsBtn.disabled = true;
+    setRefineStatus(
+        statusEl,
+        isFromRough
+            ? '✨ Refining your rough draft with the Mary2Moon style prompt… (usually 10–25s)'
+            : '✨ Incorporating your edits and smoothing flow… (usually 10–25s)',
+        'is-working'
+    );
+
+    try {
+        const data = await apiCall({
+            action: 'refine_m2m_script',
+            mode,
+            title: dom.m2mTitle.value.trim() || 'Untitled Episode',
+            subseries: dom.m2mSubseries.value,
+            research_doc: dom.m2mResearchInput.value || '',
+            source_script: sourceScript
+        });
+
+        if (!data?.refined_script) {
+            throw new Error(data?.error || 'No refined script returned.');
+        }
+
+        // Snapshot previous refined text for one-click Undo
+        if (prevRefined.trim()) {
+            m2mRefinedUndoText = prevRefined;
+            dom.m2mUndoRefineBtn.hidden = false;
+        } else {
+            m2mRefinedUndoText = null;
+            dom.m2mUndoRefineBtn.hidden = true;
+        }
+
+        dom.m2mRefinedInput.value = data.refined_script;
+        renderM2mPacingReport(data.pacing_report || null);
+        if (data.pacing_report) dom.m2mPacingCard.open = true;
+        updateM2mWriterStats();
+
+        // Persist immediately to OpenBrain if this is an existing episode
+        if (state.editingM2mId) {
+            const ep = state.m2mEpisodes.find(item => item.id === state.editingM2mId);
+            if (ep) {
+                const updatedM2m = {
+                    ...(ep.metadata?.m2m || {}),
+                    script_draft: dom.m2mScriptInput.value,
+                    refined_script: data.refined_script,
+                    pacing_report: data.pacing_report || null
+                };
+                ep.metadata = { ...(ep.metadata || {}), m2m: updatedM2m };
+                trackSave(apiCall({ action: 'update', id: ep.id, metadata: { m2m: updatedM2m } }));
+            }
+        }
+
+        if (isFromRough) {
+            setRefineStatus(dom.m2mRoughRefineStatus, '✓ Refined script ready in the Refined Script tab.', 'is-done');
+            setRefineStatus(dom.m2mRefinedStatus, '✓ Freshly refined from your Rough Script. Make any edits above, then click Refine Edits to smooth.', 'is-done');
+            setM2mTab('refined');
+        } else {
+            setRefineStatus(dom.m2mRefinedStatus, '✓ Edits smoothed and replaced in place. Use Undo Last Refine if you want to step back.', 'is-done');
+        }
+    } catch (err) {
+        setRefineStatus(statusEl, `Refine failed: ${err.message || err}`, 'is-error');
+    } finally {
+        dom.m2mRefineFromRoughBtn.disabled = false;
+        dom.m2mRefineEditsBtn.disabled = false;
+    }
 }
 
 function openM2mWorkspaceDialog(epId) {
@@ -3323,6 +3477,14 @@ function openM2mWorkspaceDialog(epId) {
     renderLinksPreview(dom.m2mLinksPreview, researchText);
 
     dom.m2mScriptInput.value = m2m.script_draft || '';
+    dom.m2mRefinedInput.value = m2m.refined_script || '';
+    m2mRefinedUndoText = null;
+    dom.m2mUndoRefineBtn.hidden = true;
+    renderM2mPacingReport(m2m.pacing_report || null);
+    dom.m2mPacingCard.open = false;
+    setRefineStatus(dom.m2mRoughRefineStatus, 'Sends your rough draft through the Mary2Moon style prompt → outputs to Refined Script tab.');
+    setRefineStatus(dom.m2mRefinedStatus, 'Make any rough edits above, then click Refine Edits to smooth & replace in place.');
+
     dom.m2mVideoUrl.value = m2m.video_url || '';
     dom.m2mGraphicsInput.value = m2m.graphics_notes || '';
 
@@ -3364,6 +3526,18 @@ dom.m2mResearchInput.addEventListener('input', () => {
     renderLinksPreview(dom.m2mLinksPreview, dom.m2mResearchInput.value);
 });
 dom.m2mScriptInput.addEventListener('input', updateM2mWriterStats);
+dom.m2mRefinedInput.addEventListener('input', updateM2mWriterStats);
+
+dom.m2mRefineFromRoughBtn.addEventListener('click', () => runM2mRefineScript('from_rough'));
+dom.m2mRefineEditsBtn.addEventListener('click', () => runM2mRefineScript('polish_edits'));
+dom.m2mUndoRefineBtn.addEventListener('click', () => {
+    if (m2mRefinedUndoText === null) return;
+    dom.m2mRefinedInput.value = m2mRefinedUndoText;
+    m2mRefinedUndoText = null;
+    dom.m2mUndoRefineBtn.hidden = true;
+    updateM2mWriterStats();
+    setRefineStatus(dom.m2mRefinedStatus, '↩ Reverted to the previous version. Click Save Episode to keep.', 'is-done');
+});
 
 dom.m2mClose.addEventListener('click', () => dom.m2mDialog.close());
 dom.m2mCancel.addEventListener('click', () => dom.m2mDialog.close());
@@ -3383,6 +3557,8 @@ dom.m2mForm.addEventListener('submit', async (e) => {
         stage: dom.m2mStage.value,
         research_doc: dom.m2mResearchInput.value,
         script_draft: dom.m2mScriptInput.value,
+        refined_script: dom.m2mRefinedInput.value,
+        pacing_report: m2mCurrentPacingReport,
         video_url: dom.m2mVideoUrl.value.trim() || null,
         graphics_notes: dom.m2mGraphicsInput.value,
         checklist
@@ -3421,10 +3597,11 @@ async function sendM2mEpisodeToLifeInbox(epId) {
     const ep = state.m2mEpisodes.find(e => e.id === epId);
     if (!ep) return;
 
+    const isCoding = ep.metadata?.type === 'coding_task' || Boolean(ep.metadata?.coding_task);
     const metaPatch = {
-        type: 'task',
+        type: isCoding ? 'coding_task' : 'task',
         status: ep.metadata?.status === 'completed' ? 'pending' : (ep.metadata?.status || 'pending'),
-        project: null,
+        project: isCoding ? (ep.metadata?.project ?? null) : null,
         m2m: null
     };
 

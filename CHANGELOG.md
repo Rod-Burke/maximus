@@ -29,6 +29,16 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
+## [v142] - 2026-11-26
+
+### Fix: M2M Studio "Other" Column JSONB Null Leak & Coding Task Safeguard
+- **Changes**:
+  - Fixed `manage-thoughts` (`metadata->>m2m` instead of `metadata->m2m`) and `extractMetadata()` in `supabase/functions/_shared/ai.ts` so non-M2M thoughts with JSON `null` no longer leak into M2M Studio's `Other` column; cleaned `m2m: null` on updates and deployed `manage-thoughts`, `ingest-thought`, and `voice-gateway`.
+  - Added defensive client-side `metadata.m2m` object filtering on `state.m2mEpisodes` in `warchart.js` and updated `sendM2mEpisodeToLifeInbox()` to preserve `coding_task` type and project if triggered on a coding task.
+  - Restored 7 coding tasks previously downgraded by `Send to Life Inbox` back to their proper `Maximus Core`, `Chat Ops`, and `Infrastructure` columns.
+
+---
+
 ## [v141] - 2026-11-26
 
 ### Task: War Chart 2-Row Column Headers & M2M "Send to Life Inbox" Transfer
