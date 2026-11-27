@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="warchart.css?v=142">
+    <link rel="stylesheet" href="warchart.css?v=143">
 </head>
 <body>
     <!-- Login Dialog (shown only when unauthenticated) -->
@@ -48,7 +48,7 @@
                 <div class="wc-brand">
                     <span class="wc-logo-sym" aria-hidden="true">✞</span>
                     <h1>War Chart</h1>
-                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v142</span>
+                    <span id="wc-version-badge" class="wc-version-badge" title="Maximus War Chart version">v143</span>
                 </div>
 
                 <!-- Board Switcher: Life War Chart <-> M2M Studio -->
@@ -196,7 +196,7 @@
             </div>
         </section>
 
-        <!-- Top Pane: Collapsible Weekly Calendar Strip (Life Board) -->
+        <!-- Top Pane: Collapsible Weekly Calendar Strip / Hourly Time-Blocking Grid (Life Board) -->
         <section id="wc-calendar-pane" class="wc-calendar-pane" aria-label="Weekly Calendar">
             <div class="wc-cal-toolbar">
                 <div class="wc-cal-nav">
@@ -212,9 +212,21 @@
                         </svg>
                     </button>
                     <h2 id="wc-cal-range-title" class="wc-cal-range-title">Week</h2>
+                    <div class="wc-segmented wc-cal-mode-seg" role="group" aria-label="Calendar display mode">
+                        <button type="button" class="wc-seg-btn active" data-cal-mode="strip" title="Compact 7-day strip">Strip</button>
+                        <button type="button" class="wc-seg-btn" data-cal-mode="hourly" title="Hourly Google Calendar time-blocking (4 AM – 10 PM)">📅 Hourly</button>
+                    </div>
+                    <div class="wc-cal-picker-wrap">
+                        <button type="button" id="wc-cal-picker-btn" class="wc-btn wc-btn-ghost wc-btn-xs" aria-expanded="false" aria-controls="wc-cal-picker-menu" title="Choose Google Calendars to display">Calendars ▾</button>
+                        <div id="wc-cal-picker-menu" class="wc-cal-picker-menu" hidden>
+                            <div class="wc-cal-picker-empty">Loading Google Calendars…</div>
+                        </div>
+                    </div>
+                    <button type="button" id="wc-cal-sync-btn" class="wc-btn wc-btn-ghost wc-btn-xs" title="Refresh Google Calendar events">↻ Sync</button>
+                    <span id="wc-cal-sync-status" class="wc-cal-sync-status" aria-live="polite"></span>
                 </div>
                 <div class="wc-cal-hint">
-                    <span>★ Top row = Front Line · Drag cards up onto a day to schedule</span>
+                    <span id="wc-cal-hint-text">★ Top row = Front Line · Drag cards up onto a day to schedule</span>
                     <span class="wc-legend">
                         <span><span class="wc-dot wc-dot-red"></span>Unscheduled</span>
                         <span><span class="wc-dot wc-dot-amber"></span>Scheduled</span>
@@ -224,8 +236,12 @@
                 </div>
             </div>
             <div id="wc-cal-grid" class="wc-cal-grid">
-                <!-- 7 day columns populated by warchart.js -->
+                <!-- 7 day columns populated by warchart.js (Strip mode) -->
             </div>
+            <div id="wc-cal-hourly" class="wc-cal-hourly" hidden>
+                <!-- 7-day hourly timeline (4 AM – 10 PM) populated by warchart.js (Hourly mode) -->
+            </div>
+            <div id="wc-cal-resizer" class="wc-cal-resizer" hidden role="separator" aria-orientation="horizontal" aria-label="Resize calendar height" title="Drag to resize calendar height"></div>
         </section>
 
         <!-- Bottom Pane: Horizontal Columns Board (Viewport-Locked Scroller) -->
@@ -340,6 +356,18 @@
                     <label for="wc-detail-location">Location</label>
                     <input type="text" id="wc-detail-location" placeholder="Optional location…">
                 </div>
+            </div>
+
+            <div id="wc-detail-block-bar" class="wc-detail-block-bar">
+                <span class="wc-detail-block-label">⏱ Quick Time Block:</span>
+                <div class="wc-detail-dur-pills">
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" data-dur="30">30m</button>
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" data-dur="60">1h</button>
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" data-dur="90">1.5h</button>
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" data-dur="120">2h</button>
+                    <button type="button" class="wc-btn wc-btn-ghost wc-btn-xs" data-dur="180">3h</button>
+                </div>
+                <button type="button" id="wc-detail-unblock-btn" class="wc-btn wc-btn-ghost wc-btn-xs" title="Remove time block from Google Calendar">Clear Time</button>
             </div>
 
             <div id="wc-detail-coding-section" class="wc-coding-section" hidden>
@@ -618,6 +646,6 @@
         </form>
     </dialog>
 
-    <script src="warchart.js?v=142"></script>
+    <script src="warchart.js?v=143"></script>
 </body>
 </html>

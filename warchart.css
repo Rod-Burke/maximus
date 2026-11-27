@@ -537,6 +537,492 @@ html, body {
     color: var(--wc-red);
 }
 
+/* --- PHASE 2: HOURLY GOOGLE CALENDAR TIME-BLOCKING GRID --- */
+.wc-cal-mode-seg {
+    margin-left: 0.45rem;
+}
+
+.wc-cal-picker-wrap {
+    position: relative;
+}
+
+.wc-cal-picker-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 60;
+    min-width: 240px;
+    max-width: 310px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #0f172a;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 10px;
+    padding: 0.45rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.wc-cal-picker-menu[hidden] {
+    display: none;
+}
+
+.wc-cal-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.32rem 0.45rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: var(--wc-text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.wc-cal-picker-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.wc-cal-picker-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.wc-cal-picker-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wc-cal-picker-badge {
+    font-size: 0.65rem;
+    color: var(--wc-text-dim);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.05rem 0.32rem;
+    border-radius: 4px;
+}
+
+.wc-cal-picker-empty {
+    font-size: 0.76rem;
+    color: var(--wc-text-dim);
+    padding: 0.35rem 0.45rem;
+}
+
+.wc-cal-sync-status {
+    font-size: 0.72rem;
+    color: var(--wc-text-dim);
+    margin-left: 0.15rem;
+}
+
+.wc-calendar-pane.is-hourly-mode {
+    padding-bottom: 0;
+}
+
+.wc-cal-hourly {
+    display: flex;
+    flex-direction: column;
+    height: 340px;
+    min-height: 180px;
+    max-height: 70vh;
+    border: 1px solid var(--wc-border);
+    border-radius: 8px;
+    background: rgba(9, 14, 28, 0.88);
+    overflow: hidden;
+}
+
+.wc-cal-hourly[hidden] {
+    display: none;
+}
+
+.wc-hourly-head {
+    display: grid;
+    grid-template-columns: 54px repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid var(--wc-border);
+    background: rgba(15, 23, 42, 0.96);
+    flex-shrink: 0;
+    padding-right: 10px;
+}
+
+.wc-hourly-gutter-head {
+    font-size: 0.65rem;
+    color: var(--wc-text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.wc-hourly-day-head {
+    padding: 0.28rem 0.45rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.wc-hourly-day-head:last-child {
+    border-right: none;
+}
+
+.wc-hourly-day-head.is-today {
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.wc-hourly-day-head.is-drop-target {
+    background: rgba(251, 191, 36, 0.18);
+    outline: 1px dashed var(--wc-gold);
+}
+
+.wc-hourly-day-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.74rem;
+    color: var(--wc-text-muted);
+}
+
+.wc-hourly-day-head.is-today .wc-cal-day-num {
+    background: var(--wc-gold);
+    color: #0b1120;
+}
+
+.wc-hourly-allday-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 46px;
+    overflow-y: auto;
+}
+
+.wc-hourly-allday-chip {
+    font-size: 0.68rem;
+    line-height: 1.25;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.22);
+    border-left: 2px solid var(--ev-color, #3b82f6);
+    color: var(--wc-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.wc-hourly-allday-chip.is-free {
+    background: rgba(148, 163, 184, 0.1);
+    border-left-style: dashed;
+    color: var(--wc-text-muted);
+}
+
+.wc-hourly-allday-chip.is-task {
+    background: rgba(245, 158, 11, 0.18);
+    border-left-color: var(--wc-amber);
+}
+
+.wc-hourly-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.wc-hourly-body {
+    display: grid;
+    grid-template-columns: 54px repeat(7, minmax(0, 1fr));
+    position: relative;
+    min-height: 792px;
+}
+
+.wc-hourly-gutter {
+    position: relative;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.65);
+    user-select: none;
+}
+
+.wc-hourly-time-label {
+    position: absolute;
+    left: 0;
+    right: 6px;
+    text-align: right;
+    font-size: 0.66rem;
+    color: var(--wc-text-dim);
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.wc-hourly-col {
+    position: relative;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background-image:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.07) 0px,
+            rgba(255, 255, 255, 0.07) 1px,
+            transparent 1px,
+            transparent 22px,
+            rgba(255, 255, 255, 0.03) 22px,
+            rgba(255, 255, 255, 0.03) 23px,
+            transparent 23px,
+            transparent 44px
+        );
+}
+
+.wc-hourly-col:last-child {
+    border-right: none;
+}
+
+.wc-hourly-col.is-today {
+    background-color: rgba(251, 191, 36, 0.03);
+}
+
+.wc-hourly-col.is-drop-target {
+    background-color: rgba(251, 191, 36, 0.07);
+}
+
+.wc-hourly-now-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #ef4444;
+    z-index: 15;
+    pointer-events: none;
+}
+
+.wc-hourly-now-line::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+}
+
+.wc-hourly-drop-ghost {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    border-radius: 6px;
+    border: 2px dashed var(--wc-gold);
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--wc-gold);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 5px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.wc-gcal-block {
+    position: absolute;
+    left: 2px;
+    right: 3px;
+    border-radius: 5px;
+    padding: 2px 5px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    overflow: hidden;
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-left: 3px solid var(--ev-color, #3b82f6);
+    color: #e2e8f0;
+    z-index: 2;
+    cursor: default;
+}
+
+.wc-gcal-block.is-free {
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px dashed rgba(148, 163, 184, 0.35);
+    border-left: 2px dashed var(--ev-color, #94a3b8);
+    color: var(--wc-text-muted);
+    z-index: 1;
+}
+
+.wc-cal-hourly.is-dragging .wc-gcal-block {
+    pointer-events: none;
+}
+
+.wc-gcal-block-time {
+    font-size: 0.64rem;
+    color: rgba(226, 232, 240, 0.75);
+    margin-right: 4px;
+}
+
+.wc-gcal-free-tag {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 3px;
+    padding: 0 3px;
+    margin-left: 4px;
+}
+
+.wc-tb-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 6px;
+    padding: 3px 6px 8px;
+    font-size: 0.72rem;
+    line-height: 1.22;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid var(--tb-color, #f59e0b);
+    border-left: 4px solid var(--tb-color, #f59e0b);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    color: var(--wc-text);
+    z-index: 5;
+    cursor: grab;
+    user-select: none;
+}
+
+.wc-tb-block:hover {
+    z-index: 12;
+    filter: brightness(1.08);
+}
+
+.wc-tb-block.is-completed {
+    border-color: var(--wc-green);
+    border-left-color: var(--wc-green);
+    opacity: 0.72;
+}
+
+.wc-tb-block.is-completed .wc-tb-title {
+    text-decoration: line-through;
+}
+
+.wc-tb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.wc-tb-time {
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: var(--wc-gold);
+    white-space: nowrap;
+}
+
+.wc-tb-title {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.wc-tb-unblock {
+    border: none;
+    background: transparent;
+    color: var(--wc-text-dim);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+}
+
+.wc-tb-block:hover .wc-tb-unblock {
+    opacity: 1;
+}
+
+.wc-tb-unblock:hover {
+    color: var(--wc-red);
+}
+
+.wc-tb-resize {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 7px;
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wc-tb-resize::after {
+    content: '';
+    width: 24px;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.wc-tb-block:hover .wc-tb-resize::after {
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.wc-cal-resizer {
+    height: 7px;
+    margin-top: 3px;
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wc-cal-resizer[hidden] {
+    display: none;
+}
+
+.wc-cal-resizer::after {
+    content: '';
+    width: 48px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.35);
+    transition: background 0.15s, width 0.15s;
+}
+
+.wc-cal-resizer:hover::after {
+    background: var(--wc-gold);
+    width: 72px;
+}
+
+.wc-detail-block-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 0.65rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--wc-border);
+}
+
+.wc-detail-block-label {
+    font-size: 0.76rem;
+    color: var(--wc-text-muted);
+    font-weight: 500;
+}
+
+.wc-detail-dur-pills {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 /* --- BOTTOM PANE: HORIZONTAL COLUMNS BOARD --- */
 .wc-board-shell {
     flex: 1;

@@ -2,8 +2,13 @@
 
 const CONFIG = {
     MANAGE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/manage-thoughts',
+    SYNC_GOOGLE_ENDPOINT: 'https://xbrhqaztkqtlruocvwal.supabase.co/functions/v1/sync-google',
     KEY: ''
 };
+
+const HOURLY_START_HOUR = 4;   // 4:00 AM
+const HOURLY_END_HOUR = 22;    // 10:00 PM
+const HOUR_HEIGHT_PX = 44;     // 44px per hour (22px per 30-min slot)
 
 const INBOX_KEY = '__inbox__';
 const M2M_COLUMN_RENDER_CAP = 60;
@@ -127,6 +132,9 @@ const state = {
     boardConfig: {
         columns: [],
         calendarCollapsed: false,
+        calendarMode: 'strip',     // 'strip' | 'hourly'
+        calendarHeight: 340,
+        enabledCalendarIds: null,  // null = default (primary + selected non-holiday)
         compactMode: false,
         inboxCollapsed: false,
         fillInSeeded: false,
@@ -151,6 +159,12 @@ const state = {
     m2mExpandedCols: new Set(),
     searchQuery: '',
     weekStart: getSundayOfWeek(new Date()),
+    gcalCalendars: [],
+    gcalEvents: [],
+    gcalLoadedWeek: null,
+    gcalLoading: false,
+    gcalError: null,
+    hourlyAutoScrolled: false,
     editingTaskId: null,
     editingM2mId: null,
     m2mActiveTab: 'research',
@@ -201,7 +215,14 @@ const dom = {
     calToday: document.getElementById('wc-cal-today'),
     calNext: document.getElementById('wc-cal-next'),
     calRangeTitle: document.getElementById('wc-cal-range-title'),
+    calPickerBtn: document.getElementById('wc-cal-picker-btn'),
+    calPickerMenu: document.getElementById('wc-cal-picker-menu'),
+    calSyncBtn: document.getElementById('wc-cal-sync-btn'),
+    calSyncStatus: document.getElementById('wc-cal-sync-status'),
+    calHintText: document.getElementById('wc-cal-hint-text'),
     calGrid: document.getElementById('wc-cal-grid'),
+    calHourly: document.getElementById('wc-cal-hourly'),
+    calResizer: document.getElementById('wc-cal-resizer'),
 
     // Board
     boardViewport: document.getElementById('wc-board-viewport'),
@@ -235,6 +256,8 @@ const dom = {
     detailStartTime: document.getElementById('wc-detail-start-time'),
     detailEndTime: document.getElementById('wc-detail-end-time'),
     detailLocation: document.getElementById('wc-detail-location'),
+    detailBlockBar: document.getElementById('wc-detail-block-bar'),
+    detailUnblockBtn: document.getElementById('wc-detail-unblock-btn'),
     detailCodingSection: document.getElementById('wc-detail-coding-section'),
     detailCtStatus: document.getElementById('wc-detail-ct-status'),
     detailCtComplexity: document.getElementById('wc-detail-ct-complexity'),
@@ -576,6 +599,22 @@ async function apiCall(payload) {
     return res.json();
 }
 
+async function syncGoogleCall(payload) {
+    const res = await fetch(CONFIG.SYNC_GOOGLE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-brain-key': CONFIG.KEY
+        },
+        body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data;
+}
+
 // --- AUTH ---
 function initAuth() {
     const token = localStorage.getItem('maximus_session_token');
@@ -700,6 +739,13 @@ async function loadAllData() {
                     hidden: Boolean(c.hidden)
                 })),
                 calendarCollapsed: Boolean(wcConfigThought.metadata.calendarCollapsed),
+                calendarMode: wcConfigThought.metadata.calendarMode === 'hourly' ? 'hourly' : 'strip',
+                calendarHeight: Number.isFinite(Number(wcConfigThought.metadata.calendarHeight))
+                    ? Math.max(180, Math.min(680, Number(wcConfigThought.metadata.calendarHeight)))
+                    : 340,
+                enabledCalendarIds: Array.isArray(wcConfigThought.metadata.enabledCalendarIds)
+                    ? wcConfigThought.metadata.enabledCalendarIds
+                    : null,
                 compactMode: Boolean(wcConfigThought.metadata.compactMode),
                 inboxCollapsed: Boolean(wcConfigThought.metadata.inboxCollapsed),
                 fillInSeeded: Boolean(wcConfigThought.metadata.fillInSeeded),
@@ -769,6 +815,9 @@ async function loadAllData() {
         applyBoardModeUI();
         renderAll();
         setSaveStatus('saved', `Synced (${state.thoughts.length + state.m2mEpisodes.length})`);
+        if (state.boardConfig.calendarMode === 'hourly' && !state.boardConfig.calendarCollapsed) {
+            loadGoogleCalendarWeek(false);
+        }
     } catch (err) {
         if (err.message !== 'Unauthorized') {
             setSaveStatus('error', 'Load failed');
@@ -783,6 +832,9 @@ async function saveBoardConfig() {
         type: 'warchart_config',
         columns: state.boardConfig.columns,
         calendarCollapsed: state.boardConfig.calendarCollapsed,
+        calendarMode: state.boardConfig.calendarMode,
+        calendarHeight: state.boardConfig.calendarHeight,
+        enabledCalendarIds: state.boardConfig.enabledCalendarIds,
         compactMode: state.boardConfig.compactMode,
         inboxCollapsed: state.boardConfig.inboxCollapsed,
         fillInSeeded: state.boardConfig.fillInSeeded,
@@ -970,6 +1022,23 @@ function applyBoardModeUI() {
 
     dom.calPane.classList.toggle('is-collapsed', isM2m || state.boardConfig.calendarCollapsed);
     dom.toggleCalBtn.classList.toggle('active', !state.boardConfig.calendarCollapsed);
+
+    const isHourly = state.boardConfig.calendarMode === 'hourly';
+    dom.calPane.classList.toggle('is-hourly-mode', isHourly);
+    dom.calGrid.hidden = isHourly;
+    dom.calHourly.hidden = !isHourly;
+    dom.calResizer.hidden = !isHourly;
+    if (isHourly) {
+        dom.calHourly.style.height = `${state.boardConfig.calendarHeight || 340}px`;
+    }
+    document.querySelectorAll('[data-cal-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.calMode === state.boardConfig.calendarMode);
+    });
+    if (dom.calHintText) {
+        dom.calHintText.textContent = isHourly
+            ? 'Drag cards onto any 30-min slot to time-block · Drag bottom edge to resize · Free events flow in parallel'
+            : '★ Top row = Front Line · Drag cards up onto a day to schedule';
+    }
     dom.app.classList.toggle('is-compact', state.boardConfig.compactMode);
     dom.compactBtn.classList.toggle('active', state.boardConfig.compactMode);
     dom.app.classList.toggle('is-quick-delete', state.boardConfig.quickDeleteMode);
@@ -1007,6 +1076,11 @@ function renderCalendar() {
         year: 'numeric'
     });
     dom.calRangeTitle.textContent = `${startLabel} – ${endLabel}`;
+
+    if (state.boardConfig.calendarMode === 'hourly') {
+        renderHourlyCalendar();
+        return;
+    }
 
     const itemsByDate = new Map();
     for (let i = 0; i < 7; i++) {
@@ -1124,6 +1198,561 @@ function renderCalendar() {
         });
 
         dom.calGrid.appendChild(dayEl);
+    }
+}
+
+// --- PHASE 2: HOURLY GOOGLE CALENDAR TIME-BLOCKING (4 AM – 10 PM) ---
+function parseTimeToMinutes(hhmm) {
+    if (!hhmm || typeof hhmm !== 'string') return null;
+    const parts = hhmm.split(':');
+    if (parts.length < 2) return null;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h * 60 + m;
+}
+
+function minutesToTimeStr(totalMins) {
+    const clamped = Math.max(0, Math.min(23 * 60 + 45, Math.round(totalMins)));
+    const h = Math.floor(clamped / 60);
+    const m = clamped % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function formatHourLabel(hour) {
+    if (hour === 0) return '12 AM';
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return '12 PM';
+    return `${hour - 12} PM`;
+}
+
+function getColumnColorForTask(task) {
+    const colKey = getTaskColumnKey(task);
+    const col = state.boardConfig.columns.find(c => c.key === colKey);
+    return col?.color || '#f59e0b';
+}
+
+function getTaskTimeBlock(task) {
+    const m = task?.metadata || {};
+    if (m.time_block?.date && m.time_block?.start_time && m.time_block?.end_time) {
+        return m.time_block;
+    }
+    if (m.due_date && m.start_time && m.end_time) {
+        return { date: m.due_date, start_time: m.start_time, end_time: m.end_time };
+    }
+    return null;
+}
+
+function setCalSyncStatus(text, isError = false) {
+    if (!dom.calSyncStatus) return;
+    dom.calSyncStatus.textContent = text;
+    dom.calSyncStatus.style.color = isError ? '#f87171' : '';
+}
+
+async function loadGoogleCalendarWeek(force = false) {
+    const weekKey = getLocalDateStr(state.weekStart);
+    if (!force && state.gcalLoadedWeek === weekKey && !state.gcalError) {
+        return;
+    }
+    if (state.gcalLoading) return;
+    state.gcalLoading = true;
+    state.gcalError = null;
+    setCalSyncStatus('Syncing Google Cal…');
+
+    try {
+        const startLocal = new Date(state.weekStart.getFullYear(), state.weekStart.getMonth(), state.weekStart.getDate(), 0, 0, 0);
+        const endLocal = new Date(state.weekStart.getFullYear(), state.weekStart.getMonth(), state.weekStart.getDate() + 7, 0, 0, 0);
+        const data = await syncGoogleCall({
+            action: 'list_calendar_events',
+            timeMin: startLocal.toISOString(),
+            timeMax: endLocal.toISOString(),
+            calendarIds: state.boardConfig.enabledCalendarIds
+        });
+        state.gcalCalendars = Array.isArray(data.calendars) ? data.calendars : [];
+        state.gcalEvents = Array.isArray(data.events) ? data.events : [];
+        state.gcalLoadedWeek = weekKey;
+        renderCalendarPicker();
+        setCalSyncStatus(`✓ ${state.gcalEvents.length} events`);
+        if (state.boardConfig.calendarMode === 'hourly') {
+            renderHourlyCalendar();
+        }
+    } catch (err) {
+        state.gcalError = err.message || 'Calendar sync failed';
+        const isExpired = /invalid_grant|refresh Google token/i.test(state.gcalError);
+        setCalSyncStatus(isExpired ? '⚠ Google Auth expired (run refresh_google_auth.bat)' : '⚠ Cal sync failed', true);
+        console.warn('Google Calendar load error:', err);
+    } finally {
+        state.gcalLoading = false;
+    }
+}
+
+function renderCalendarPicker() {
+    if (!dom.calPickerMenu) return;
+    if (!state.gcalCalendars.length) {
+        dom.calPickerMenu.innerHTML = '<div class="wc-cal-picker-empty">Click ↻ Sync to load Google Calendars</div>';
+        return;
+    }
+    const enabledSet = Array.isArray(state.boardConfig.enabledCalendarIds)
+        ? new Set(state.boardConfig.enabledCalendarIds)
+        : new Set(
+            state.gcalCalendars
+                .filter(c => c.primary || (c.selected && !String(c.id).includes('#holiday@')))
+                .map(c => c.id)
+        );
+
+    dom.calPickerMenu.innerHTML = '';
+    for (const cal of state.gcalCalendars) {
+        const label = document.createElement('label');
+        label.className = 'wc-cal-picker-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = enabledSet.has(cal.id);
+        cb.addEventListener('change', async () => {
+            if (cb.checked) enabledSet.add(cal.id);
+            else enabledSet.delete(cal.id);
+            state.boardConfig.enabledCalendarIds = Array.from(enabledSet);
+            await saveBoardConfig();
+            loadGoogleCalendarWeek(true);
+        });
+        const dot = document.createElement('span');
+        dot.className = 'wc-cal-picker-dot';
+        dot.style.backgroundColor = cal.backgroundColor || '#3b82f6';
+        const name = document.createElement('span');
+        name.className = 'wc-cal-picker-name';
+        name.textContent = cal.summary || cal.id;
+        label.appendChild(cb);
+        label.appendChild(dot);
+        label.appendChild(name);
+        if (cal.primary) {
+            const badge = document.createElement('span');
+            badge.className = 'wc-cal-picker-badge';
+            badge.textContent = 'Primary';
+            label.appendChild(badge);
+        }
+        dom.calPickerMenu.appendChild(label);
+    }
+}
+
+function extractLocalDateAndMins(isoStr) {
+    if (!isoStr) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoStr)) {
+        return { dateStr: isoStr, mins: null };
+    }
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return null;
+    return { dateStr: getLocalDateStr(d), mins: d.getHours() * 60 + d.getMinutes() };
+}
+
+function computeSlotFromY(yPx, colEl) {
+    const rect = colEl.getBoundingClientRect();
+    const relY = Math.max(0, yPx - rect.top);
+    const totalHours = HOURLY_END_HOUR - HOURLY_START_HOUR;
+    const rawMins = HOURLY_START_HOUR * 60 + (relY / HOUR_HEIGHT_PX) * 60;
+    const snapped = Math.round(rawMins / 30) * 30;
+    const minStart = HOURLY_START_HOUR * 60;
+    const maxStart = (HOURLY_START_HOUR + totalHours) * 60 - 30;
+    return Math.max(minStart, Math.min(maxStart, snapped));
+}
+
+async function scheduleTaskTimeBlock(taskId, dateStr, startMins, durationMins = 60) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+    const dur = Math.max(15, Math.min(480, durationMins));
+    const endMins = Math.min(23 * 60 + 45, startMins + dur);
+    const startTime = minutesToTimeStr(startMins);
+    const endTime = minutesToTimeStr(endMins);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+
+    const metaPatch = {
+        due_date: dateStr,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: false,
+        timezone: tz,
+        time_block: {
+            date: dateStr,
+            start_time: startTime,
+            end_time: endTime,
+            duration_min: endMins - startMins
+        }
+    };
+
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+}
+
+async function clearTaskTimeBlock(taskId) {
+    const task = state.thoughts.find(t => t.id === taskId);
+    if (!task) return;
+    const metaPatch = {
+        due_date: null,
+        start_time: null,
+        end_time: null,
+        all_day: true,
+        time_block: null
+    };
+    task.metadata = { ...(task.metadata || {}), ...metaPatch };
+    delete task.metadata.time_block;
+    renderAll();
+    await trackSave(apiCall({ action: 'update', id: taskId, metadata: metaPatch }));
+}
+
+function renderHourlyCalendar() {
+    const start = state.weekStart;
+    const todayStr = getLocalDateStr();
+    const totalHours = HOURLY_END_HOUR - HOURLY_START_HOUR;
+    const bodyHeight = totalHours * HOUR_HEIGHT_PX;
+    const prevScrollTop = dom.calHourly.querySelector('.wc-hourly-scroll')?.scrollTop ?? null;
+
+    const dayDates = [];
+    const daySet = new Set();
+    for (let i = 0; i < 7; i++) {
+        const d = addDays(start, i);
+        const ds = getLocalDateStr(d);
+        dayDates.push({ date: d, dateStr: ds });
+        daySet.add(ds);
+    }
+
+    // Collect Maximus time-blocked tasks + date-only tasks for this week
+    const timeBlocksByDate = new Map();
+    const allDayTasksByDate = new Map();
+    const activeBlockThoughtIds = new Set();
+    const activeOpenBrainEventIds = new Set();
+    dayDates.forEach(({ dateStr }) => {
+        timeBlocksByDate.set(dateStr, []);
+        allDayTasksByDate.set(dateStr, []);
+    });
+
+    const q = state.searchQuery.toLowerCase();
+    for (const t of state.thoughts) {
+        const type = getTaskType(t);
+        if (type === 'task' && state.scopeFilter === 'coding') continue;
+        if (type === 'coding_task' && state.scopeFilter === 'general') continue;
+        if (q) {
+            const hay = `${t.metadata?.summary || ''} ${t.content || ''} ${t.metadata?.notes || ''}`.toLowerCase();
+            if (!hay.includes(q)) continue;
+        }
+        if (t.metadata?.google_event_id) activeOpenBrainEventIds.add(t.metadata.google_event_id);
+
+        const tb = getTaskTimeBlock(t);
+        if (tb && daySet.has(tb.date)) {
+            timeBlocksByDate.get(tb.date).push({ task: t, tb });
+            activeBlockThoughtIds.add(t.id);
+        } else if (t.metadata?.due_date && daySet.has(t.metadata.due_date)) {
+            allDayTasksByDate.get(t.metadata.due_date).push(t);
+        }
+    }
+
+    // Partition Google Calendar events into all-day vs timed, deduplicating Maximus blocks
+    const gcalAllDayByDate = new Map();
+    const gcalTimedByDate = new Map();
+    dayDates.forEach(({ dateStr }) => {
+        gcalAllDayByDate.set(dateStr, []);
+        gcalTimedByDate.set(dateStr, []);
+    });
+
+    for (const ev of state.gcalEvents) {
+        if (ev.maximusThoughtId && activeBlockThoughtIds.has(ev.maximusThoughtId)) continue;
+        if (activeOpenBrainEventIds.has(ev.id)) continue;
+        if (q && !(ev.summary || '').toLowerCase().includes(q)) continue;
+
+        const sInfo = extractLocalDateAndMins(ev.start);
+        if (!sInfo || !daySet.has(sInfo.dateStr)) continue;
+
+        if (ev.allDay || sInfo.mins === null) {
+            gcalAllDayByDate.get(sInfo.dateStr).push(ev);
+        } else {
+            const eInfo = extractLocalDateAndMins(ev.end);
+            const endMins = (eInfo && eInfo.dateStr === sInfo.dateStr && eInfo.mins !== null)
+                ? eInfo.mins
+                : Math.min(24 * 60, sInfo.mins + 60);
+            gcalTimedByDate.get(sInfo.dateStr).push({ ...ev, startMins: sInfo.mins, endMins });
+        }
+    }
+
+    dom.calHourly.innerHTML = '';
+
+    // 1. Sticky Day Header + All-Day Row
+    const headEl = document.createElement('div');
+    headEl.className = 'wc-hourly-head';
+    headEl.innerHTML = `<div class="wc-hourly-gutter-head">ALL<br>DAY</div>`;
+
+    for (const { date, dateStr } of dayDates) {
+        const isToday = dateStr === todayStr;
+        const dh = document.createElement('div');
+        dh.className = `wc-hourly-day-head${isToday ? ' is-today' : ''}`;
+        dh.dataset.date = dateStr;
+
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayNum = date.getDate();
+        dh.innerHTML = `
+            <div class="wc-hourly-day-top">
+                <span class="wc-cal-day-name">${dayName}</span>
+                <span class="wc-cal-day-num">${dayNum}</span>
+            </div>
+            <div class="wc-hourly-allday-list"></div>
+        `;
+        const allDayList = dh.querySelector('.wc-hourly-allday-list');
+
+        for (const ev of (gcalAllDayByDate.get(dateStr) || [])) {
+            const chip = document.createElement('div');
+            chip.className = `wc-hourly-allday-chip${ev.transparency === 'free' ? ' is-free' : ''}`;
+            chip.style.setProperty('--ev-color', ev.calendarColor || '#3b82f6');
+            chip.textContent = ev.summary;
+            chip.title = `${ev.summary} (${ev.calendarName}${ev.transparency === 'free' ? ' · Free' : ''})`;
+            allDayList.appendChild(chip);
+        }
+
+        for (const task of (allDayTasksByDate.get(dateStr) || [])) {
+            const chip = document.createElement('div');
+            chip.className = 'wc-hourly-allday-chip is-task';
+            chip.textContent = getTaskTitle(task);
+            chip.title = `${getTaskTitle(task)} (click to edit or drag onto an hour slot)`;
+            chip.draggable = true;
+            chip.addEventListener('click', () => openTaskDetailDialog(task.id));
+            chip.addEventListener('dragstart', (e) => {
+                state.drag = { mode: 'cal-item', id: task.id, sourceColKey: null };
+                dom.calHourly.classList.add('is-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', task.id);
+            });
+            chip.addEventListener('dragend', () => {
+                dom.calHourly.classList.remove('is-dragging');
+                clearDragState();
+            });
+            allDayList.appendChild(chip);
+        }
+
+        // Allow dropping onto All-Day header to schedule date-only
+        dh.addEventListener('dragover', (e) => {
+            if (!['card', 'cal-item', 'time-block'].includes(state.drag.mode)) return;
+            e.preventDefault();
+            dh.classList.add('is-drop-target');
+        });
+        dh.addEventListener('dragleave', (e) => {
+            if (!dh.contains(e.relatedTarget)) dh.classList.remove('is-drop-target');
+        });
+        dh.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dh.classList.remove('is-drop-target');
+            const taskId = state.drag.id || e.dataTransfer.getData('text/plain');
+            if (taskId) updateTaskScheduleDate(taskId, dateStr);
+            clearDragState();
+        });
+
+        headEl.appendChild(dh);
+    }
+    dom.calHourly.appendChild(headEl);
+
+    // 2. Scrollable 4 AM – 10 PM Timeline Body
+    const scrollEl = document.createElement('div');
+    scrollEl.className = 'wc-hourly-scroll';
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'wc-hourly-body';
+    bodyEl.style.height = `${bodyHeight}px`;
+
+    // Left time gutter
+    const gutterEl = document.createElement('div');
+    gutterEl.className = 'wc-hourly-gutter';
+    for (let h = HOURLY_START_HOUR; h < HOURLY_END_HOUR; h++) {
+        const lbl = document.createElement('div');
+        lbl.className = 'wc-hourly-time-label';
+        lbl.style.top = `${(h - HOURLY_START_HOUR) * HOUR_HEIGHT_PX}px`;
+        lbl.textContent = formatHourLabel(h);
+        gutterEl.appendChild(lbl);
+    }
+    bodyEl.appendChild(gutterEl);
+
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    for (const { dateStr } of dayDates) {
+        const isToday = dateStr === todayStr;
+        const colEl = document.createElement('div');
+        colEl.className = `wc-hourly-col${isToday ? ' is-today' : ''}`;
+        colEl.dataset.date = dateStr;
+
+        // Current time red line
+        if (isToday && nowMins >= HOURLY_START_HOUR * 60 && nowMins <= HOURLY_END_HOUR * 60) {
+            const nowLine = document.createElement('div');
+            nowLine.className = 'wc-hourly-now-line';
+            nowLine.style.top = `${((nowMins - HOURLY_START_HOUR * 60) / 60) * HOUR_HEIGHT_PX}px`;
+            colEl.appendChild(nowLine);
+        }
+
+        // External Google Calendar Events (Free vs Busy)
+        const gcalList = gcalTimedByDate.get(dateStr) || [];
+        for (const ev of gcalList) {
+            const clampedStart = Math.max(HOURLY_START_HOUR * 60, ev.startMins);
+            const clampedEnd = Math.min(HOURLY_END_HOUR * 60, ev.endMins);
+            if (clampedEnd <= clampedStart) continue;
+
+            const topPx = ((clampedStart - HOURLY_START_HOUR * 60) / 60) * HOUR_HEIGHT_PX;
+            const heightPx = Math.max(18, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT_PX);
+            const isFree = ev.transparency === 'free';
+
+            const block = document.createElement('div');
+            block.className = `wc-gcal-block${isFree ? ' is-free' : ''}`;
+            block.style.top = `${topPx}px`;
+            block.style.height = `${heightPx}px`;
+            block.style.setProperty('--ev-color', ev.calendarColor || '#3b82f6');
+            const timeTxt = format12HourTime(minutesToTimeStr(ev.startMins));
+            block.innerHTML = `<span class="wc-gcal-block-time">${escapeHtml(timeTxt)}</span>${escapeHtml(ev.summary)}${isFree ? '<span class="wc-gcal-free-tag">Free</span>' : ''}`;
+            block.title = `${ev.summary}\n${timeTxt} – ${format12HourTime(minutesToTimeStr(ev.endMins))}\nCalendar: ${ev.calendarName}${isFree ? ' (Free — flows in parallel)' : ' (Busy)'}`;
+            colEl.appendChild(block);
+        }
+
+        // Maximus Time Blocks
+        const tbList = timeBlocksByDate.get(dateStr) || [];
+        for (const { task, tb } of tbList) {
+            const sMins = parseTimeToMinutes(tb.start_time);
+            const eMins = parseTimeToMinutes(tb.end_time);
+            if (sMins === null || eMins === null) continue;
+            const clampedStart = Math.max(HOURLY_START_HOUR * 60, sMins);
+            const clampedEnd = Math.min(HOURLY_END_HOUR * 60, Math.max(sMins + 15, eMins));
+            if (clampedEnd <= clampedStart) continue;
+
+            const topPx = ((clampedStart - HOURLY_START_HOUR * 60) / 60) * HOUR_HEIGHT_PX;
+            const heightPx = Math.max(24, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT_PX);
+            const completed = isTaskCompleted(task);
+            const color = getColumnColorForTask(task);
+
+            const block = document.createElement('div');
+            block.className = `wc-tb-block${completed ? ' is-completed' : ''}`;
+            block.style.top = `${topPx}px`;
+            block.style.height = `${heightPx}px`;
+            block.style.setProperty('--tb-color', color);
+            block.draggable = true;
+            block.dataset.taskId = task.id;
+
+            const timeLabel = `${format12HourTime(tb.start_time)} – ${format12HourTime(tb.end_time)}`;
+            block.innerHTML = `
+                <div class="wc-tb-head">
+                    <span class="wc-tb-time">${completed ? '✓ ' : '⏱ '}${escapeHtml(timeLabel)}</span>
+                    <button type="button" class="wc-tb-unblock" title="Remove time block from calendar" aria-label="Unblock">&times;</button>
+                </div>
+                <div class="wc-tb-title">${escapeHtml(getTaskTitle(task))}</div>
+                <div class="wc-tb-resize" title="Drag to resize duration"></div>
+            `;
+
+            block.addEventListener('click', (e) => {
+                if (e.target.closest('.wc-tb-unblock')) {
+                    e.stopPropagation();
+                    clearTaskTimeBlock(task.id);
+                    return;
+                }
+                if (e.target.closest('.wc-tb-resize')) return;
+                openTaskDetailDialog(task.id);
+            });
+
+            block.addEventListener('dragstart', (e) => {
+                if (e.target.closest('.wc-tb-resize')) {
+                    e.preventDefault();
+                    return;
+                }
+                state.drag = { mode: 'time-block', id: task.id, sourceColKey: null, durationMins: Math.max(15, eMins - sMins) };
+                dom.calHourly.classList.add('is-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', task.id);
+            });
+
+            block.addEventListener('dragend', () => {
+                dom.calHourly.classList.remove('is-dragging');
+                clearDragState();
+            });
+
+            // Bottom resize handle (15-min snap)
+            const resizeEl = block.querySelector('.wc-tb-resize');
+            resizeEl.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                resizeEl.setPointerCapture(e.pointerId);
+                const startY = e.clientY;
+                const origDur = Math.max(15, eMins - sMins);
+                let liveDur = origDur;
+
+                const onMove = (ev) => {
+                    const deltaPx = ev.clientY - startY;
+                    const deltaMins = Math.round(((deltaPx / HOUR_HEIGHT_PX) * 60) / 15) * 15;
+                    liveDur = Math.max(15, Math.min(HOURLY_END_HOUR * 60 - sMins, origDur + deltaMins));
+                    block.style.height = `${Math.max(24, (liveDur / 60) * HOUR_HEIGHT_PX)}px`;
+                    const timeEl = block.querySelector('.wc-tb-time');
+                    if (timeEl) {
+                        timeEl.textContent = `${completed ? '✓ ' : '⏱ '}${format12HourTime(tb.start_time)} – ${format12HourTime(minutesToTimeStr(sMins + liveDur))}`;
+                    }
+                };
+
+                const onUp = () => {
+                    resizeEl.removeEventListener('pointermove', onMove);
+                    resizeEl.removeEventListener('pointerup', onUp);
+                    resizeEl.removeEventListener('pointercancel', onUp);
+                    if (liveDur !== origDur) {
+                        scheduleTaskTimeBlock(task.id, dateStr, sMins, liveDur);
+                    }
+                };
+
+                resizeEl.addEventListener('pointermove', onMove);
+                resizeEl.addEventListener('pointerup', onUp);
+                resizeEl.addEventListener('pointercancel', onUp);
+            });
+
+            colEl.appendChild(block);
+        }
+
+        // Drop target for War Chart cards, calendar chips, or moving time blocks
+        let ghostEl = null;
+        colEl.addEventListener('dragover', (e) => {
+            if (!['card', 'cal-item', 'time-block'].includes(state.drag.mode)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            colEl.classList.add('is-drop-target');
+            const snapMins = computeSlotFromY(e.clientY, colEl);
+            const dur = state.drag.durationMins || 60;
+            if (!ghostEl) {
+                ghostEl = document.createElement('div');
+                ghostEl.className = 'wc-hourly-drop-ghost';
+                colEl.appendChild(ghostEl);
+            }
+            ghostEl.style.top = `${((snapMins - HOURLY_START_HOUR * 60) / 60) * HOUR_HEIGHT_PX}px`;
+            ghostEl.style.height = `${Math.max(22, (dur / 60) * HOUR_HEIGHT_PX)}px`;
+            ghostEl.textContent = `${format12HourTime(minutesToTimeStr(snapMins))} – ${format12HourTime(minutesToTimeStr(snapMins + dur))}`;
+        });
+
+        colEl.addEventListener('dragleave', (e) => {
+            if (!colEl.contains(e.relatedTarget)) {
+                colEl.classList.remove('is-drop-target');
+                if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+            }
+        });
+
+        colEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            colEl.classList.remove('is-drop-target');
+            if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+            dom.calHourly.classList.remove('is-dragging');
+            const taskId = state.drag.id || e.dataTransfer.getData('text/plain');
+            if (taskId && ['card', 'cal-item', 'time-block'].includes(state.drag.mode)) {
+                const snapMins = computeSlotFromY(e.clientY, colEl);
+                const dur = state.drag.durationMins || 60;
+                scheduleTaskTimeBlock(taskId, dateStr, snapMins, dur);
+            }
+            clearDragState();
+        });
+
+        bodyEl.appendChild(colEl);
+    }
+
+    scrollEl.appendChild(bodyEl);
+    dom.calHourly.appendChild(scrollEl);
+
+    if (prevScrollTop !== null) {
+        scrollEl.scrollTop = prevScrollTop;
+    } else if (!state.hourlyAutoScrolled) {
+        // Default scroll near 6:30 AM (so 4 AM – 6 AM is one flick up, work day is center stage)
+        scrollEl.scrollTop = Math.max(0, (6.5 - HOURLY_START_HOUR) * HOUR_HEIGHT_PX);
+        state.hourlyAutoScrolled = true;
     }
 }
 
@@ -3110,6 +3739,31 @@ dom.detailClearDate.addEventListener('click', () => { dom.detailDueDate.value = 
 dom.detailClose.addEventListener('click', () => dom.detailDialog.close());
 dom.detailCancel.addEventListener('click', () => dom.detailDialog.close());
 
+if (dom.detailBlockBar) {
+    dom.detailBlockBar.querySelectorAll('[data-dur]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const durMins = parseInt(btn.dataset.dur, 10) || 60;
+            if (!dom.detailDueDate.value) {
+                dom.detailDueDate.value = getLocalDateStr();
+            }
+            let sMins = parseTimeToMinutes(dom.detailStartTime.value);
+            if (sMins === null) {
+                const now = new Date();
+                sMins = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30;
+                sMins = Math.max(HOURLY_START_HOUR * 60, Math.min(21 * 60, sMins));
+                dom.detailStartTime.value = minutesToTimeStr(sMins);
+            }
+            dom.detailEndTime.value = minutesToTimeStr(Math.min(23 * 60 + 45, sMins + durMins));
+        });
+    });
+}
+if (dom.detailUnblockBtn) {
+    dom.detailUnblockBtn.addEventListener('click', () => {
+        dom.detailStartTime.value = '';
+        dom.detailEndTime.value = '';
+    });
+}
+
 dom.detailForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const taskId = state.editingTaskId;
@@ -3137,6 +3791,17 @@ dom.detailForm.addEventListener('submit', async (e) => {
         notes: dom.detailNotes.value.trim() || null,
         project: assignedProject
     };
+
+    if ((type === 'task' || type === 'coding_task') && metaPatch.due_date && metaPatch.start_time && metaPatch.end_time) {
+        metaPatch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+        metaPatch.time_block = {
+            date: metaPatch.due_date,
+            start_time: metaPatch.start_time,
+            end_time: metaPatch.end_time
+        };
+    } else if (type === 'task' || type === 'coding_task') {
+        metaPatch.time_block = null;
+    }
 
     if (type === 'task') {
         metaPatch.status = dom.detailTaskStatus.value;
@@ -4051,19 +4716,91 @@ dom.refreshBtn.addEventListener('click', loadAllData);
 dom.calPrev.addEventListener('click', () => {
     state.weekStart = addDays(state.weekStart, -7);
     renderCalendar();
+    if (state.boardConfig.calendarMode === 'hourly') loadGoogleCalendarWeek(false);
 });
 
 dom.calToday.addEventListener('click', () => {
     state.weekStart = getSundayOfWeek(new Date());
     renderCalendar();
+    if (state.boardConfig.calendarMode === 'hourly') loadGoogleCalendarWeek(false);
 });
 
 dom.calNext.addEventListener('click', () => {
     state.weekStart = addDays(state.weekStart, 7);
     renderCalendar();
+    if (state.boardConfig.calendarMode === 'hourly') loadGoogleCalendarWeek(false);
 });
 
-window.addEventListener('dragend', clearDragState);
+// Phase 2 Calendar Mode (Strip | Hourly), Calendar Picker, Sync & Height Resizer
+document.querySelectorAll('[data-cal-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const mode = btn.dataset.calMode === 'hourly' ? 'hourly' : 'strip';
+        if (state.boardConfig.calendarMode === mode) return;
+        state.boardConfig.calendarMode = mode;
+        applyBoardModeUI();
+        renderCalendar();
+        saveBoardConfig();
+        if (mode === 'hourly') loadGoogleCalendarWeek(false);
+    });
+});
+
+if (dom.calSyncBtn) {
+    dom.calSyncBtn.addEventListener('click', () => loadGoogleCalendarWeek(true));
+}
+
+if (dom.calPickerBtn && dom.calPickerMenu) {
+    dom.calPickerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = dom.calPickerMenu.hidden;
+        dom.calPickerMenu.hidden = !willOpen;
+        dom.calPickerBtn.setAttribute('aria-expanded', String(willOpen));
+        if (willOpen && !state.gcalCalendars.length) {
+            loadGoogleCalendarWeek(true);
+        }
+    });
+    document.addEventListener('click', (e) => {
+        if (!dom.calPickerMenu.hidden && !dom.calPickerMenu.contains(e.target) && e.target !== dom.calPickerBtn) {
+            dom.calPickerMenu.hidden = true;
+            dom.calPickerBtn.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
+
+if (dom.calResizer) {
+    dom.calResizer.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        dom.calResizer.setPointerCapture(e.pointerId);
+        const startY = e.clientY;
+        const startH = dom.calHourly.getBoundingClientRect().height;
+        let finalH = startH;
+
+        const onMove = (ev) => {
+            finalH = Math.max(180, Math.min(680, Math.round(startH + (ev.clientY - startY))));
+            dom.calHourly.style.height = `${finalH}px`;
+        };
+        const onUp = () => {
+            dom.calResizer.removeEventListener('pointermove', onMove);
+            dom.calResizer.removeEventListener('pointerup', onUp);
+            dom.calResizer.removeEventListener('pointercancel', onUp);
+            state.boardConfig.calendarHeight = finalH;
+            saveBoardConfig();
+        };
+        dom.calResizer.addEventListener('pointermove', onMove);
+        dom.calResizer.addEventListener('pointerup', onUp);
+        dom.calResizer.addEventListener('pointercancel', onUp);
+    });
+}
+
+window.addEventListener('dragstart', () => {
+    if (['card', 'cal-item', 'time-block'].includes(state.drag.mode)) {
+        dom.calHourly?.classList.add('is-dragging');
+    }
+});
+
+window.addEventListener('dragend', () => {
+    dom.calHourly?.classList.remove('is-dragging');
+    clearDragState();
+});
 
 // --- BOOTSTRAP ---
 populateM2mDropdowns();

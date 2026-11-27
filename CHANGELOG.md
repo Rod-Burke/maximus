@@ -29,6 +29,16 @@ This file contains the persistent record of all completed tasks, architectural u
 
 ---
 
+## [v143] - 2026-11-26
+
+### Feature: Phase 2 — Hourly Google Calendar Time-Blocking (Retiring Reclaim)
+- **Changes**:
+  - Added `list_calendar_events` (multi-calendar with calendar colors, expanded recurring events, and Free/Busy `transparency` flags), `push_time_block` (syncs `⏱ Title` and keeps completed blocks as `✓ Title`), and `delete_time_block` to `supabase/functions/sync-google/index.ts`, and wired automatic time-block sync/cleanup into `supabase/functions/manage-thoughts/index.ts`.
+  - Upgraded the War Chart Calendar pane (`warchart.html`, `warchart.css`, `warchart.js`) with a **`Strip` | `📅 Hourly`** mode toggle (4:00 AM – 10:00 PM timeline), sticky All-Day/date-only tray, live red current-time indicator, draggable height resizer (`#wc-cal-resizer`), and **`Calendars ▾`** multi-calendar picker persisted in `warchart_config`.
+  - Added Free-vs-Busy parallel rendering (events marked Free render dashed/muted and allow War Chart cards to drop right over them), 30-minute drag-to-time-block with drop preview ghost, drag-to-move blocks across hours/days, 15-minute bottom resize handle, and Quick Time Block duration pills (`30m`–`3h`) in Task Details.
+
+---
+
 ## [v142] - 2026-11-26
 
 ### Fix: M2M Studio "Other" Column JSONB Null Leak & Coding Task Safeguard
